@@ -227,11 +227,11 @@ consegui:
    rodei (ver item 4).
 4. **`npm run db:seed` rodou com sucesso** — 82 pessoas/contratos, números batendo
    **exatamente** com a Seção 11 em cada uma das 11 regiões (76 ativos, 6 distrato,
-   206 eventos_contrato). *Cuidado operacional: a primeira tentativa de seed "morreu"
+   206 eventos_contrato). _Cuidado operacional: a primeira tentativa de seed "morreu"
    por timeout do lado de cá mas continuou rodando no servidor — rodei de novo sem
-   perceber e dupliquei os dados. Truncado e re-semeado uma única vez, limpo.*
+   perceber e dupliquei os dados. Truncado e re-semeado uma única vez, limpo._
 5. **Bloqueio restante:** o **Custom Access Token Hook** (a função existe no banco,
-   mas o Supabase Auth precisa ser instruído a *chamá-la* — isso é configuração de
+   mas o Supabase Auth precisa ser instruído a _chamá-la_ — isso é configuração de
    plataforma, não SQL) exige `supabase link`, que por sua vez exige um token de
    acesso pessoal (`SUPABASE_ACCESS_TOKEN`) que não recebi. Você optou por habilitar
    manualmente no Dashboard (Authentication → Hooks). **Enquanto isso não acontece,
