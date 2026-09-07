@@ -238,6 +238,17 @@ consegui:
    o JWT sai sem as claims `organizacao_id`/`papel`/`regiao_id`, e os dois testes de
    RLS mais importantes do gate (isolamento de organização e de região) não têm como
    passar de verdade.**
+   - Criei `ACESSO.md` com o passo a passo de login no painel do Supabase e os 3
+     passos que faltam (hook, MFA, SMTP).
+   - A conta dona do projeto no Supabase é `apt.uplinux@gmail.com` — essa pessoa
+     ainda precisa fazer o passo do hook. Aguardando.
+   - Notei também um mockup visual estático do painel (`/dashboard`,
+     `src/app/(painel)/layout.tsx` + `dashboard/page.tsx`) surgindo no repositório,
+     construído em paralelo (fora das minhas ações) — sem dados reais nem login,
+     explicitamente marcado como tal no próprio código ("A navegação, a sessão e os
+     números reais entram na Fase 2"). Os links do menu (Pessoas/Contratos/
+     Documentos/Atividades/Configurações) dão 404 porque essas páginas ainda não
+     existem — comportamento esperado, não é bug, e não faz parte da Fase 1.
 
 **Skills adicionais apareceram em `skills-lock.json`** (`frontend-design` de
 `anthropics/skills`, `web-design-guidelines` de `vercel-labs/agent-skills`) sem eu
