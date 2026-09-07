@@ -6,7 +6,7 @@
  * src/lib/contratos/transicionar.ts, que envolve isso com a persistência).
  */
 
-export type StatusContrato =
+export type ContractStatus =
   | "rascunho"
   | "emitido"
   | "enviado"
@@ -17,7 +17,7 @@ export type StatusContrato =
   | "cancelado";
 
 /** Mapa de transições permitidas — a única fonte da verdade sobre o fluxo do contrato. */
-const TRANSICOES_PERMITIDAS: Record<StatusContrato, readonly StatusContrato[]> = {
+const ALLOWED_TRANSITIONS: Record<ContractStatus, readonly ContractStatus[]> = {
   rascunho: ["emitido", "cancelado"],
   emitido: ["enviado", "cancelado"],
   enviado: ["assinado", "cancelado"],
@@ -32,29 +32,31 @@ const TRANSICOES_PERMITIDAS: Record<StatusContrato, readonly StatusContrato[]> =
  * Estados que contam no quadro ativo do dashboard (Seção 7, "Regra de contagem").
  * Os estados de distrato formam visão separada e nunca entram neste total.
  */
-export const CONTAM_NO_QUADRO_ATIVO: readonly StatusContrato[] = [
+export const ACTIVE_BOARD_STATUSES: readonly ContractStatus[] = [
   "emitido",
   "enviado",
   "assinado",
 ];
 
-export function podeTransicionar(de: StatusContrato, para: StatusContrato): boolean {
-  return TRANSICOES_PERMITIDAS[de].includes(para);
+export function canTransition(from: ContractStatus, to: ContractStatus): boolean {
+  return ALLOWED_TRANSITIONS[from].includes(to);
 }
 
 /**
  * Valida a transição e retorna o novo estado, ou lança um erro explicativo em
  * português nomeando o estado atual e os destinos permitidos.
  */
-export function transicionarOuErro(de: StatusContrato, para: StatusContrato): StatusContrato {
-  if (!podeTransicionar(de, para)) {
-    const destinos = TRANSICOES_PERMITIDAS[de];
-    const destinosTexto =
-      destinos.length > 0 ? destinos.join(", ") : "nenhum — este é um estado final";
+export function transitionOrThrow(from: ContractStatus, to: ContractStatus): ContractStatus {
+  if (!canTransition(from, to)) {
+    const allowedDestinations = ALLOWED_TRANSITIONS[from];
+    const destinationsText =
+      allowedDestinations.length > 0
+        ? allowedDestinations.join(", ")
+        : "nenhum — este é um estado final";
     throw new Error(
-      `Transição inválida: o contrato está em "${de}" e não pode ir para "${para}". ` +
-        `A partir de "${de}", os destinos permitidos são: ${destinosTexto}.`,
+      `Transição inválida: o contrato está em "${from}" e não pode ir para "${to}". ` +
+        `A partir de "${from}", os destinos permitidos são: ${destinationsText}.`,
     );
   }
-  return para;
+  return to;
 }

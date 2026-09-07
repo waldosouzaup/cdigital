@@ -1,42 +1,42 @@
 import { describe, it, expect } from "vitest";
-import { cpfValido, limparCpf } from "@/lib/documentos/cpf";
+import { isValidCpf, stripCpf } from "@/lib/documentos/cpf";
 
-describe("cpfValido", () => {
+describe("isValidCpf", () => {
   it("aceita CPFs válidos sem máscara", () => {
-    expect(cpfValido("11144477735")).toBe(true);
-    expect(cpfValido("52998224725")).toBe(true);
+    expect(isValidCpf("11144477735")).toBe(true);
+    expect(isValidCpf("52998224725")).toBe(true);
   });
 
   it("aceita CPFs válidos com máscara", () => {
-    expect(cpfValido("111.444.777-35")).toBe(true);
-    expect(cpfValido("529.982.247-25")).toBe(true);
+    expect(isValidCpf("111.444.777-35")).toBe(true);
+    expect(isValidCpf("529.982.247-25")).toBe(true);
   });
 
   it("rejeita CPF com dígito verificador errado", () => {
-    expect(cpfValido("111.444.777-36")).toBe(false);
-    expect(cpfValido("52998224726")).toBe(false);
+    expect(isValidCpf("111.444.777-36")).toBe(false);
+    expect(isValidCpf("52998224726")).toBe(false);
   });
 
   it("rejeita todos os dígitos iguais, mesmo que a matemática do DV bata", () => {
-    expect(cpfValido("00000000000")).toBe(false);
-    expect(cpfValido("111.111.111-11")).toBe(false);
-    expect(cpfValido("99999999999")).toBe(false);
+    expect(isValidCpf("00000000000")).toBe(false);
+    expect(isValidCpf("111.111.111-11")).toBe(false);
+    expect(isValidCpf("99999999999")).toBe(false);
   });
 
   it("rejeita comprimento incorreto", () => {
-    expect(cpfValido("123")).toBe(false);
-    expect(cpfValido("123456789012")).toBe(false);
-    expect(cpfValido("")).toBe(false);
+    expect(isValidCpf("123")).toBe(false);
+    expect(isValidCpf("123456789012")).toBe(false);
+    expect(isValidCpf("")).toBe(false);
   });
 
   it("rejeita entrada não numérica além da máscara", () => {
-    expect(cpfValido("abc.def.ghi-jk")).toBe(false);
+    expect(isValidCpf("abc.def.ghi-jk")).toBe(false);
   });
 });
 
-describe("limparCpf", () => {
+describe("stripCpf", () => {
   it("remove pontuação e mantém só dígitos", () => {
-    expect(limparCpf("111.444.777-35")).toBe("11144477735");
-    expect(limparCpf("11144477735")).toBe("11144477735");
+    expect(stripCpf("111.444.777-35")).toBe("11144477735");
+    expect(stripCpf("11144477735")).toBe("11144477735");
   });
 });

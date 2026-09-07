@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
-  podeTransicionar,
-  transicionarOuErro,
-  CONTAM_NO_QUADRO_ATIVO,
-  type StatusContrato,
+  canTransition,
+  transitionOrThrow,
+  ACTIVE_BOARD_STATUSES,
+  type ContractStatus,
 } from "@/lib/contratos/maquina-estados";
 
 // Transições válidas — Seção 7 do PROMPT
-const TRANSICOES_VALIDAS: [StatusContrato, StatusContrato][] = [
+const VALID_TRANSITIONS: [ContractStatus, ContractStatus][] = [
   ["rascunho", "emitido"],
   ["rascunho", "cancelado"],
   ["emitido", "enviado"],
@@ -20,7 +20,7 @@ const TRANSICOES_VALIDAS: [StatusContrato, StatusContrato][] = [
 ];
 
 // Transições inválidas — pelo menos 5, exigido pelo gate da Fase 1
-const TRANSICOES_INVALIDAS: [StatusContrato, StatusContrato][] = [
+const INVALID_TRANSITIONS: [ContractStatus, ContractStatus][] = [
   ["emitido", "assinado"], // pula "enviado"
   ["rascunho", "assinado"], // pula tudo
   ["rascunho", "enviado"],
@@ -31,55 +31,55 @@ const TRANSICOES_INVALIDAS: [StatusContrato, StatusContrato][] = [
   ["enviado", "emitido"], // regressão
 ];
 
-describe("podeTransicionar", () => {
-  it.each(TRANSICOES_VALIDAS)("permite %s → %s", (de, para) => {
-    expect(podeTransicionar(de, para)).toBe(true);
+describe("canTransition", () => {
+  it.each(VALID_TRANSITIONS)("permite %s → %s", (from, to) => {
+    expect(canTransition(from, to)).toBe(true);
   });
 
-  it.each(TRANSICOES_INVALIDAS)("rejeita %s → %s", (de, para) => {
-    expect(podeTransicionar(de, para)).toBe(false);
+  it.each(INVALID_TRANSITIONS)("rejeita %s → %s", (from, to) => {
+    expect(canTransition(from, to)).toBe(false);
   });
 
   it("rejeita transição para o mesmo estado", () => {
-    expect(podeTransicionar("emitido", "emitido")).toBe(false);
+    expect(canTransition("emitido", "emitido")).toBe(false);
   });
 });
 
-describe("transicionarOuErro", () => {
+describe("transitionOrThrow", () => {
   it("retorna o novo estado quando a transição é válida", () => {
-    expect(transicionarOuErro("rascunho", "emitido")).toBe("emitido");
+    expect(transitionOrThrow("rascunho", "emitido")).toBe("emitido");
   });
 
   it("lança erro explicativo em português numa transição inválida", () => {
-    expect(() => transicionarOuErro("emitido", "assinado")).toThrowError(
+    expect(() => transitionOrThrow("emitido", "assinado")).toThrowError(
       /emitido.*enviado.*cancelado/is,
     );
   });
 
   it("o erro nomeia o estado atual e os destinos permitidos", () => {
     try {
-      transicionarOuErro("assinado", "rascunho");
+      transitionOrThrow("assinado", "rascunho");
       expect.fail("deveria ter lançado erro");
-    } catch (erro) {
-      expect((erro as Error).message).toContain("assinado");
-      expect((erro as Error).message).toMatch(/distratado|encerrado/);
+    } catch (error) {
+      expect((error as Error).message).toContain("assinado");
+      expect((error as Error).message).toMatch(/distratado|encerrado/);
     }
   });
 });
 
-describe("CONTAM_NO_QUADRO_ATIVO", () => {
+describe("ACTIVE_BOARD_STATUSES", () => {
   it("contém exatamente emitido, enviado e assinado", () => {
-    expect(CONTAM_NO_QUADRO_ATIVO).toEqual(
+    expect(ACTIVE_BOARD_STATUSES).toEqual(
       expect.arrayContaining(["emitido", "enviado", "assinado"]),
     );
-    expect(CONTAM_NO_QUADRO_ATIVO).toHaveLength(3);
+    expect(ACTIVE_BOARD_STATUSES).toHaveLength(3);
   });
 
   it("não inclui estados de distrato nem estados terminais fora do fluxo ativo", () => {
-    expect(CONTAM_NO_QUADRO_ATIVO).not.toContain("distratado");
-    expect(CONTAM_NO_QUADRO_ATIVO).not.toContain("distrato_assinado");
-    expect(CONTAM_NO_QUADRO_ATIVO).not.toContain("encerrado");
-    expect(CONTAM_NO_QUADRO_ATIVO).not.toContain("cancelado");
-    expect(CONTAM_NO_QUADRO_ATIVO).not.toContain("rascunho");
+    expect(ACTIVE_BOARD_STATUSES).not.toContain("distratado");
+    expect(ACTIVE_BOARD_STATUSES).not.toContain("distrato_assinado");
+    expect(ACTIVE_BOARD_STATUSES).not.toContain("encerrado");
+    expect(ACTIVE_BOARD_STATUSES).not.toContain("cancelado");
+    expect(ACTIVE_BOARD_STATUSES).not.toContain("rascunho");
   });
 });

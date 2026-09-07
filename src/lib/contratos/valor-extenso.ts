@@ -13,6 +13,6 @@ import extenso from "extenso";
  * Recebe um valor em reais — número ou string (como o Drizzle devolve para colunas
  * `numeric`) — e retorna o valor por extenso em português, modo moeda (BRL).
  */
-export function valorExtenso(valorEmReais: number | string): string {
-  return extenso(valorEmReais, { mode: "currency", currency: { type: "BRL" } });
+export function amountInWords(amountInReais: number | string): string {
+  return extenso(amountInReais, { mode: "currency", currency: { type: "BRL" } });
 }

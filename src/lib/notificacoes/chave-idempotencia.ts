@@ -10,7 +10,7 @@
  */
 // Mesmos valores do enum `tipo_notificacao` da Seção 5. Fica local (em vez de importar
 // de src/db/schema) porque esta função é pura e não deve depender do schema do banco.
-export type TipoNotificacao =
+export type NotificationType =
   | "link_coleta"
   | "documento_rejeitado"
   | "contrato_enviado"
@@ -19,10 +19,10 @@ export type TipoNotificacao =
   | "resumo_diario"
   | "pessoa_apta";
 
-export function chaveIdempotencia(
-  tipo: TipoNotificacao,
-  entidadeId: string,
-  ...segmentosExtras: string[]
+export function idempotencyKey(
+  type: NotificationType,
+  entityId: string,
+  ...extraSegments: string[]
 ): string {
-  return [tipo, entidadeId, ...segmentosExtras].join(":");
+  return [type, entityId, ...extraSegments].join(":");
 }
