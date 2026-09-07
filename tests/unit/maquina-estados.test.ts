@@ -52,7 +52,7 @@ describe("transitionOrThrow", () => {
 
   it("lança erro explicativo em português numa transição inválida", () => {
     expect(() => transitionOrThrow("emitido", "assinado")).toThrowError(
-      /emitido.*enviado.*cancelado/is,
+      /emitido.*enviado.*cancelado/i,
     );
   });
 

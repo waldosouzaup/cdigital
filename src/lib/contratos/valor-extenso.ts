@@ -14,5 +14,5 @@ import extenso from "extenso";
  * `numeric`) — e retorna o valor por extenso em português, modo moeda (BRL).
  */
 export function amountInWords(amountInReais: number | string): string {
-  return extenso(amountInReais, { mode: "currency", currency: { type: "BRL" } });
+  return extenso(amountInReais, { mode: "currency", currency: { code: "BRL" } });
 }
