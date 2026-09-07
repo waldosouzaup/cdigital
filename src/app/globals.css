@@ -1,26 +1,36 @@
 @import "tailwindcss";
 
+/*
+ * Tokens de design — Tarefa 8 (telas de auth), processo de duas passadas da skill
+ * front-end-design. Registro completo da revisão contra os defaults em CONSULTAS.md.
+ *
+ * Direção: um comitê de campanha eleitoral lidando com contrato, documento e prazo —
+ * seriedade institucional, não SaaS genérico. Paleta clara de "papel oficial", um
+ * único acento (cor de selo/lacre), sem serifada de exposição nem cartão-com-sombra.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-paper: #eceeeb; /* fundo — papel frio, não o creme #F4F1EA (tell) */
+  --color-ink: #1b2430; /* texto principal */
+  --color-ink-muted: #5b6472; /* texto secundário */
+  --color-seal: #b8752e; /* acento único — mais escuro que o terracota #D97757 (tell) */
+  --color-seal-ink: #ffffff; /* texto sobre o acento */
+  --color-line: #d4d2c9; /* hairlines e divisores */
+  --color-alert: #a23b33; /* erro — tom tijolo, não vermelho genérico */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-paper: var(--color-paper);
+  --color-ink: var(--color-ink);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-seal: var(--color-seal);
+  --color-seal-ink: var(--color-seal-ink);
+  --color-line: var(--color-line);
+  --color-alert: var(--color-alert);
+  --font-sans: var(--font-archivo);
+  --font-mono: var(--font-plex-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
 }

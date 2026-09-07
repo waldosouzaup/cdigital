@@ -1,8 +1,19 @@
 import type { Metadata } from "next";
+import { Archivo, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-// A tipografia definitiva é decisão da Tarefa 8 (telas de auth), seguindo o processo
-// de duas passadas da skill front-end-design — não improvisada aqui no layout raiz.
+// Tipografia definida na Tarefa 8 (telas de auth), processo da skill front-end-design
+// — ver o comentário no topo de globals.css e o registro em CONSULTAS.md.
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin"],
+});
+
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+});
 
 export const metadata: Metadata = {
   title: "Comitê Digital",
@@ -17,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className="antialiased">{children}</body>
+      <body className={`${archivo.variable} ${plexMono.variable} antialiased`}>{children}</body>
     </html>
   );
 }
