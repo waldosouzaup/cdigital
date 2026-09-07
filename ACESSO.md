@@ -16,12 +16,12 @@
 
 ### Dados deste projeto
 
-| Campo | Valor |
-|---|---|
-| Nome do projeto | (o que você deu ao criar — verifique no dashboard) |
-| Referência (project ref) | `qedypaqsmmrhnpgnkrxq` |
-| URL da API | `https://qedypaqsmmrhnpgnkrxq.supabase.co` |
-| Link direto do painel | `https://supabase.com/dashboard/project/qedypaqsmmrhnpgnkrxq` |
+| Campo                    | Valor                                                         |
+| ------------------------ | ------------------------------------------------------------- |
+| Nome do projeto          | (o que você deu ao criar — verifique no dashboard)            |
+| Referência (project ref) | `qedypaqsmmrhnpgnkrxq`                                        |
+| URL da API               | `https://qedypaqsmmrhnpgnkrxq.supabase.co`                    |
+| Link direto do painel    | `https://supabase.com/dashboard/project/qedypaqsmmrhnpgnkrxq` |
 
 ### Passo a passo para entrar
 

@@ -255,3 +255,28 @@ consegui:
 ter rodado `npx skills add` de novo — parece um comportamento de sincronização
 automática da ferramenta `skills`. Ambas as fontes são legítimas (Anthropic e Vercel
 Labs); não investiguei a fundo por não ser bloqueante.
+
+## Atualização — provisionamento + trabalho paralelo de Fase 2-4
+
+- **`apt.uplinux@gmail.com` provisionado como `gestor`** via novo script
+  `npm run db:provision-user` (`src/db/provision-user.ts`) — reaproveitou um
+  usuário de Auth que já existia (alguém já tinha tentado `/login` com esse
+  e-mail antes de ter linha em `usuarios`).
+- **Decisão de projeto, fora do PROMPT: hospedagem será na Netlify.** Registrado
+  em `TESTE-LOCAL.md` (Seção 7) com os pontos de atenção conhecidos (Next
+  Runtime da Netlify, variáveis de ambiente no painel dela, `middleware.ts` como
+  Edge Function, agendamento de `/api/cron/*` da Fase 4 ainda não desenhado
+  para lá). Nada configurado ainda — é só o registro da decisão.
+- **Um volume grande de telas de Fase 2/3/4 apareceu no repositório**, fora das
+  minhas ações diretas (`(painel)/pessoas`, `contratos`, `documentos`,
+  `atividades`, `configuracoes`, `coleta/[token]`, e novos componentes de UI) —
+  confirmei que **tudo é mockup visual com dado fixo no código** (`useState`
+  local, sem `createClient`, sem consulta ao Supabase), então não interfere com
+  o gate da Fase 1 nem com a integridade dos dados reais. `npm run build`,
+  `tsc` e `lint` passam limpos com esse código incluído. **Não revisei esse
+  código linha a linha** (seria auditar entrega de Fase 2/3/4 que não me foi
+  pedida) — só verifiquei que builda e que não importa `admin.ts` dentro de
+  `(painel)` (a regra de ESLint pegaria isso automaticamente).
+- Criado `TESTE-LOCAL.md` com o passo a passo completo de `npm install` até
+  logar de verdade como o gestor provisionado, explicando exatamente quais
+  telas são reais e quais são mockup hoje.
