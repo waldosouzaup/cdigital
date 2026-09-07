@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidCpf, stripCpf } from "@/lib/documentos/cpf";
+import { generateValidCpf, isValidCpf, stripCpf } from "@/lib/documentos/cpf";
 
 describe("isValidCpf", () => {
   it("aceita CPFs válidos sem máscara", () => {
@@ -38,5 +38,19 @@ describe("stripCpf", () => {
   it("remove pontuação e mantém só dígitos", () => {
     expect(stripCpf("111.444.777-35")).toBe("11144477735");
     expect(stripCpf("11144477735")).toBe("11144477735");
+  });
+});
+
+describe("generateValidCpf", () => {
+  it("gera um CPF que passa em isValidCpf", () => {
+    const cpf = generateValidCpf("111444777");
+    expect(isValidCpf(cpf)).toBe(true);
+    expect(cpf).toBe("11144477735");
+  });
+
+  it("preenche a base com zeros à esquerda quando necessário", () => {
+    const cpf = generateValidCpf("123");
+    expect(cpf).toHaveLength(11);
+    expect(isValidCpf(cpf)).toBe(true);
   });
 });

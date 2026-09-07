@@ -31,3 +31,14 @@ export function isValidCpf(cpf: string): boolean {
 
   return digits === digits.slice(0, 9) + String(firstCheckDigit) + String(secondCheckDigit);
 }
+
+/**
+ * Gera um CPF sintático e matematicamente válido a partir de uma base numérica —
+ * usado só pelo seed (Seção 11), nunca em fluxo de produção.
+ */
+export function generateValidCpf(base: string): string {
+  const paddedBase = base.replace(/\D/g, "").slice(0, 9).padStart(9, "0");
+  const firstCheckDigit = calculateCheckDigit(paddedBase, 10);
+  const secondCheckDigit = calculateCheckDigit(paddedBase + firstCheckDigit, 11);
+  return paddedBase + String(firstCheckDigit) + String(secondCheckDigit);
+}

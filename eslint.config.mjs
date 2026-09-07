@@ -33,6 +33,13 @@ const eslintConfig = [
                 "RLS por completo (Seção 3.1). Não pode ser importado dentro de " +
                 "src/app/(painel)/. Use src/lib/supabase/server.ts.",
             },
+            {
+              group: ["**/db/client", "**/db/client.ts", "@/db/client"],
+              message:
+                "Proibido: src/db/client.ts conecta direto no Postgres, fora do " +
+                "PostgREST, e ignora RLS (Seção 3.1) — só para seed/cron. Não pode " +
+                "ser importado dentro de src/app/(painel)/. Use src/lib/supabase/server.ts.",
+            },
           ],
         },
       ],
