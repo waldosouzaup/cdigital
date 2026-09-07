@@ -6,6 +6,7 @@
 ## O que ficou pronto
 
 ### Seção 2.1 (obrigatória antes de codar)
+
 - [x] Superpowers consultado no início da fase — classificação Architectural, HARD-GATE
       de aprovação cumprido (plano aprovado antes de qualquer código).
 - [x] Context 7 consultado antes de tocar em cada biblioteca externa nova — 20
@@ -16,30 +17,31 @@
 - [x] `CONSULTAS.md` existe e cobre todas as fases aplicáveis até aqui.
 
 ### Fase 1 — itens do "Entregar"
+
 1. ❌ Não há `supabase start` — ver **Bloqueio** abaixo. CLI usado para `init`/
    `config` local; Postgres seria o hospedado.
 2. [x] Next.js 15.5.25 (fixado, não 16) + TypeScript + Tailwind v4 + ESLint + Prettier.
 3. [x] Schema completo da Seção 5 em Drizzle (`src/db/schema.ts`) — 6 enums, 12
-   tabelas, `id`/`criado_em`/`atualizado_em` em todas, os 3 índices únicos obrigatórios,
-   os 3 checks de `contratos`. Migrations geradas em `supabase/migrations/`.
+       tabelas, `id`/`criado_em`/`atualizado_em` em todas, os 3 índices únicos obrigatórios,
+       os 3 checks de `contratos`. Migrations geradas em `supabase/migrations/`.
 4. [x] RLS ativo em todas as 12 tabelas via `auth.organizacao_id()`; `coord_regiao`
-   restrito à própria região em `pessoas`, `contratos`, `documentos`,
-   `registros_atividade` — **escrito e revisado, não aplicado a banco real** (ver
-   Bloqueio).
+       restrito à própria região em `pessoas`, `contratos`, `documentos`,
+       `registros_atividade` — **escrito e revisado, não aplicado a banco real** (ver
+       Bloqueio).
 5. [x] Custom Access Token Hook escrito (`0001_auth_claims.sql`) — função Postgres,
-   com o bloco de GRANT/REVOKE que o Context 7 revelou como necessário.
+       com o bloco de GRANT/REVOKE que o Context 7 revelou como necessário.
 6. [x] Supabase Auth com link mágico (`login/`) e MFA TOTP (`mfa/`) — telas prontas,
-   chamando a API real; enforcement de obrigatoriedade é policy RLS (`aal2`), não
-   checagem de aplicação.
+       chamando a API real; enforcement de obrigatoriedade é policy RLS (`aal2`), não
+       checagem de aplicação.
 7. [x] Buckets `documentos`/`contratos` privados declarados em `config.toml`, policies
-   por `organizacao_id` em `0004_storage_policies.sql`.
+       por `organizacao_id` em `0004_storage_policies.sql`.
 8. [x] `client.ts`, `server.ts`, `admin.ts` — regra de ESLint provada quebrando de
-   propósito duas vezes (Tarefa 1 e Tarefa 10, para `admin.ts` e `db/client.ts`).
+       propósito duas vezes (Tarefa 1 e Tarefa 10, para `admin.ts` e `db/client.ts`).
 9. [~] `src/lib/notificacoes/` completo e testado (idempotência, retry, webhook) —
    **sem conta Resend real ainda**, então o teste ponta a ponta do gate não rodou.
 10. [x] Log de auditoria (`src/lib/auditoria/registrar.ts`) — grava em toda leitura de
-    documento (via `criarUrlAssinada`); helpers prontos para escrita em
-    `pessoas`/`contratos` (a chamada em si entra nos Server Actions da Fase 2).
+        documento (via `criarUrlAssinada`); helpers prontos para escrita em
+        `pessoas`/`contratos` (a chamada em si entra nos Server Actions da Fase 2).
 11. [x] `seed.ts` e `seed-carga.ts` escritos — **não executados** (ver Bloqueio).
 
 ## Bloqueio ativo — impede o gate completo
@@ -76,17 +78,17 @@ supabase start && npm run db:migrate && npm run db:seed   # ❌ bloqueado — se
 
 Checklist item a item:
 
-| Item | Resultado |
-|---|---|
-| `CONSULTAS.md` registra Superpowers e Context 7 (Auth, RLS, Storage, Next 15, Drizzle) | ✅ |
-| Ambiente sobe do zero com um comando | ❌ bloqueado — sem projeto Supabase |
-| Org A não lê linha de org B (anon key + JWT real) | ❌ bloqueado — RLS escrita e revisada, não testada contra banco real |
-| `coord_regiao` X não lê pessoa da região Y | ❌ bloqueado — mesma causa |
-| `lint` falha ao importar `admin.ts` em `(painel)` | ✅ provado quebrando de propósito e revertendo (saída colada acima na conversa) |
-| Trocar papel força renovação da sessão | ⚠️ mecanismo (`signOut(jwt, 'global')`) ainda não implementado num Server Action — é Fase 2 (edição de usuário) |
-| CPF repetido falha com erro tratado | ✅ índice único existe no schema; teste de integração fica para quando o banco existir |
-| Login sem TOTP recusado para `gestor` | ✅ policy RLS restritiva escrita; não testada contra banco real |
-| E-mail de teste chega e vai a `entregue` via webhook | ❌ bloqueado — sem conta Resend |
+| Item                                                                                   | Resultado                                                                                                       |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `CONSULTAS.md` registra Superpowers e Context 7 (Auth, RLS, Storage, Next 15, Drizzle) | ✅                                                                                                              |
+| Ambiente sobe do zero com um comando                                                   | ❌ bloqueado — sem projeto Supabase                                                                             |
+| Org A não lê linha de org B (anon key + JWT real)                                      | ❌ bloqueado — RLS escrita e revisada, não testada contra banco real                                            |
+| `coord_regiao` X não lê pessoa da região Y                                             | ❌ bloqueado — mesma causa                                                                                      |
+| `lint` falha ao importar `admin.ts` em `(painel)`                                      | ✅ provado quebrando de propósito e revertendo (saída colada acima na conversa)                                 |
+| Trocar papel força renovação da sessão                                                 | ⚠️ mecanismo (`signOut(jwt, 'global')`) ainda não implementado num Server Action — é Fase 2 (edição de usuário) |
+| CPF repetido falha com erro tratado                                                    | ✅ índice único existe no schema; teste de integração fica para quando o banco existir                          |
+| Login sem TOTP recusado para `gestor`                                                  | ✅ policy RLS restritiva escrita; não testada contra banco real                                                 |
+| E-mail de teste chega e vai a `entregue` via webhook                                   | ❌ bloqueado — sem conta Resend                                                                                 |
 
 **4 de 9 itens verdes, 1 parcial, 4 bloqueados por infraestrutura ausente — não por
 código faltando.** Todo o código que os itens bloqueados exercitariam está escrito,
@@ -174,3 +176,34 @@ real em desktop (1280px) e mobile (360px).
    RLS pendentes, e o teste ponta a ponta do Resend.
 3. Só então a Fase 1 fecha com o gate 100% verde — e paro para você revisar antes da
    Fase 2, como pedido.
+
+## Atualização — skills oficiais da Supabase instaladas
+
+A seu pedido, `npx skills add supabase/agent-skills` instalou dois skills mantidos
+pela própria Supabase (`.agents/skills/supabase/` e
+`.agents/skills/supabase-postgres-best-practices/`). Revisei o design já feito contra
+os dois antes de aplicar a primeira migration de verdade:
+
+- **Achado que mudou código:** toda policy de RLS precisa envolver `auth.organizacao_id()`
+  /`auth.papel()`/`auth.regiao_id()`/`auth.jwt()` em `(select ...)` — sem isso o
+  Postgres reavalia a função por linha em vez de uma vez por consulta (até 100x mais
+  lento em tabela grande, e a Seção 10 exige dashboard < 2s com 2.000 contratos).
+  Corrigido em `src/db/schema.ts` (4 helpers de policy) e em
+  `0004_storage_policies.sql`; a migration 0002 foi regenerada com o nome novo
+  `0002_ancient_speed.sql` (a antiga não tinha sido aplicada a banco nenhum).
+- O checklist de segurança do skill oficial (`auth.role()` deprecado, `TO authenticated`
+  sem predicado de posse, `UPDATE` sem `WITH CHECK`, `SECURITY DEFINER` sem
+  `REVOKE EXECUTE`, upload de Storage exigindo INSERT+SELECT+UPDATE) já estava coberto
+  pelo design das Tarefas 4/5/7 — nenhuma mudança adicional necessária.
+
+Detalhe completo em `CONSULTAS.md`.
+
+## Credenciais — recebidas nesta sessão
+
+Você colou as credenciais diretamente no `.env.example` (o template versionado no
+git) em vez do `.env.local` — movi os valores para `.env.local` (gitignored) e
+restaurei o `.env.example` ao template vazio antes de qualquer commit, então nada
+sensível chegou a entrar no histórico do git. Recebidos até aqui: `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`.
+`DATABASE_URL` ainda está com o placeholder `[YOUR-PASSWORD]` — aguardando a senha
+real do banco para rodar `db:migrate`/`db:seed`.

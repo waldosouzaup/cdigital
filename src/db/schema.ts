@@ -97,9 +97,18 @@ const timestamps = {
 // Helpers de RLS — ver o comentário do topo do arquivo para o raciocínio.
 // ---------------------------------------------------------------------------
 
-/** Isolamento por organização, para todas as operações. */
+/**
+ * Isolamento por organização, para todas as operações.
+ *
+ * `(select auth.organizacao_id())`, não `auth.organizacao_id()` puro — achado do
+ * skill oficial `supabase-postgres-best-practices` (instalado após a Tarefa 8):
+ * envolver a chamada em `select` deixa o Postgres avaliar a função uma vez por
+ * consulta em vez de uma vez por linha (InitPlan cacheado vs. reavaliação por
+ * linha) — até 100x mais rápido em tabelas grandes. Relevante aqui porque a Seção
+ * 10 exige dashboard < 2s com 2.000 contratos.
+ */
 function organizationPolicy(name: string, organizationIdColumn: AnyPgColumn) {
-  const condition = sql`${organizationIdColumn} = auth.organizacao_id()`;
+  const condition = sql`${organizationIdColumn} = (select auth.organizacao_id())`;
   return pgPolicy(name, {
     as: "permissive",
     for: "all",
@@ -111,14 +120,15 @@ function organizationPolicy(name: string, organizationIdColumn: AnyPgColumn) {
 
 /**
  * Isolamento por organização + região: coord_regiao só enxerga linhas da própria
- * região; os demais papéis não são restritos por região.
+ * região; os demais papéis não são restritos por região. Mesmo cuidado de
+ * performance do comentário de `organizationPolicy` acima.
  */
 function organizationAndRegionPolicy(
   name: string,
   organizationIdColumn: AnyPgColumn,
   regionIdColumn: AnyPgColumn,
 ) {
-  const condition = sql`${organizationIdColumn} = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR ${regionIdColumn} = auth.regiao_id())`;
+  const condition = sql`${organizationIdColumn} = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR ${regionIdColumn} = (select auth.regiao_id()))`;
   return pgPolicy(name, {
     as: "permissive",
     for: "all",
@@ -131,10 +141,10 @@ function organizationAndRegionPolicy(
 /**
  * MFA obrigatório para gestor e coord_comite (Seção 3, item 6 da Fase 1). Restritiva:
  * intersecta (AND) com toda policy permissiva da mesma tabela — nunca afrouxa nada
- * sozinha, só pode negar.
+ * sozinha, só pode negar. Mesmo cuidado de performance das duas anteriores.
  */
 function mfaGatePolicy(name: string) {
-  const condition = sql`auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'`;
+  const condition = sql`(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'`;
   return pgPolicy(name, {
     as: "restrictive",
     for: "all",
@@ -184,7 +194,7 @@ export const organizations = pgTable(
       as: "permissive",
       for: "select",
       to: authenticatedRole,
-      using: sql`${table.id} = auth.organizacao_id()`,
+      using: sql`${table.id} = (select auth.organizacao_id())`,
     }),
     mfaGatePolicy("organizacoes_mfa"),
   ],
@@ -211,7 +221,7 @@ export const regions = pgTable(
       as: "permissive",
       for: "select",
       to: authenticatedRole,
-      using: sql`${table.organizationId} = auth.organizacao_id()`,
+      using: sql`${table.organizationId} = (select auth.organizacao_id())`,
     }),
     mfaGatePolicy("regioes_mfa"),
   ],
@@ -379,7 +389,7 @@ export const contractEvents = pgTable(
   (table) => [
     ...organizationReadInsertPolicies(
       "eventos_contrato_organizacao",
-      sql`exists (select 1 from contratos c where c.id = ${table.contractId} and c.organizacao_id = auth.organizacao_id())`,
+      sql`exists (select 1 from contratos c where c.id = ${table.contractId} and c.organizacao_id = (select auth.organizacao_id()))`,
     ),
     mfaGatePolicy("eventos_contrato_mfa"),
   ],
@@ -548,7 +558,7 @@ export const auditLog = pgTable(
     ),
     ...organizationReadInsertPolicies(
       "log_auditoria_organizacao",
-      sql`${table.organizationId} = auth.organizacao_id()`,
+      sql`${table.organizationId} = (select auth.organizacao_id())`,
     ),
     mfaGatePolicy("log_auditoria_mfa"),
   ],
