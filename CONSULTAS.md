@@ -40,6 +40,7 @@ Skills disponíveis no Superpowers 6.3.0: `brainstorming`, `dispatching-parallel
 | 2026-09-07 | 1 | Context 7 | Mudanças do App Router no Next.js 15 | `cookies()` é assíncrono e `params` é `Promise<{...}>` **tanto em página quanto em Route Handler** — eu teria escrito a forma síncrona. Afeta `/coleta/[token]` e todos os factories de cliente Supabase no servidor |
 | 2026-09-07 | 1 | Context 7 | Situação das chaves `anon` e `service_role` | **Conflito com a §3.2 do PROMPT.** As chaves legadas estão depreciadas em favor de `publishable`/`secret` e serão removidas no fim de 2026. Conforme a §2.1 ("se conflitar com uma regra deste arquivo, pare e pergunte"), escalei ao usuário. Decisão: manter os nomes de variável da §3.2 e aceitar os dois formatos de chave |
 | 2026-09-07 | 1 | front-end-design | Quais telas da Fase 1 exigem trabalho visual e que direção seguir | As telas de auth (login, verificação, MFA) **são** trabalho visual e não podem ser improvisadas por serem "só um formulário". A skill exige processo de duas passadas: plano de tokens (4–6 hex nomeados, tipografia, layout, princípios) revisado contra os defaults conhecidos, e só então código. Lista de defaults a evitar registrada para a Tarefa 8: fundo creme #F4F1EA com serifada de alto contraste e acento terracota #D97757, eyebrow em caixa alta acima de cada título, cards idênticos com um só border-radius e sombra cinza, `→` colado no texto de botão, meta unida por `·` |
+| 2026-09-07 | 1 | Context 7 | Estrutura de pacotes do React Email antes de instalar | **Divergiu do que a Seção 3 sugere ("Resend + React Email").** `@react-email/components` está **deprecated** no npm ("Package no longer supported"), assim como todas as suas subdependências `@react-email/*` (button, container, img, etc.), e `@react-email/render` também. O ecossistema foi consolidado num único pacote `react-email` (v6.9.3, não depreciado) que reexporta todos os componentes **e** `render`. Troquei a dependência antes mesmo de escrever o primeiro template — instalar o pacote depreciado teria funcionado hoje e quebrado sem aviso quando o registro for despublicado |
 
 ---
 
@@ -47,7 +48,7 @@ Skills disponíveis no Superpowers 6.3.0: `brainstorming`, `dispatching-parallel
 
 Nenhuma até aqui. Todas as consultas da Fase 1 retornaram documentação da fonte oficial
 (repositórios `supabase/supabase`, `supabase/cli`, `supabase/ssr`, `vercel/next.js`,
-`drizzle-team/drizzle-orm-docs`).
+`drizzle-team/drizzle-orm-docs`, `resend/react-email`).
 
 Quando o Context 7 não cobrir um caso, a regra da §2.1 é registrar a lacuna aqui
 explicitamente e ir à documentação oficial — nunca preencher de memória.
