@@ -12,11 +12,15 @@
  * A regra de ESLint em `eslint.config.mjs` proíbe importar este arquivo dentro de
  * `src/app/(painel)/**` — não contorne essa regra.
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-let cliente: ReturnType<typeof createClient> | undefined;
+// `SupabaseClient` direto, não `ReturnType<typeof createClient>`: extrair o retorno
+// de uma função genérica não instanciada não aplica os parâmetros-padrão da mesma
+// forma que chamar a função aplica, e deixa `.update()`/`.insert()` como `never` em
+// tempo de compilação (achado do `tsc`, não do Context 7).
+let cliente: SupabaseClient | undefined;
 
-export function criarClienteAdmin() {
+export function criarClienteAdmin(): SupabaseClient {
   if (cliente) return cliente;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
