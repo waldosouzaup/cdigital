@@ -46,9 +46,27 @@ Skills disponíveis no Superpowers 6.3.0: `brainstorming`, `dispatching-parallel
 
 ## Lacunas do Context 7
 
-Nenhuma até aqui. Todas as consultas da Fase 1 retornaram documentação da fonte oficial
+| Data | Fase | Biblioteca | Lacuna | Onde fui em vez disso |
+|---|---|---|---|---|
+| 2026-09-07 | 1 | `extenso` (pt-BR) | Busca por "extenso pt-br número por extenso" não retornou o pacote `lusofonia/extenso.js` nem nada equivalente — só resultados sem relação (CLASS-PT, PDPJ-Br, libs PHP) | README oficial em `node_modules/extenso/README.md` (projeto `lusofonia/extenso.js` no GitHub) |
+
+Fora isso, todas as consultas da Fase 1 retornaram documentação da fonte oficial
 (repositórios `supabase/supabase`, `supabase/cli`, `supabase/ssr`, `vercel/next.js`,
 `drizzle-team/drizzle-orm-docs`, `resend/react-email`).
 
 Quando o Context 7 não cobrir um caso, a regra da §2.1 é registrar a lacuna aqui
 explicitamente e ir à documentação oficial — nunca preencher de memória.
+
+## Divergência de conteúdo — não é regra de skill, mas precisa de registro
+
+A Seção 12 pede que R$ 3.553,00 gere **exatamente** `três mil, quinhentos e cinquenta e
+três reais` (com vírgula depois de "mil"). A biblioteca `extenso` gera
+`três mil quinhentos e cinquenta e três reais` (sem vírgula) — e essa saída está
+gramaticalmente correta: o "e" antes de um grupo é regido pela regra numeral do
+português (aparece quando o grupo seguinte é uma centena "redonda", como em
+`dois mil e duzentos`, mas não quando é um número composto, como `quinhentos e
+cinquenta e três`), não por escolha de formatação. Inserir uma vírgula artificial
+exigiria lógica própria de pontuação por cima da lib — o mais perto de "escrever valor
+por extenso à mão" que a regra da Seção 2 ("não fazer") proíbe. **Decisão: usar a saída
+literal da biblioteca, sem vírgula, para todos os valores.** Sinalizado também em
+`PROGRESSO.md` como decisão tomada fora do documento.
