@@ -1,27 +1,35 @@
 -- Custom Access Token Hook — Seção 3.1 do PROMPT-Comite-Digital.md.
 --
 -- Injeta organizacao_id, papel e regiao_id como claims no JWT do Supabase Auth, para
--- que as políticas de RLS leiam via auth.organizacao_id()/auth.papel()/auth.regiao_id()
--- em vez de fazer subconsulta em `usuarios` a cada linha (lento e sujeito a recursão).
+-- que as políticas de RLS leiam via public.organizacao_id()/public.papel()/
+-- public.regiao_id() em vez de fazer subconsulta em `usuarios` a cada linha (lento e
+-- sujeito a recursão).
 --
 -- Confirmado no Context 7 (registrado em CONSULTAS.md): o hook é uma FUNÇÃO POSTGRES,
 -- não uma Edge Function — a forma como o próprio PROMPT o menciona sugeria o contrário.
+--
+-- ATENÇÃO — segunda divergência descoberta só ao aplicar contra o projeto real
+-- (registrada em CONSULTAS.md): em projeto hospedado, o schema `auth` é travado —
+-- só `supabase_auth_admin` pode criar objeto lá, nem o role `postgres` (o de mais
+-- privilégio disponível ao usuário) tem `CREATE` em `auth`. As funções de leitura de
+-- claim abaixo vivem em `public`, igual ao exemplo oficial atual do Supabase para
+-- RBAC (`public.authorize(...)`) — não em `auth.*`, como a Seção 3.1 do PROMPT sugere.
 
 -- ---------------------------------------------------------------------------
 -- Funções de leitura dos claims, usadas nas policies de RLS (Tarefa 5)
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION auth.organizacao_id() RETURNS uuid
+CREATE OR REPLACE FUNCTION public.organizacao_id() RETURNS uuid
 LANGUAGE sql STABLE AS $$
   SELECT nullif(current_setting('request.jwt.claims', true)::json->>'organizacao_id','')::uuid
 $$;
 
-CREATE OR REPLACE FUNCTION auth.papel() RETURNS public.papel_usuario
+CREATE OR REPLACE FUNCTION public.papel() RETURNS public.papel_usuario
 LANGUAGE sql STABLE AS $$
   SELECT nullif(current_setting('request.jwt.claims', true)::json->>'papel','')::public.papel_usuario
 $$;
 
-CREATE OR REPLACE FUNCTION auth.regiao_id() RETURNS uuid
+CREATE OR REPLACE FUNCTION public.regiao_id() RETURNS uuid
 LANGUAGE sql STABLE AS $$
   SELECT nullif(current_setting('request.jwt.claims', true)::json->>'regiao_id','')::uuid
 $$;

@@ -6,7 +6,7 @@
 -- {organizacao_id}/{tipo}_{pessoa_id}_v{versao}.{ext} — por isso
 -- (storage.foldername(name))[1] é sempre o organizacao_id.
 --
--- `(select auth.organizacao_id())`, não a chamada pura — achado do skill oficial
+-- `(select public.organizacao_id())`, não a chamada pura — achado do skill oficial
 -- supabase-postgres-best-practices (referenced.md security-rls-performance):
 -- envolver em `select` faz o Postgres avaliar a função uma vez por consulta em vez
 -- de uma vez por linha.
@@ -17,7 +17,7 @@ CREATE POLICY "Leitura por organização — documentos"
   TO authenticated
   USING (
     bucket_id = 'documentos'
-    AND (storage.foldername(name))[1] = (select auth.organizacao_id())::text
+    AND (storage.foldername(name))[1] = (select public.organizacao_id())::text
   );
 
 CREATE POLICY "Escrita por organização — documentos"
@@ -26,7 +26,7 @@ CREATE POLICY "Escrita por organização — documentos"
   TO authenticated
   WITH CHECK (
     bucket_id = 'documentos'
-    AND (storage.foldername(name))[1] = (select auth.organizacao_id())::text
+    AND (storage.foldername(name))[1] = (select public.organizacao_id())::text
   );
 
 CREATE POLICY "Leitura por organização — contratos"
@@ -35,7 +35,7 @@ CREATE POLICY "Leitura por organização — contratos"
   TO authenticated
   USING (
     bucket_id = 'contratos'
-    AND (storage.foldername(name))[1] = (select auth.organizacao_id())::text
+    AND (storage.foldername(name))[1] = (select public.organizacao_id())::text
   );
 
 CREATE POLICY "Escrita por organização — contratos"
@@ -44,7 +44,7 @@ CREATE POLICY "Escrita por organização — contratos"
   TO authenticated
   WITH CHECK (
     bucket_id = 'contratos'
-    AND (storage.foldername(name))[1] = (select auth.organizacao_id())::text
+    AND (storage.foldername(name))[1] = (select public.organizacao_id())::text
   );
 
 -- Sem policy de UPDATE/DELETE para authenticated: reenvio de documento cria versão
@@ -58,5 +58,5 @@ CREATE POLICY "MFA obrigatório para gestor e coord_comite — storage"
   AS RESTRICTIVE
   FOR ALL
   TO authenticated
-  USING ((select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2')
-  WITH CHECK ((select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2');
+  USING ((select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2')
+  WITH CHECK ((select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2');

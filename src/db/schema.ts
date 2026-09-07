@@ -6,7 +6,7 @@
  * exatamente como a Seção 5 os declara — são eles que viram SQL.
  *
  * RLS: cada tabela com organizacao_id ganha uma policy permissiva de isolamento por
- * organização (usando auth.organizacao_id(), definida em
+ * organização (usando public.organizacao_id(), definida em
  * supabase/migrations/0001_auth_claims.sql) e uma policy restritiva de MFA. Quatro
  * tabelas (pessoas, contratos, documentos, registros_atividade) ganham também a
  * restrição de região para coord_regiao (Seção 5, "Regras de integridade
@@ -100,7 +100,7 @@ const timestamps = {
 /**
  * Isolamento por organização, para todas as operações.
  *
- * `(select auth.organizacao_id())`, não `auth.organizacao_id()` puro — achado do
+ * `(select public.organizacao_id())`, não `public.organizacao_id()` puro — achado do
  * skill oficial `supabase-postgres-best-practices` (instalado após a Tarefa 8):
  * envolver a chamada em `select` deixa o Postgres avaliar a função uma vez por
  * consulta em vez de uma vez por linha (InitPlan cacheado vs. reavaliação por
@@ -108,7 +108,7 @@ const timestamps = {
  * 10 exige dashboard < 2s com 2.000 contratos.
  */
 function organizationPolicy(name: string, organizationIdColumn: AnyPgColumn) {
-  const condition = sql`${organizationIdColumn} = (select auth.organizacao_id())`;
+  const condition = sql`${organizationIdColumn} = (select public.organizacao_id())`;
   return pgPolicy(name, {
     as: "permissive",
     for: "all",
@@ -128,7 +128,7 @@ function organizationAndRegionPolicy(
   organizationIdColumn: AnyPgColumn,
   regionIdColumn: AnyPgColumn,
 ) {
-  const condition = sql`${organizationIdColumn} = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR ${regionIdColumn} = (select auth.regiao_id()))`;
+  const condition = sql`${organizationIdColumn} = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR ${regionIdColumn} = (select public.regiao_id()))`;
   return pgPolicy(name, {
     as: "permissive",
     for: "all",
@@ -144,7 +144,7 @@ function organizationAndRegionPolicy(
  * sozinha, só pode negar. Mesmo cuidado de performance das duas anteriores.
  */
 function mfaGatePolicy(name: string) {
-  const condition = sql`(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'`;
+  const condition = sql`(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'`;
   return pgPolicy(name, {
     as: "restrictive",
     for: "all",
@@ -194,7 +194,7 @@ export const organizations = pgTable(
       as: "permissive",
       for: "select",
       to: authenticatedRole,
-      using: sql`${table.id} = (select auth.organizacao_id())`,
+      using: sql`${table.id} = (select public.organizacao_id())`,
     }),
     mfaGatePolicy("organizacoes_mfa"),
   ],
@@ -221,7 +221,7 @@ export const regions = pgTable(
       as: "permissive",
       for: "select",
       to: authenticatedRole,
-      using: sql`${table.organizationId} = (select auth.organizacao_id())`,
+      using: sql`${table.organizationId} = (select public.organizacao_id())`,
     }),
     mfaGatePolicy("regioes_mfa"),
   ],
@@ -389,7 +389,7 @@ export const contractEvents = pgTable(
   (table) => [
     ...organizationReadInsertPolicies(
       "eventos_contrato_organizacao",
-      sql`exists (select 1 from contratos c where c.id = ${table.contractId} and c.organizacao_id = (select auth.organizacao_id()))`,
+      sql`exists (select 1 from contratos c where c.id = ${table.contractId} and c.organizacao_id = (select public.organizacao_id()))`,
     ),
     mfaGatePolicy("eventos_contrato_mfa"),
   ],
@@ -558,7 +558,7 @@ export const auditLog = pgTable(
     ),
     ...organizationReadInsertPolicies(
       "log_auditoria_organizacao",
-      sql`${table.organizationId} = (select auth.organizacao_id())`,
+      sql`${table.organizationId} = (select public.organizacao_id())`,
     ),
     mfaGatePolicy("log_auditoria_mfa"),
   ],

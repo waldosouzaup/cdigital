@@ -1,5 +1,5 @@
 {
-  "id": "706f195a-62f3-4415-8cee-6a2f0f131878",
+  "id": "769fff63-c1ff-4581-9554-dc9cee9e79d0",
   "prevId": "023b01ad-ad0f-4229-9150-90251f624bb4",
   "version": "7",
   "dialect": "postgresql",
@@ -136,8 +136,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"registros_atividade\".\"organizacao_id\" = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR \"registros_atividade\".\"regiao_id\" = (select auth.regiao_id()))",
-          "withCheck": "\"registros_atividade\".\"organizacao_id\" = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR \"registros_atividade\".\"regiao_id\" = (select auth.regiao_id()))"
+          "using": "\"registros_atividade\".\"organizacao_id\" = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR \"registros_atividade\".\"regiao_id\" = (select public.regiao_id()))",
+          "withCheck": "\"registros_atividade\".\"organizacao_id\" = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR \"registros_atividade\".\"regiao_id\" = (select public.regiao_id()))"
         },
         "registros_atividade_mfa": {
           "name": "registros_atividade_mfa",
@@ -146,8 +146,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -283,7 +283,7 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"log_auditoria\".\"organizacao_id\" = (select auth.organizacao_id())"
+          "using": "\"log_auditoria\".\"organizacao_id\" = (select public.organizacao_id())"
         },
         "log_auditoria_organizacao_insert": {
           "name": "log_auditoria_organizacao_insert",
@@ -292,7 +292,7 @@
           "to": [
             "authenticated"
           ],
-          "withCheck": "\"log_auditoria\".\"organizacao_id\" = (select auth.organizacao_id())"
+          "withCheck": "\"log_auditoria\".\"organizacao_id\" = (select public.organizacao_id())"
         },
         "log_auditoria_mfa": {
           "name": "log_auditoria_mfa",
@@ -301,8 +301,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -411,8 +411,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"links_coleta\".\"organizacao_id\" = (select auth.organizacao_id())",
-          "withCheck": "\"links_coleta\".\"organizacao_id\" = (select auth.organizacao_id())"
+          "using": "\"links_coleta\".\"organizacao_id\" = (select public.organizacao_id())",
+          "withCheck": "\"links_coleta\".\"organizacao_id\" = (select public.organizacao_id())"
         },
         "links_coleta_mfa": {
           "name": "links_coleta_mfa",
@@ -421,8 +421,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -532,7 +532,7 @@
           "to": [
             "authenticated"
           ],
-          "using": "exists (select 1 from contratos c where c.id = \"eventos_contrato\".\"contrato_id\" and c.organizacao_id = (select auth.organizacao_id()))"
+          "using": "exists (select 1 from contratos c where c.id = \"eventos_contrato\".\"contrato_id\" and c.organizacao_id = (select public.organizacao_id()))"
         },
         "eventos_contrato_organizacao_insert": {
           "name": "eventos_contrato_organizacao_insert",
@@ -541,7 +541,7 @@
           "to": [
             "authenticated"
           ],
-          "withCheck": "exists (select 1 from contratos c where c.id = \"eventos_contrato\".\"contrato_id\" and c.organizacao_id = (select auth.organizacao_id()))"
+          "withCheck": "exists (select 1 from contratos c where c.id = \"eventos_contrato\".\"contrato_id\" and c.organizacao_id = (select public.organizacao_id()))"
         },
         "eventos_contrato_mfa": {
           "name": "eventos_contrato_mfa",
@@ -550,8 +550,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -646,8 +646,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"templates_contrato\".\"organizacao_id\" = (select auth.organizacao_id())",
-          "withCheck": "\"templates_contrato\".\"organizacao_id\" = (select auth.organizacao_id())"
+          "using": "\"templates_contrato\".\"organizacao_id\" = (select public.organizacao_id())",
+          "withCheck": "\"templates_contrato\".\"organizacao_id\" = (select public.organizacao_id())"
         },
         "templates_contrato_mfa": {
           "name": "templates_contrato_mfa",
@@ -656,8 +656,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -847,8 +847,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"contratos\".\"organizacao_id\" = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR \"contratos\".\"regiao_id\" = (select auth.regiao_id()))",
-          "withCheck": "\"contratos\".\"organizacao_id\" = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR \"contratos\".\"regiao_id\" = (select auth.regiao_id()))"
+          "using": "\"contratos\".\"organizacao_id\" = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR \"contratos\".\"regiao_id\" = (select public.regiao_id()))",
+          "withCheck": "\"contratos\".\"organizacao_id\" = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR \"contratos\".\"regiao_id\" = (select public.regiao_id()))"
         },
         "contratos_mfa": {
           "name": "contratos_mfa",
@@ -857,8 +857,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {
@@ -1058,8 +1058,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"documentos\".\"organizacao_id\" = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR \"documentos\".\"regiao_id\" = (select auth.regiao_id()))",
-          "withCheck": "\"documentos\".\"organizacao_id\" = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR \"documentos\".\"regiao_id\" = (select auth.regiao_id()))"
+          "using": "\"documentos\".\"organizacao_id\" = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR \"documentos\".\"regiao_id\" = (select public.regiao_id()))",
+          "withCheck": "\"documentos\".\"organizacao_id\" = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR \"documentos\".\"regiao_id\" = (select public.regiao_id()))"
         },
         "documentos_mfa": {
           "name": "documentos_mfa",
@@ -1068,8 +1068,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -1205,8 +1205,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"notificacoes\".\"organizacao_id\" = (select auth.organizacao_id())",
-          "withCheck": "\"notificacoes\".\"organizacao_id\" = (select auth.organizacao_id())"
+          "using": "\"notificacoes\".\"organizacao_id\" = (select public.organizacao_id())",
+          "withCheck": "\"notificacoes\".\"organizacao_id\" = (select public.organizacao_id())"
         },
         "notificacoes_mfa": {
           "name": "notificacoes_mfa",
@@ -1215,8 +1215,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -1279,7 +1279,7 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"organizacoes\".\"id\" = (select auth.organizacao_id())"
+          "using": "\"organizacoes\".\"id\" = (select public.organizacao_id())"
         },
         "organizacoes_mfa": {
           "name": "organizacoes_mfa",
@@ -1288,8 +1288,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -1473,8 +1473,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"pessoas\".\"organizacao_id\" = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR \"pessoas\".\"regiao_id\" = (select auth.regiao_id()))",
-          "withCheck": "\"pessoas\".\"organizacao_id\" = (select auth.organizacao_id()) AND ((select auth.papel()) <> 'coord_regiao' OR \"pessoas\".\"regiao_id\" = (select auth.regiao_id()))"
+          "using": "\"pessoas\".\"organizacao_id\" = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR \"pessoas\".\"regiao_id\" = (select public.regiao_id()))",
+          "withCheck": "\"pessoas\".\"organizacao_id\" = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR \"pessoas\".\"regiao_id\" = (select public.regiao_id()))"
         },
         "pessoas_mfa": {
           "name": "pessoas_mfa",
@@ -1483,8 +1483,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -1554,7 +1554,7 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"regioes\".\"organizacao_id\" = (select auth.organizacao_id())"
+          "using": "\"regioes\".\"organizacao_id\" = (select public.organizacao_id())"
         },
         "regioes_mfa": {
           "name": "regioes_mfa",
@@ -1563,8 +1563,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},
@@ -1679,8 +1679,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "\"usuarios\".\"organizacao_id\" = (select auth.organizacao_id())",
-          "withCheck": "\"usuarios\".\"organizacao_id\" = (select auth.organizacao_id())"
+          "using": "\"usuarios\".\"organizacao_id\" = (select public.organizacao_id())",
+          "withCheck": "\"usuarios\".\"organizacao_id\" = (select public.organizacao_id())"
         },
         "usuarios_mfa": {
           "name": "usuarios_mfa",
@@ -1689,8 +1689,8 @@
           "to": [
             "authenticated"
           ],
-          "using": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
-          "withCheck": "(select auth.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
+          "using": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'",
+          "withCheck": "(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'"
         }
       },
       "checkConstraints": {},

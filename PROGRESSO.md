@@ -203,7 +203,44 @@ Detalhe completo em `CONSULTAS.md`.
 Você colou as credenciais diretamente no `.env.example` (o template versionado no
 git) em vez do `.env.local` — movi os valores para `.env.local` (gitignored) e
 restaurei o `.env.example` ao template vazio antes de qualquer commit, então nada
-sensível chegou a entrar no histórico do git. Recebidos até aqui: `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`.
-`DATABASE_URL` ainda está com o placeholder `[YOUR-PASSWORD]` — aguardando a senha
-real do banco para rodar `db:migrate`/`db:seed`.
+sensível chegou a entrar no histórico do git.
+
+## Atualização — banco real migrado e semeado
+
+Com `DATABASE_URL` completa (senha continha `@`, precisou de URL-encoding — `%40`),
+consegui:
+
+1. **Aplicar as 5 migrations no projeto hospedado.** `drizzle-kit migrate` travava
+   indefinidamente contra o pooler (sem lock nenhum do lado do servidor — investiguei
+   via `pg_stat_activity`/`pg_locks`), então apliquei cada migration diretamente via
+   `postgres-js`, dividindo por `--> statement-breakpoint` e envolvendo em transação.
+   Funcionou de primeira.
+2. **Achado real, só descoberto ao aplicar (não em nenhuma doc genérica): o schema
+   `auth` é travado em projeto hospedado** — nem o role `postgres` tem `CREATE` lá, só
+   `supabase_auth_admin`. `auth.organizacao_id()`/`auth.papel()`/`auth.regiao_id()`
+   tiveram que virar `public.organizacao_id()` etc. — o mesmo padrão do exemplo
+   oficial atual do Supabase para claims customizadas (`public.authorize(...)`).
+   Corrigido em `0001_auth_claims.sql`, `src/db/schema.ts` e `0004_storage_policies.sql`;
+   migration 0002 regenerada de novo (`0002_tearful_vindicator.sql`).
+3. **Criei os buckets `documentos`/`contratos`** direto via `insert into storage.buckets`
+   — `config.toml` só é aplicado via `supabase config push`/CLI vinculado, que não
+   rodei (ver item 4).
+4. **`npm run db:seed` rodou com sucesso** — 82 pessoas/contratos, números batendo
+   **exatamente** com a Seção 11 em cada uma das 11 regiões (76 ativos, 6 distrato,
+   206 eventos_contrato). *Cuidado operacional: a primeira tentativa de seed "morreu"
+   por timeout do lado de cá mas continuou rodando no servidor — rodei de novo sem
+   perceber e dupliquei os dados. Truncado e re-semeado uma única vez, limpo.*
+5. **Bloqueio restante:** o **Custom Access Token Hook** (a função existe no banco,
+   mas o Supabase Auth precisa ser instruído a *chamá-la* — isso é configuração de
+   plataforma, não SQL) exige `supabase link`, que por sua vez exige um token de
+   acesso pessoal (`SUPABASE_ACCESS_TOKEN`) que não recebi. Você optou por habilitar
+   manualmente no Dashboard (Authentication → Hooks). **Enquanto isso não acontece,
+   o JWT sai sem as claims `organizacao_id`/`papel`/`regiao_id`, e os dois testes de
+   RLS mais importantes do gate (isolamento de organização e de região) não têm como
+   passar de verdade.**
+
+**Skills adicionais apareceram em `skills-lock.json`** (`frontend-design` de
+`anthropics/skills`, `web-design-guidelines` de `vercel-labs/agent-skills`) sem eu
+ter rodado `npx skills add` de novo — parece um comportamento de sincronização
+automática da ferramenta `skills`. Ambas as fontes são legítimas (Anthropic e Vercel
+Labs); não investiguei a fundo por não ser bloqueante.
