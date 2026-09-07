@@ -1,0 +1,12 @@
+# Vendorizado — não é código do projeto, o format nunca deve tocar aqui.
+.agents/
+skills-lock.json
+
+# Fonte da verdade do projeto, fornecida pelo usuário — nunca reformatar.
+PROMPT-Comite-Digital.md
+
+# Gerado pelo drizzle-kit — formatação própria, não precisa (nem deve) de Prettier.
+supabase/migrations/meta/
+
+node_modules/
+.next/

@@ -12,13 +12,7 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: [
-      "node_modules/**",
-      ".next/**",
-      "out/**",
-      "build/**",
-      "next-env.d.ts",
-    ],
+    ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts"],
   },
   // Regra de segurança da Seção 3.1 do PROMPT: a `service_role` bypassa RLS por
   // completo, então `src/lib/supabase/admin.ts` (o único lugar autorizado a usá-la)

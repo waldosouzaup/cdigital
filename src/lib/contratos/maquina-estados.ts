@@ -32,11 +32,7 @@ const ALLOWED_TRANSITIONS: Record<ContractStatus, readonly ContractStatus[]> = {
  * Estados que contam no quadro ativo do dashboard (Seção 7, "Regra de contagem").
  * Os estados de distrato formam visão separada e nunca entram neste total.
  */
-export const ACTIVE_BOARD_STATUSES: readonly ContractStatus[] = [
-  "emitido",
-  "enviado",
-  "assinado",
-];
+export const ACTIVE_BOARD_STATUSES: readonly ContractStatus[] = ["emitido", "enviado", "assinado"];
 
 export function canTransition(from: ContractStatus, to: ContractStatus): boolean {
   return ALLOWED_TRANSITIONS[from].includes(to);

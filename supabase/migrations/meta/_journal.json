@@ -8,6 +8,20 @@
       "when": 1788809464583,
       "tag": "0000_common_dakota_north",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788810191564,
+      "tag": "0001_auth_claims",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788810198214,
+      "tag": "0002_blushing_micromacro",
+      "breakpoints": true
     }
   ]
 }

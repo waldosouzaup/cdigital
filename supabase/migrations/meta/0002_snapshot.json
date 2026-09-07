@@ -1,0 +1,1780 @@
+{
+  "id": "c4c819e7-cf73-468d-9edd-831cc7aa2f86",
+  "prevId": "023b01ad-ad0f-4229-9150-90251f624bb4",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.registros_atividade": {
+      "name": "registros_atividade",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pessoa_id": {
+          "name": "pessoa_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "regiao_id": {
+          "name": "regiao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantidade": {
+          "name": "quantidade",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "foto_caminho": {
+          "name": "foto_caminho",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "observacao": {
+          "name": "observacao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sincronizado_em": {
+          "name": "sincronizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "registros_atividade_organizacao_id_organizacoes_id_fk": {
+          "name": "registros_atividade_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "registros_atividade",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "registros_atividade_pessoa_id_pessoas_id_fk": {
+          "name": "registros_atividade_pessoa_id_pessoas_id_fk",
+          "tableFrom": "registros_atividade",
+          "tableTo": "pessoas",
+          "columnsFrom": [
+            "pessoa_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "registros_atividade_regiao_id_regioes_id_fk": {
+          "name": "registros_atividade_regiao_id_regioes_id_fk",
+          "tableFrom": "registros_atividade",
+          "tableTo": "regioes",
+          "columnsFrom": [
+            "regiao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "registros_atividade_organizacao_regiao": {
+          "name": "registros_atividade_organizacao_regiao",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"registros_atividade\".\"organizacao_id\" = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR \"registros_atividade\".\"regiao_id\" = auth.regiao_id())",
+          "withCheck": "\"registros_atividade\".\"organizacao_id\" = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR \"registros_atividade\".\"regiao_id\" = auth.regiao_id())"
+        },
+        "registros_atividade_mfa": {
+          "name": "registros_atividade_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.log_auditoria": {
+      "name": "log_auditoria",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acao": {
+          "name": "acao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entidade": {
+          "name": "entidade",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entidade_id": {
+          "name": "entidade_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip": {
+          "name": "ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocorrido_em": {
+          "name": "ocorrido_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "log_auditoria_organizacao_id_ocorrido_em_idx": {
+          "name": "log_auditoria_organizacao_id_ocorrido_em_idx",
+          "columns": [
+            {
+              "expression": "organizacao_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ocorrido_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "log_auditoria_organizacao_id_organizacoes_id_fk": {
+          "name": "log_auditoria_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "log_auditoria",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "log_auditoria_usuario_id_usuarios_id_fk": {
+          "name": "log_auditoria_usuario_id_usuarios_id_fk",
+          "tableFrom": "log_auditoria",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "log_auditoria_organizacao_select": {
+          "name": "log_auditoria_organizacao_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"log_auditoria\".\"organizacao_id\" = auth.organizacao_id()"
+        },
+        "log_auditoria_organizacao_insert": {
+          "name": "log_auditoria_organizacao_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "\"log_auditoria\".\"organizacao_id\" = auth.organizacao_id()"
+        },
+        "log_auditoria_mfa": {
+          "name": "log_auditoria_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.links_coleta": {
+      "name": "links_coleta",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pessoa_id": {
+          "name": "pessoa_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expira_em": {
+          "name": "expira_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usado_em": {
+          "name": "usado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "links_coleta_organizacao_id_organizacoes_id_fk": {
+          "name": "links_coleta_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "links_coleta",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "links_coleta_pessoa_id_pessoas_id_fk": {
+          "name": "links_coleta_pessoa_id_pessoas_id_fk",
+          "tableFrom": "links_coleta",
+          "tableTo": "pessoas",
+          "columnsFrom": [
+            "pessoa_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "links_coleta_token_unique": {
+          "name": "links_coleta_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {
+        "links_coleta_organizacao": {
+          "name": "links_coleta_organizacao",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"links_coleta\".\"organizacao_id\" = auth.organizacao_id()",
+          "withCheck": "\"links_coleta\".\"organizacao_id\" = auth.organizacao_id()"
+        },
+        "links_coleta_mfa": {
+          "name": "links_coleta_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.eventos_contrato": {
+      "name": "eventos_contrato",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "contrato_id": {
+          "name": "contrato_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status_anterior": {
+          "name": "status_anterior",
+          "type": "status_contrato",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_novo": {
+          "name": "status_novo",
+          "type": "status_contrato",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "observacao": {
+          "name": "observacao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocorrido_em": {
+          "name": "ocorrido_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "eventos_contrato_contrato_id_contratos_id_fk": {
+          "name": "eventos_contrato_contrato_id_contratos_id_fk",
+          "tableFrom": "eventos_contrato",
+          "tableTo": "contratos",
+          "columnsFrom": [
+            "contrato_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "eventos_contrato_usuario_id_usuarios_id_fk": {
+          "name": "eventos_contrato_usuario_id_usuarios_id_fk",
+          "tableFrom": "eventos_contrato",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "eventos_contrato_organizacao_select": {
+          "name": "eventos_contrato_organizacao_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (select 1 from contratos c where c.id = \"eventos_contrato\".\"contrato_id\" and c.organizacao_id = auth.organizacao_id())"
+        },
+        "eventos_contrato_organizacao_insert": {
+          "name": "eventos_contrato_organizacao_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "exists (select 1 from contratos c where c.id = \"eventos_contrato\".\"contrato_id\" and c.organizacao_id = auth.organizacao_id())"
+        },
+        "eventos_contrato_mfa": {
+          "name": "eventos_contrato_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.templates_contrato": {
+      "name": "templates_contrato",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "objeto": {
+          "name": "objeto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "corpo_html": {
+          "name": "corpo_html",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_padrao": {
+          "name": "valor_padrao",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "templates_contrato_organizacao_id_organizacoes_id_fk": {
+          "name": "templates_contrato_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "templates_contrato",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "templates_contrato_organizacao": {
+          "name": "templates_contrato_organizacao",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"templates_contrato\".\"organizacao_id\" = auth.organizacao_id()",
+          "withCheck": "\"templates_contrato\".\"organizacao_id\" = auth.organizacao_id()"
+        },
+        "templates_contrato_mfa": {
+          "name": "templates_contrato_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.contratos": {
+      "name": "contratos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pessoa_id": {
+          "name": "pessoa_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "regiao_id": {
+          "name": "regiao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "objeto": {
+          "name": "objeto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor": {
+          "name": "valor",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_extenso": {
+          "name": "valor_extenso",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vigencia_inicio": {
+          "name": "vigencia_inicio",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vigencia_fim": {
+          "name": "vigencia_fim",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "status_contrato",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'rascunho'"
+        },
+        "emitido_em": {
+          "name": "emitido_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enviado_em": {
+          "name": "enviado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "canal_envio": {
+          "name": "canal_envio",
+          "type": "canal_envio",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enviado_para": {
+          "name": "enviado_para",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assinado_em": {
+          "name": "assinado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "contratos_organizacao_id_organizacoes_id_fk": {
+          "name": "contratos_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "contratos",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contratos_pessoa_id_pessoas_id_fk": {
+          "name": "contratos_pessoa_id_pessoas_id_fk",
+          "tableFrom": "contratos",
+          "tableTo": "pessoas",
+          "columnsFrom": [
+            "pessoa_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contratos_template_id_templates_contrato_id_fk": {
+          "name": "contratos_template_id_templates_contrato_id_fk",
+          "tableFrom": "contratos",
+          "tableTo": "templates_contrato",
+          "columnsFrom": [
+            "template_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contratos_regiao_id_regioes_id_fk": {
+          "name": "contratos_regiao_id_regioes_id_fk",
+          "tableFrom": "contratos",
+          "tableTo": "regioes",
+          "columnsFrom": [
+            "regiao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "contratos_organizacao_regiao": {
+          "name": "contratos_organizacao_regiao",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"contratos\".\"organizacao_id\" = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR \"contratos\".\"regiao_id\" = auth.regiao_id())",
+          "withCheck": "\"contratos\".\"organizacao_id\" = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR \"contratos\".\"regiao_id\" = auth.regiao_id())"
+        },
+        "contratos_mfa": {
+          "name": "contratos_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {
+        "vigencia_valida": {
+          "name": "vigencia_valida",
+          "value": "\"contratos\".\"vigencia_fim\" >= \"contratos\".\"vigencia_inicio\""
+        },
+        "valor_positivo": {
+          "name": "valor_positivo",
+          "value": "\"contratos\".\"valor\" > 0"
+        },
+        "ordem_datas": {
+          "name": "ordem_datas",
+          "value": "\"contratos\".\"enviado_em\" IS NULL OR \"contratos\".\"emitido_em\" IS NULL OR \"contratos\".\"enviado_em\" >= \"contratos\".\"emitido_em\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.documentos": {
+      "name": "documentos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pessoa_id": {
+          "name": "pessoa_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "regiao_id": {
+          "name": "regiao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "caminho_storage": {
+          "name": "caminho_storage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome_original": {
+          "name": "nome_original",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hash_sha256": {
+          "name": "hash_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "largura_px": {
+          "name": "largura_px",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "altura_px": {
+          "name": "altura_px",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bytes": {
+          "name": "bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_documento",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendente'"
+        },
+        "motivo_rejeicao": {
+          "name": "motivo_rejeicao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "versao": {
+          "name": "versao",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "documentos_organizacao_id_hash_sha256_idx": {
+          "name": "documentos_organizacao_id_hash_sha256_idx",
+          "columns": [
+            {
+              "expression": "organizacao_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "hash_sha256",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "documentos_organizacao_id_organizacoes_id_fk": {
+          "name": "documentos_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "documentos",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "documentos_pessoa_id_pessoas_id_fk": {
+          "name": "documentos_pessoa_id_pessoas_id_fk",
+          "tableFrom": "documentos",
+          "tableTo": "pessoas",
+          "columnsFrom": [
+            "pessoa_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "documentos_regiao_id_regioes_id_fk": {
+          "name": "documentos_regiao_id_regioes_id_fk",
+          "tableFrom": "documentos",
+          "tableTo": "regioes",
+          "columnsFrom": [
+            "regiao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "documentos_organizacao_regiao": {
+          "name": "documentos_organizacao_regiao",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"documentos\".\"organizacao_id\" = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR \"documentos\".\"regiao_id\" = auth.regiao_id())",
+          "withCheck": "\"documentos\".\"organizacao_id\" = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR \"documentos\".\"regiao_id\" = auth.regiao_id())"
+        },
+        "documentos_mfa": {
+          "name": "documentos_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notificacoes": {
+      "name": "notificacoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_notificacao",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "destinatario_email": {
+          "name": "destinatario_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entidade": {
+          "name": "entidade",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entidade_id": {
+          "name": "entidade_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chave_idempotencia": {
+          "name": "chave_idempotencia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resend_id": {
+          "name": "resend_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_notificacao",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'enfileirada'"
+        },
+        "tentativas": {
+          "name": "tentativas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "erro": {
+          "name": "erro",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enviada_em": {
+          "name": "enviada_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "notificacoes_organizacao_id_organizacoes_id_fk": {
+          "name": "notificacoes_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "notificacoes",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "notificacoes_chave_idempotencia_unique": {
+          "name": "notificacoes_chave_idempotencia_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "chave_idempotencia"
+          ]
+        }
+      },
+      "policies": {
+        "notificacoes_organizacao": {
+          "name": "notificacoes_organizacao",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"notificacoes\".\"organizacao_id\" = auth.organizacao_id()",
+          "withCheck": "\"notificacoes\".\"organizacao_id\" = auth.organizacao_id()"
+        },
+        "notificacoes_mfa": {
+          "name": "notificacoes_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organizacoes": {
+      "name": "organizacoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cnpj": {
+          "name": "cnpj",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativa": {
+          "name": "ativa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "organizacoes_select": {
+          "name": "organizacoes_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"organizacoes\".\"id\" = auth.organizacao_id()"
+        },
+        "organizacoes_mfa": {
+          "name": "organizacoes_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pessoas": {
+      "name": "pessoas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome_completo": {
+          "name": "nome_completo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cpf": {
+          "name": "cpf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rg": {
+          "name": "rg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_nascimento": {
+          "name": "data_nascimento",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "endereco": {
+          "name": "endereco",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cep": {
+          "name": "cep",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telefone": {
+          "name": "telefone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "regiao_id": {
+          "name": "regiao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "funcao": {
+          "name": "funcao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "banco": {
+          "name": "banco",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agencia": {
+          "name": "agencia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conta": {
+          "name": "conta",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apta": {
+          "name": "apta",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pessoas_organizacao_id_cpf_idx": {
+          "name": "pessoas_organizacao_id_cpf_idx",
+          "columns": [
+            {
+              "expression": "organizacao_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cpf",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pessoas_organizacao_id_organizacoes_id_fk": {
+          "name": "pessoas_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "pessoas",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pessoas_regiao_id_regioes_id_fk": {
+          "name": "pessoas_regiao_id_regioes_id_fk",
+          "tableFrom": "pessoas",
+          "tableTo": "regioes",
+          "columnsFrom": [
+            "regiao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "pessoas_organizacao_regiao": {
+          "name": "pessoas_organizacao_regiao",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"pessoas\".\"organizacao_id\" = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR \"pessoas\".\"regiao_id\" = auth.regiao_id())",
+          "withCheck": "\"pessoas\".\"organizacao_id\" = auth.organizacao_id() AND (auth.papel() <> 'coord_regiao' OR \"pessoas\".\"regiao_id\" = auth.regiao_id())"
+        },
+        "pessoas_mfa": {
+          "name": "pessoas_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.regioes": {
+      "name": "regioes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "regioes_organizacao_id_organizacoes_id_fk": {
+          "name": "regioes_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "regioes",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "regioes_select": {
+          "name": "regioes_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"regioes\".\"organizacao_id\" = auth.organizacao_id()"
+        },
+        "regioes_mfa": {
+          "name": "regioes_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.usuarios": {
+      "name": "usuarios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "organizacao_id": {
+          "name": "organizacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "papel": {
+          "name": "papel",
+          "type": "papel_usuario",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "regiao_id": {
+          "name": "regiao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "usuarios_organizacao_id_organizacoes_id_fk": {
+          "name": "usuarios_organizacao_id_organizacoes_id_fk",
+          "tableFrom": "usuarios",
+          "tableTo": "organizacoes",
+          "columnsFrom": [
+            "organizacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "usuarios_regiao_id_regioes_id_fk": {
+          "name": "usuarios_regiao_id_regioes_id_fk",
+          "tableFrom": "usuarios",
+          "tableTo": "regioes",
+          "columnsFrom": [
+            "regiao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "usuarios_id_auth_users_id_fk": {
+          "name": "usuarios_id_auth_users_id_fk",
+          "tableFrom": "usuarios",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "usuarios_organizacao": {
+          "name": "usuarios_organizacao",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"usuarios\".\"organizacao_id\" = auth.organizacao_id()",
+          "withCheck": "\"usuarios\".\"organizacao_id\" = auth.organizacao_id()"
+        },
+        "usuarios_mfa": {
+          "name": "usuarios_mfa",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "authenticated"
+          ],
+          "using": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'",
+          "withCheck": "auth.papel() NOT IN ('gestor', 'coord_comite') OR (auth.jwt() ->> 'aal') = 'aal2'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.status_contrato": {
+      "name": "status_contrato",
+      "schema": "public",
+      "values": [
+        "rascunho",
+        "emitido",
+        "enviado",
+        "assinado",
+        "distratado",
+        "distrato_assinado",
+        "encerrado",
+        "cancelado"
+      ]
+    },
+    "public.canal_envio": {
+      "name": "canal_envio",
+      "schema": "public",
+      "values": [
+        "email",
+        "whatsapp",
+        "presencial"
+      ]
+    },
+    "public.status_documento": {
+      "name": "status_documento",
+      "schema": "public",
+      "values": [
+        "pendente",
+        "aprovado",
+        "rejeitado"
+      ]
+    },
+    "public.status_notificacao": {
+      "name": "status_notificacao",
+      "schema": "public",
+      "values": [
+        "enfileirada",
+        "enviada",
+        "entregue",
+        "falhou",
+        "bounce",
+        "reclamada"
+      ]
+    },
+    "public.tipo_notificacao": {
+      "name": "tipo_notificacao",
+      "schema": "public",
+      "values": [
+        "link_coleta",
+        "documento_rejeitado",
+        "contrato_enviado",
+        "lembrete_assinatura",
+        "vigencia_a_vencer",
+        "resumo_diario",
+        "pessoa_apta"
+      ]
+    },
+    "public.papel_usuario": {
+      "name": "papel_usuario",
+      "schema": "public",
+      "values": [
+        "gestor",
+        "coord_comite",
+        "coord_regiao",
+        "contratado",
+        "auditor"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
