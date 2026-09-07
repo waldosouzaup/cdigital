@@ -12,6 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
     "seed:carga": "tsx src/db/seed-carga.ts",
+    "db:provision-user": "tsx src/db/provision-user.ts",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
