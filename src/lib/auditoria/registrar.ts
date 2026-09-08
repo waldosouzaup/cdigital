@@ -94,6 +94,22 @@ export async function registerDocumentReview(params: {
   });
 }
 
+export async function registerActivityWrite(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  userId: string | null;
+  activityId: string;
+}): Promise<void> {
+  await registrarAuditoria({
+    supabase: params.supabase,
+    organizationId: params.organizationId,
+    userId: params.userId,
+    action: "registro_atividade",
+    entity: "registros_atividade",
+    entityId: params.activityId,
+  });
+}
+
 export async function registerContractWrite(params: {
   supabase: SupabaseClient;
   organizationId: string;
