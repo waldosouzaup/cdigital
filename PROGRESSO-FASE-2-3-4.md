@@ -286,3 +286,94 @@ curl GET /coleta/[token-real]     → 200, saudação com o primeiro nome corret
 - `gerarLinkColeta` não checa se já existe um link **ainda válido e não usado** para a
   mesma pessoa antes de criar outro — hoje cada clique gera uma linha nova em
   `links_coleta` (não é um bug de segurança, mas permite links órfãos acumularem).
+
+---
+
+## Atualização — 2026-09-07 (mesmo dia, continuação): item 3 da Fase 2
+
+### Upload de documento — real, validado no servidor, ligado ao Storage de verdade
+
+- **`src/lib/documentos/upload.ts`** (TDD): `validarTipoETamanho` (JPG/PNG/PDF, 20MB),
+  `validarDimensaoImagem` (usa `sharp`, `autoOrient` para contabilizar rotação EXIF de
+  foto de celular — achado do Context 7, registrado em CONSULTAS.md), `calcularHashSha256`,
+  `extensaoPorMime` (extensão vem sempre do mime real, nunca do nome que a pessoa deu).
+- **Migration `0006_upload_coleta_publico.sql`**: mesmo padrão SECURITY DEFINER do
+  item 2. `registrar_documento_coleta(...)` calcula a próxima versão (com
+  `pg_advisory_xact_lock` travando a corrida), monta o caminho
+  `{organizacao_id}/coleta/{token}/{tipo}_{pessoa_id}_v{versao}.{ext}` e grava a linha
+  em `documentos` — hash duplicado dentro da organização é recusado (índice único já
+  existia da Fase 1) apontando o documento existente. Nova policy de Storage
+  (`anon`, só para o bucket `documentos`) valida o token embutido no caminho antes de
+  aceitar o INSERT do arquivo em si.
+  **Achado de gap da Fase 1 corrigido de passagem:** `documentos.versao` nunca teve o
+  índice único `(pessoa_id, tipo, versao)` que o plano original já prometia — criado
+  agora, junto com o upload real que finalmente precisa dele.
+- **`POST /api/coleta/[token]/documento`** (Route Handler, `runtime = "nodejs"` por
+  causa do `sharp`): valida tipo/tamanho → revalida o token no servidor → valida
+  dimensão → calcula hash → chama a RPC → só então sobe os bytes para o Storage.
+  Nunca usa `admin.ts`/service_role (mesma disciplina do item 2).
+- **`documento_rejeitado`** dispara por e-mail quando a dimensão é recusada e a
+  pessoa tem e-mail cadastrado, com chave de idempotência pelo hash do arquivo
+  rejeitado (evita duplo aviso por duplo clique, mas avisa de novo numa foto
+  diferente).
+- **`/coleta/[token]`** ganhou uma Etapa 2 real (documento), com "pular por
+  enquanto" para não travar quem ainda não tem a foto à mão.
+
+### Bug encontrado e corrigido durante o teste manual ao vivo
+
+`src/middleware.ts`: `/api/coleta/[token]/documento` estava caindo no redirect para
+`/login` porque só a página `/coleta/[token]` estava marcada como pública, não a rota
+de API correspondente — uma chamada `fetch()` recebia de volta uma página de login em
+HTML, sem erro claro. **Provavelmente o mesmo problema já afetava
+`/api/webhooks/resend`** (nunca testado via HTTP de verdade até agora, só a lógica
+interna). Corrigido de forma geral: nenhuma rota `/api/*` passa mais pelo redirect de
+sessão — cada uma faz sua própria checagem (token, assinatura de webhook,
+`CRON_SECRET` no futuro) e devolve JSON com o status certo.
+
+### Achado operacional do bucket
+
+O bucket `documentos` já tinha `allowed_mime_types` (`image/jpeg`, `image/png`,
+`application/pdf`) e `file_size_limit` (20 MB) configurados desde a criação manual na
+Fase 1 — uma camada de defesa a mais no próprio Storage, além da validação em
+`upload.ts`. Só apareceu porque o teste de integração usava um `Blob` sintético sem
+`type`, mandando `application/octet-stream`; o código real (que usa `File` do
+navegador) não tem esse problema.
+
+### Testes novos, contra o Supabase real
+
+`tests/integration/upload-coleta.test.ts` (5 testes, todos pelo cliente anon): o
+caminho gerado é exatamente o esperado; o upload físico real é aceito nesse caminho;
+um caminho fora do padrão é recusado pela policy; o mesmo hash de novo é recusado
+apontando o documento existente; um hash diferente cria a versão 2 preservando a 1.
+
+### Verificação manual ao vivo (não só teste automatizado)
+
+Gerado um link real via SQL, três chamadas `curl -F` reais contra o servidor rodando:
+
+```
+Imagem 72×72   → {"ok":false,"motivo":"...resolução baixa (72 × 72 px)...mínimo 800px..."}
+Imagem 1200×1600 → {"ok":true}
+Mesma imagem de novo → {"ok":false,"motivo":"Este documento já foi enviado antes (em 07/09/2026)."}
+```
+
+Exatamente os 3 comportamentos que o gate da Fase 2 pede para este item.
+
+### Checagem final
+
+```
+npx tsc --noEmit          → limpo
+npm run lint              → limpo
+npm run test:unit         → 78/78 (11 novos: validação de upload)
+npm run test:integration  → 18/18 (RLS + webhook + CPF duplicado + links_coleta + upload)
+npm run build             → limpo, 14 rotas
+```
+
+### O que do item 3 ainda falta
+
+- Só um tipo de documento (`documento_identidade`) — RG/CNH/comprovante de residência
+  não são diferenciados ainda (a coluna é texto livre, não bloqueia isso no futuro).
+- "Documentação completa e aprovada marca a pessoa como apta" (item 6) — o upload
+  grava `status: 'pendente'`, mas nada ainda revisa/aprova o documento nem atualiza
+  `pessoas.apta`. Isso é o próximo pedaço natural (mesa de triagem, já existe como
+  mockup em `/documentos`).
+- OCR (sugestão de nome/CPF a partir do documento) é Fase 4, não esta.
