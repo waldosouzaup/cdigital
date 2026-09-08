@@ -1,0 +1,296 @@
+"use client";
+
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Campo } from "@/components/campo";
+import { Selo } from "@/components/selo";
+import { Badge } from "@/components/badge";
+import { Alerta } from "@/components/alerta";
+import { Modal } from "@/components/modal";
+import {
+  ESTADO_INICIAL_SALVAR_TEMPLATE,
+  alternarAtivoTemplate,
+  salvarTemplate,
+} from "./acoes";
+import type { TemplateContrato } from "./dados";
+
+const MARCADORES = [
+  "{{nome}}",
+  "{{cpf}}",
+  "{{endereco}}",
+  "{{objeto}}",
+  "{{valor}}",
+  "{{valor_extenso}}",
+  "{{vigencia_inicio}}",
+  "{{vigencia_fim}}",
+];
+
+export function ConfiguracoesCliente({
+  templatesIniciais,
+}: {
+  templatesIniciais: TemplateContrato[];
+}) {
+  const router = useRouter();
+
+  // Identidade do comitê — cosmético, fora do escopo da Fase 2, não persiste.
+  const [nomeComite, setNomeComite] = useState("Comitê Central — Eleições 2026");
+  const [cnpj, setCnpj] = useState("00.000.000/0001-00");
+
+  // Editor de modelos — real
+  const [modalAberto, setModalAberto] = useState(false);
+  const [templateEmEdicao, setTemplateEmEdicao] = useState<TemplateContrato | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const corpoRef = useRef<HTMLTextAreaElement>(null);
+  const [estado, formAction, pendente] = useActionState(
+    salvarTemplate,
+    ESTADO_INICIAL_SALVAR_TEMPLATE,
+  );
+
+  useEffect(() => {
+    if (estado.status === "sucesso") {
+      setModalAberto(false);
+      router.refresh();
+    }
+  }, [estado.status, router]);
+
+  function abrirNovoTemplate() {
+    setTemplateEmEdicao(null);
+    setModalAberto(true);
+  }
+
+  function abrirEdicaoTemplate(template: TemplateContrato) {
+    setTemplateEmEdicao(template);
+    setModalAberto(true);
+  }
+
+  function inserirMarcador(marcador: string) {
+    const textarea = corpoRef.current;
+    if (!textarea) return;
+    const inicio = textarea.selectionStart ?? textarea.value.length;
+    const fim = textarea.selectionEnd ?? textarea.value.length;
+    textarea.value = textarea.value.slice(0, inicio) + marcador + textarea.value.slice(fim);
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = inicio + marcador.length;
+  }
+
+  async function handleAlternarAtivo(template: TemplateContrato) {
+    await alternarAtivoTemplate(template.id, !template.ativo);
+    router.refresh();
+  }
+
+  return (
+    <div className="space-y-8 max-w-5xl">
+      {/* Cabeçalho */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 border-b border-line pb-4">
+        <div>
+          <span className="font-mono text-xs uppercase tracking-wider text-seal">
+            Parâmetros do Comitê & Modelos
+          </span>
+          <h1 className="text-h1 font-semibold text-ink">Configurações e Governança</h1>
+          <p className="mt-1 text-small text-ink-muted">
+            Dados cadastrais da campanha, modelos de minutas e políticas de retenção LGPD.
+          </p>
+        </div>
+
+        <Selo voz="selo" onClick={abrirNovoTemplate} className="text-xs">
+          + Novo Modelo de Contrato
+        </Selo>
+      </div>
+
+      {/* DADOS DA ORGANIZAÇÃO ELEITORAL — cosmético, fora do escopo da Fase 2 */}
+      <section className="border border-line bg-surface p-6 space-y-6">
+        <div className="regua">
+          <h2 className="text-h2 font-semibold text-ink">Identificação do Comitê Eleitoral</h2>
+          <p className="text-xs text-ink-muted">
+            Dados vinculados ao Cadastro Nacional da Pessoa Jurídica da campanha e aos relatórios
+            do TSE.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+          <Campo
+            rotulo="Razão Social / Nome do Comitê"
+            id="nome-comite"
+            value={nomeComite}
+            onChange={(e) => setNomeComite(e.target.value)}
+          />
+          <Campo
+            rotulo="CNPJ Eleitoral da Campanha"
+            id="cnpj"
+            mono
+            value={cnpj}
+            onChange={(e) => setCnpj(e.target.value)}
+          />
+        </div>
+      </section>
+
+      {/* MODELOS DE MINUTA CONTRATUAL — real (Fase 2, item 7) */}
+      <section className="border border-line bg-surface p-6 space-y-6">
+        <div className="regua flex items-center justify-between">
+          <div>
+            <h2 className="text-h2 font-semibold text-ink">Modelos de Minuta Contratual</h2>
+            <p className="text-xs text-ink-muted">
+              Templates com marcadores automáticos, usados na emissão de contrato.
+            </p>
+          </div>
+          <Badge status="aprovado" rotuloPersonalizado="Variáveis Dinâmicas" />
+        </div>
+
+        {templatesIniciais.length > 0 ? (
+          <div className="divide-y divide-line border border-line">
+            {templatesIniciais.map((t) => (
+              <div key={t.id} className="p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-ink">{t.nome}</span>
+                    {!t.ativo && <Badge status="neutro" rotuloPersonalizado="Inativo" />}
+                  </div>
+                  <span className="text-xs text-ink-muted block">
+                    {t.objeto}
+                    {t.valorPadrao ? ` · R$ ${Number(t.valorPadrao).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => abrirEdicaoTemplate(t)}
+                    className="text-xs text-seal hover:underline cursor-pointer"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAlternarAtivo(t)}
+                    className="text-xs text-ink-muted hover:text-ink hover:underline cursor-pointer"
+                  >
+                    {t.ativo ? "Desativar" : "Ativar"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-small text-ink-muted">
+            Nenhum modelo cadastrado ainda. Crie o primeiro para poder emitir contratos.
+          </p>
+        )}
+
+        <div className="p-4 bg-paper border border-line space-y-2">
+          <span className="text-xs font-mono text-ink font-semibold uppercase">
+            Marcadores suportados pelo sistema de emissão:
+          </span>
+          <div className="flex flex-wrap gap-2 text-xs font-mono text-ink-muted">
+            {MARCADORES.map((tag) => (
+              <span key={tag} className="border border-line bg-surface px-2 py-0.5 text-seal select-all">
+                {tag}
+              </span>
+            ))}
+          </div>
+          <p className="text-[0.75rem] text-ink-muted leading-tight pt-1">
+            * O valor por extenso é calculado no servidor a partir do valor numérico, nunca
+            digitado.
+          </p>
+        </div>
+      </section>
+
+      {/* GOVERNANÇA LGPD E SEGURANÇA — cosmético, fora do escopo da Fase 2 */}
+      <section className="border border-line bg-surface p-6 space-y-4">
+        <div className="regua">
+          <h2 className="text-h2 font-semibold text-ink">Proteção de Dados & Conformidade LGPD</h2>
+          <p className="text-xs text-ink-muted">
+            Política de privacidade, controle de privilégios e expurgo pós-campanha.
+          </p>
+        </div>
+
+        <div className="space-y-3 pt-2 text-small text-ink-muted leading-relaxed">
+          <div className="flex items-center justify-between border-b border-line pb-3">
+            <div>
+              <strong className="text-ink block">MFA TOTP Obrigatório</strong>
+              <span className="text-xs">Exigido por política RLS para gestores e coordenadores.</span>
+            </div>
+            <Badge status="aprovado">Ativado</Badge>
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <div>
+              <strong className="text-ink block">Isolamento Multi-tenant (Row-Level Security)</strong>
+              <span className="text-xs">Impede vazamento de dados entre organizações distintas.</span>
+            </div>
+            <Badge status="aprovado">100% Coberto</Badge>
+          </div>
+        </div>
+      </section>
+
+      {/* MODAL: EDITAR/CRIAR MODELO */}
+      <Modal
+        aberto={modalAberto}
+        aoFechar={() => setModalAberto(false)}
+        titulo={templateEmEdicao ? "Editar Modelo de Contrato" : "Novo Modelo de Contrato"}
+        descricao="Use os marcadores abaixo no corpo do texto — eles são substituídos pelos dados reais na emissão."
+        rotuloPrimario={pendente ? "Salvando…" : "Salvar Modelo"}
+        acaoPrimaria={() => formRef.current?.requestSubmit()}
+        desabilitarConfirmacao={pendente}
+      >
+        <form ref={formRef} action={formAction} className="space-y-4 text-small">
+          <input type="hidden" name="id" value={templateEmEdicao?.id ?? ""} />
+
+          {estado.status === "erro" && (
+            <Alerta tom="critico" titulo="Não foi possível salvar">
+              {estado.mensagem}
+            </Alerta>
+          )}
+
+          <Campo
+            rotulo="Identificador do Modelo"
+            id="template-nome"
+            name="nome"
+            required
+            defaultValue={templateEmEdicao?.nome ?? ""}
+          />
+          <Campo
+            rotulo="Objeto Padrão"
+            id="template-objeto"
+            name="objeto"
+            required
+            defaultValue={templateEmEdicao?.objeto ?? ""}
+          />
+          <Campo
+            rotulo="Valor Padrão (R$) — opcional"
+            id="template-valor"
+            name="valorPadrao"
+            mono
+            defaultValue={templateEmEdicao?.valorPadrao ?? ""}
+            placeholder="1500.00"
+          />
+
+          <div>
+            <label className="block text-small font-medium text-ink mb-1.5">
+              Corpo do Contrato
+            </label>
+            <textarea
+              ref={corpoRef}
+              name="corpoHtml"
+              rows={8}
+              required
+              defaultValue={templateEmEdicao?.corpoHtml ?? ""}
+              className="w-full border border-line bg-transparent p-2.5 text-small text-ink outline-none focus:border-seal leading-relaxed font-mono text-xs"
+              placeholder={"<p>O(a) CONTRATADO(A) {{nome}}, CPF {{cpf}}...</p>"}
+            />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {MARCADORES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => inserirMarcador(m)}
+                  className="px-2 py-1 bg-paper border border-line text-[0.7rem] font-mono text-seal hover:border-seal cursor-pointer"
+                >
+                  + {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
