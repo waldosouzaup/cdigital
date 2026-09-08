@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Campo } from "@/components/campo";
 import { Selo } from "@/components/selo";
@@ -10,6 +10,7 @@ import { Modal } from "@/components/modal";
 import {
   ESTADO_INICIAL_SALVAR_TEMPLATE,
   alternarAtivoTemplate,
+  expurgarDocumentosDaCampanha,
   salvarTemplate,
 } from "./acoes";
 import type { TemplateContrato } from "./dados";
@@ -45,6 +46,37 @@ export function ConfiguracoesCliente({
     salvarTemplate,
     ESTADO_INICIAL_SALVAR_TEMPLATE,
   );
+
+  // Retenção / expurgo (Fase 4, item 6) — só gestor; a action checa o papel.
+  const [motivoExpurgo, setMotivoExpurgo] = useState("");
+  const [expurgando, iniciarExpurgo] = useTransition();
+  const [resultadoExpurgo, setResultadoExpurgo] = useState<{
+    tom: "sucesso" | "informativo" | "critico";
+    texto: string;
+  } | null>(null);
+
+  function executarExpurgo() {
+    setResultadoExpurgo(null);
+    iniciarExpurgo(async () => {
+      const r = await expurgarDocumentosDaCampanha(motivoExpurgo);
+      if (r.status === "erro") {
+        setResultadoExpurgo({ tom: "critico", texto: r.mensagem ?? "Não foi possível expurgar." });
+        return;
+      }
+      if ((r.expurgados ?? 0) === 0) {
+        setResultadoExpurgo({ tom: "informativo", texto: r.mensagem ?? "Nada a expurgar ainda." });
+        return;
+      }
+      setMotivoExpurgo("");
+      setResultadoExpurgo({
+        tom: "sucesso",
+        texto: `${r.expurgados} documento(s) expurgado(s) e registrado(s)${
+          r.falhas ? `; ${r.falhas} falha(s)` : ""
+        }.`,
+      });
+      router.refresh();
+    });
+  }
 
   useEffect(() => {
     if (estado.status === "sucesso") {
@@ -211,12 +243,54 @@ export function ConfiguracoesCliente({
             <Badge status="aprovado">Ativado</Badge>
           </div>
 
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-between border-b border-line pb-3 pt-1">
             <div>
               <strong className="text-ink block">Isolamento Multi-tenant (Row-Level Security)</strong>
               <span className="text-xs">Impede vazamento de dados entre organizações distintas.</span>
             </div>
             <Badge status="aprovado">100% Coberto</Badge>
+          </div>
+
+          {/* Expurgo de documentos pessoais ao fim da campanha (Fase 4, item 6) */}
+          <div className="pt-2">
+            <strong className="text-ink block">Expurgo de documentos pessoais</strong>
+            <span className="text-xs block">
+              Ao fim da campanha, passada a carência legal de retenção, apaga os arquivos de
+              RG/CNH/comprovante do Storage e registra o expurgo (o que, quando, por quem e por quê).
+              Só o gestor executa.
+            </span>
+            <div className="mt-3 space-y-2">
+              <Campo
+                id="motivo-expurgo"
+                rotulo="Motivo do expurgo"
+                value={motivoExpurgo}
+                onChange={(e) => setMotivoExpurgo(e.target.value)}
+                placeholder="Ex.: encerramento da prestação de contas da campanha 2026"
+              />
+              <Selo
+                voz="perigo"
+                onClick={executarExpurgo}
+                carregando={expurgando}
+                textoCarregando="Expurgando…"
+                disabled={!motivoExpurgo.trim() || expurgando}
+                className="text-xs"
+              >
+                Executar expurgo de retenção
+              </Selo>
+              {resultadoExpurgo && (
+                <Alerta
+                  tom={
+                    resultadoExpurgo.tom === "sucesso"
+                      ? "sucesso"
+                      : resultadoExpurgo.tom === "informativo"
+                        ? "informativo"
+                        : "critico"
+                  }
+                >
+                  {resultadoExpurgo.texto}
+                </Alerta>
+              )}
+            </div>
           </div>
         </div>
       </section>

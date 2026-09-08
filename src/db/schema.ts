@@ -432,6 +432,9 @@ export const documents = pgTable(
     status: documentStatusEnum("status").notNull().default("pendente"),
     rejectionReason: text("motivo_rejeicao"),
     version: integer("versao").notNull().default(1),
+    // Fase 4, item 6: marca o documento cujo objeto no Storage já foi apagado
+    // pela política de retenção. O registro do expurgo fica em `expurgos`.
+    purgedAt: timestamp("expurgado_em", { withTimezone: true }),
     ...timestamps,
   },
   (table) => [
@@ -554,6 +557,40 @@ export const notifications = pgTable(
   (table) => [
     organizationPolicy("notificacoes_organizacao", table.organizationId),
     mfaGatePolicy("notificacoes_mfa"),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// expurgos — Fase 4, item 6. Registro append-only do expurgo de documentos
+// pessoais ao fim da campanha (só select + insert; sem update/delete).
+// ---------------------------------------------------------------------------
+
+export const purges = pgTable(
+  "expurgos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organizacao_id")
+      .notNull()
+      .references(() => organizations.id),
+    documentId: uuid("documento_id")
+      .notNull()
+      .references(() => documents.id),
+    personId: uuid("pessoa_id")
+      .notNull()
+      .references(() => people.id),
+    type: text("tipo").notNull(),
+    hashSha256: text("hash_sha256").notNull(),
+    reason: text("motivo").notNull(),
+    executedBy: uuid("executado_por").references(() => users.id),
+    purgedAt: timestamp("expurgado_em", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (table) => [
+    ...organizationReadInsertPolicies(
+      "expurgos_organizacao",
+      sql`${table.organizationId} = (select public.organizacao_id())`,
+    ),
+    mfaGatePolicy("expurgos_mfa"),
   ],
 );
 
