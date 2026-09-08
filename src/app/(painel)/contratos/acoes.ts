@@ -47,84 +47,81 @@ export interface EstadoEmitirContrato {
 
 export const ESTADO_INICIAL_EMITIR_CONTRATO: EstadoEmitirContrato = { status: "idle" };
 
-export async function emitirContrato(
-  _estadoAnterior: EstadoEmitirContrato,
-  formData: FormData,
-): Promise<EstadoEmitirContrato> {
-  const pessoaId = String(formData.get("pessoaId") ?? "");
-  const templateId = String(formData.get("templateId") ?? "");
-  const vigenciaInicio = String(formData.get("vigenciaInicio") ?? "");
-  const vigenciaFim = String(formData.get("vigenciaFim") ?? "");
-  const valorTexto = String(formData.get("valor") ?? "").replace(",", ".");
+interface DadosParaEmissao {
+  nomeCompleto: string;
+  cpf: string;
+  endereco: string | null;
+}
 
-  if (!pessoaId || !templateId || !vigenciaInicio || !vigenciaFim) {
-    return { status: "erro", mensagem: "Selecione a pessoa, o modelo e a vigência." };
-  }
+interface TemplateParaEmissao {
+  objeto: string;
+  corpoHtml: string;
+}
 
-  const valor = Number(valorTexto);
-  if (!valorTexto || Number.isNaN(valor) || valor <= 0) {
-    return { status: "erro", mensagem: "Informe um valor maior que zero." };
-  }
-  if (vigenciaFim < vigenciaInicio) {
-    return { status: "erro", mensagem: "A data final da vigência não pode ser anterior à inicial." };
-  }
+interface ParametrosEmissaoIndividual {
+  pessoaId: string;
+  templateId: string;
+  template: TemplateParaEmissao;
+  valor: number;
+  vigenciaInicio: string;
+  vigenciaFim: string;
+}
 
-  const supabase = await createClient();
-  const { organizationId, userId } = await obterContextoUsuario(supabase);
-  if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
-
-  const [{ data: pessoa }, { data: template }] = await Promise.all([
-    supabase.from("pessoas").select("nome_completo, cpf, endereco, email").eq("id", pessoaId).maybeSingle(),
-    supabase
-      .from("templates_contrato")
-      .select("nome, objeto, corpo_html")
-      .eq("id", templateId)
-      .maybeSingle(),
-  ]);
-
-  if (!pessoa) return { status: "erro", mensagem: "Pessoa não encontrada." };
-  if (!template) return { status: "erro", mensagem: "Modelo de contrato não encontrado." };
-
-  const valorExtenso = amountInWords(valor);
+/**
+ * Núcleo da emissão — extraído para ser reaproveitado pela emissão individual
+ * (`emitirContrato`) e pela emissão em lote (`emitirContratosEmLote`, item 9),
+ * que compartilham exatamente a mesma sequência: criar em rascunho, gerar PDF,
+ * subir, transicionar para "emitido". Recebe `template` e `pessoa` já
+ * carregados — quem chama decide se busca um por vez (emissão individual) ou
+ * todos de uma vez antes do laço (lote, evita N pequenas consultas repetidas).
+ */
+async function emitirContratoParaPessoa(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  userId: string | null,
+  pessoa: DadosParaEmissao,
+  params: ParametrosEmissaoIndividual,
+): Promise<{ ok: boolean; contractId?: string; mensagem?: string }> {
+  const valorExtenso = amountInWords(params.valor);
 
   const { data: contrato, error: erroInsercao } = await supabase
     .from("contratos")
     .insert({
       organizacao_id: organizationId,
-      pessoa_id: pessoaId,
-      template_id: templateId,
-      objeto: template.objeto,
-      valor,
+      pessoa_id: params.pessoaId,
+      template_id: params.templateId,
+      objeto: params.template.objeto,
+      valor: params.valor,
       valor_extenso: valorExtenso,
-      vigencia_inicio: vigenciaInicio,
-      vigencia_fim: vigenciaFim,
+      vigencia_inicio: params.vigenciaInicio,
+      vigencia_fim: params.vigenciaFim,
     })
     .select("id")
     .single();
 
   if (erroInsercao || !contrato) {
-    return { status: "erro", mensagem: "Não foi possível criar o contrato." };
+    return { ok: false, mensagem: "Não foi possível criar o contrato." };
   }
 
   // Nunca digitado (Fase 2, item 8: "valor_extenso vem da biblioteca extenso, nunca
   // de digitação") — já veio de amountInWords() acima, aqui só monta o PDF.
-  const corpoComDados = substituirMarcadores(template.corpo_html, {
-    nome: pessoa.nome_completo,
+  const corpoComDados = substituirMarcadores(params.template.corpoHtml, {
+    nome: pessoa.nomeCompleto,
     cpf: pessoa.cpf,
     endereco: pessoa.endereco ?? "não informado",
-    objeto: template.objeto,
-    valor: formatarValorBRL(valor),
+    objeto: params.template.objeto,
+    valor: formatarValorBRL(params.valor),
     valorExtenso,
-    vigenciaInicio: formatarDataBR(vigenciaInicio),
-    vigenciaFim: formatarDataBR(vigenciaFim),
+    vigenciaInicio: formatarDataBR(params.vigenciaInicio),
+    vigenciaFim: formatarDataBR(params.vigenciaFim),
   });
 
   const pdfBytes = await gerarPdfContrato({
-    titulo: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS — ${template.objeto.toUpperCase()}`,
+    titulo: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS — ${params.template.objeto.toUpperCase()}`,
     corpo: htmlParaTexto(corpoComDados),
   });
 
-  const pdfPath = `${organizationId}/${pessoaId}/contrato_${contrato.id}.pdf`;
+  const pdfPath = `${organizationId}/${params.pessoaId}/contrato_${contrato.id}.pdf`;
   const { error: erroUpload } = await supabase.storage
     .from("contratos")
     .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: false });
@@ -132,7 +129,7 @@ export async function emitirContrato(
   if (erroUpload) {
     // O contrato fica em "rascunho" sem PDF — recuperável (delete e tenta de novo),
     // melhor que marcar "emitido" com um PDF que não existe.
-    return { status: "erro", mensagem: "Contrato criado, mas o PDF não pôde ser gerado. Tente emitir de novo." };
+    return { ok: false, mensagem: "Contrato criado, mas o PDF não pôde ser gerado." };
   }
 
   await supabase.from("contratos").update({ caminho_pdf: pdfPath }).eq("id", contrato.id);
@@ -145,10 +142,7 @@ export async function emitirContrato(
   });
 
   if (erroTransicao) {
-    return {
-      status: "erro",
-      mensagem: "PDF gerado, mas não foi possível concluir a emissão. Tente de novo.",
-    };
+    return { ok: false, mensagem: "PDF gerado, mas não foi possível concluir a emissão." };
   }
 
   await registerContractWrite({
@@ -159,8 +153,174 @@ export async function emitirContrato(
     action: "emissao",
   });
 
+  return { ok: true, contractId: contrato.id };
+}
+
+function validarCamposComunsDeEmissao(params: {
+  templateId: string;
+  vigenciaInicio: string;
+  vigenciaFim: string;
+  valorTexto: string;
+}): { ok: true; valor: number } | { ok: false; mensagem: string } {
+  if (!params.templateId || !params.vigenciaInicio || !params.vigenciaFim) {
+    return { ok: false, mensagem: "Selecione o modelo e a vigência." };
+  }
+  const valor = Number(params.valorTexto.replace(",", "."));
+  if (!params.valorTexto || Number.isNaN(valor) || valor <= 0) {
+    return { ok: false, mensagem: "Informe um valor maior que zero." };
+  }
+  if (params.vigenciaFim < params.vigenciaInicio) {
+    return { ok: false, mensagem: "A data final da vigência não pode ser anterior à inicial." };
+  }
+  return { ok: true, valor };
+}
+
+export async function emitirContrato(
+  _estadoAnterior: EstadoEmitirContrato,
+  formData: FormData,
+): Promise<EstadoEmitirContrato> {
+  const pessoaId = String(formData.get("pessoaId") ?? "");
+  const templateId = String(formData.get("templateId") ?? "");
+  const vigenciaInicio = String(formData.get("vigenciaInicio") ?? "");
+  const vigenciaFim = String(formData.get("vigenciaFim") ?? "");
+  const valorTexto = String(formData.get("valor") ?? "");
+
+  if (!pessoaId) return { status: "erro", mensagem: "Selecione a pessoa." };
+
+  const camposComuns = validarCamposComunsDeEmissao({ templateId, vigenciaInicio, vigenciaFim, valorTexto });
+  if (!camposComuns.ok) return { status: "erro", mensagem: camposComuns.mensagem };
+
+  const supabase = await createClient();
+  const { organizationId, userId } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
+
+  const [{ data: pessoa }, { data: template }] = await Promise.all([
+    supabase.from("pessoas").select("nome_completo, cpf, endereco").eq("id", pessoaId).maybeSingle(),
+    supabase.from("templates_contrato").select("objeto, corpo_html").eq("id", templateId).maybeSingle(),
+  ]);
+
+  if (!pessoa) return { status: "erro", mensagem: "Pessoa não encontrada." };
+  if (!template) return { status: "erro", mensagem: "Modelo de contrato não encontrado." };
+
+  const resultado = await emitirContratoParaPessoa(
+    supabase,
+    organizationId,
+    userId,
+    { nomeCompleto: pessoa.nome_completo, cpf: pessoa.cpf, endereco: pessoa.endereco },
+    {
+      pessoaId,
+      templateId,
+      template: { objeto: template.objeto, corpoHtml: template.corpo_html },
+      valor: camposComuns.valor,
+      vigenciaInicio,
+      vigenciaFim,
+    },
+  );
+
+  if (!resultado.ok) {
+    return { status: "erro", mensagem: resultado.mensagem ?? "Não foi possível emitir o contrato." };
+  }
+
   revalidatePath("/contratos");
   return { status: "sucesso", mensagem: "Contrato emitido com sucesso." };
+}
+
+// ---------------------------------------------------------------------------
+// Emissão em lote (item 9) — mesmo template/valor/vigência para N pessoas.
+// ---------------------------------------------------------------------------
+
+export interface EstadoEmitirLote {
+  status: "idle" | "sucesso" | "erro";
+  mensagem?: string;
+  sucessos?: number;
+  falhas?: { pessoaNome: string; motivo: string }[];
+}
+
+export const ESTADO_INICIAL_EMITIR_LOTE: EstadoEmitirLote = { status: "idle" };
+
+export async function emitirContratosEmLote(
+  _estadoAnterior: EstadoEmitirLote,
+  formData: FormData,
+): Promise<EstadoEmitirLote> {
+  const pessoaIds = formData.getAll("pessoaIds").map(String).filter(Boolean);
+  const templateId = String(formData.get("templateId") ?? "");
+  const vigenciaInicio = String(formData.get("vigenciaInicio") ?? "");
+  const vigenciaFim = String(formData.get("vigenciaFim") ?? "");
+  const valorTexto = String(formData.get("valor") ?? "");
+
+  if (pessoaIds.length === 0) {
+    return { status: "erro", mensagem: "Selecione ao menos uma pessoa." };
+  }
+
+  const camposComuns = validarCamposComunsDeEmissao({ templateId, vigenciaInicio, vigenciaFim, valorTexto });
+  if (!camposComuns.ok) return { status: "erro", mensagem: camposComuns.mensagem };
+
+  const supabase = await createClient();
+  const { organizationId, userId } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
+
+  const { data: template } = await supabase
+    .from("templates_contrato")
+    .select("objeto, corpo_html")
+    .eq("id", templateId)
+    .maybeSingle();
+  if (!template) return { status: "erro", mensagem: "Modelo de contrato não encontrado." };
+
+  const { data: pessoas } = await supabase
+    .from("pessoas")
+    .select("id, nome_completo, cpf, endereco")
+    .in("id", pessoaIds);
+  const pessoaPorId = new Map((pessoas ?? []).map((p) => [p.id, p]));
+
+  const falhas: { pessoaNome: string; motivo: string }[] = [];
+  let sucessos = 0;
+
+  // Sequencial, não Promise.all: cada emissão já faz várias chamadas de rede
+  // (insert, geração de PDF, upload, RPC de transição) — paralelizar dezenas de
+  // pessoas de uma vez arrisca esgotar conexões no ambiente serverless. N
+  // esperado aqui é dezenas, não milhares (Seção 11: maior objeto do comitê tem
+  // 14 pessoas) — sequencial é aceitável.
+  for (const pessoaId of pessoaIds) {
+    const pessoa = pessoaPorId.get(pessoaId);
+    if (!pessoa) {
+      falhas.push({ pessoaNome: pessoaId, motivo: "Pessoa não encontrada." });
+      continue;
+    }
+
+    const resultado = await emitirContratoParaPessoa(
+      supabase,
+      organizationId,
+      userId,
+      { nomeCompleto: pessoa.nome_completo, cpf: pessoa.cpf, endereco: pessoa.endereco },
+      {
+        pessoaId,
+        templateId,
+        template: { objeto: template.objeto, corpoHtml: template.corpo_html },
+        valor: camposComuns.valor,
+        vigenciaInicio,
+        vigenciaFim,
+      },
+    );
+
+    if (resultado.ok) {
+      sucessos++;
+    } else {
+      falhas.push({ pessoaNome: pessoa.nome_completo, motivo: resultado.mensagem ?? "Falha desconhecida." });
+    }
+  }
+
+  revalidatePath("/contratos");
+
+  if (sucessos === 0) {
+    return { status: "erro", mensagem: "Nenhum contrato pôde ser emitido.", sucessos, falhas };
+  }
+
+  return {
+    status: "sucesso",
+    mensagem: `${sucessos} contrato(s) emitido(s) com sucesso${falhas.length ? `; ${falhas.length} falharam` : ""}.`,
+    sucessos,
+    falhas,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -244,15 +404,84 @@ export async function marcarContratoAssinado(contractId: string): Promise<Result
   });
 }
 
-/** Item 13 (parcial): a transição de estado é real; a geração do termo de distrato
- * em si (documento) ainda não existe — deferida, registrada em
- * PROGRESSO-FASE-2-3-4.md. */
-export async function distratarContrato(contractId: string): Promise<ResultadoAcaoContrato> {
+/** Item 13: "Distrato gerando termo, sem apagar o contrato original." Gera um PDF
+ * (mesmo `gerarPdfContrato` da emissão, conteúdo diferente) referenciando o
+ * contrato original por objeto/valor/vigência — nunca cria um registro novo,
+ * só anexa `distratoTermPath` ao mesmo contrato e transiciona seu status. */
+export async function distratarContrato(
+  contractId: string,
+  motivo: string,
+): Promise<ResultadoAcaoContrato> {
+  const motivoLimpo = motivo.trim();
+  if (!motivoLimpo) return { ok: false, mensagem: "Informe o motivo do distrato." };
+
+  const supabase = await createClient();
+  // userId não é usado aqui: transicionarContrato() já resolve o contexto do
+  // usuário de novo por conta própria para o auditoria do evento de transição.
+  const { organizationId } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+
+  const { data: contrato } = await supabase
+    .from("contratos")
+    .select("pessoa_id, objeto, valor, valor_extenso, vigencia_inicio, vigencia_fim, pessoas ( nome_completo, cpf )")
+    .eq("id", contractId)
+    .maybeSingle<{
+      pessoa_id: string;
+      objeto: string;
+      valor: string;
+      valor_extenso: string;
+      vigencia_inicio: string;
+      vigencia_fim: string;
+      pessoas: { nome_completo: string; cpf: string } | null;
+    }>();
+
+  if (!contrato) return { ok: false, mensagem: "Contrato não encontrado." };
+
+  const corpoTermo = [
+    `CONTRATADO(A): ${contrato.pessoas?.nome_completo ?? "—"}, CPF ${contrato.pessoas?.cpf ?? "—"}.`,
+    "",
+    `Fica distratado, a partir desta data, o contrato de ${contrato.objeto}, com vigência original de ` +
+      `${formatarDataBR(contrato.vigencia_inicio)} a ${formatarDataBR(contrato.vigencia_fim)} e valor de ` +
+      `${formatarValorBRL(Number(contrato.valor))} (${contrato.valor_extenso}).`,
+    "",
+    `MOTIVO: ${motivoLimpo}`,
+    "",
+    "O contrato original permanece arquivado, sem alteração, para fins de prestação de contas.",
+  ].join("\n\n");
+
+  const pdfBytes = await gerarPdfContrato({
+    titulo: "TERMO DE DISTRATO",
+    corpo: corpoTermo,
+  });
+
+  const caminhoTermo = `${organizationId}/${contrato.pessoa_id}/distrato_${contractId}.pdf`;
+  const { error: erroUpload } = await supabase.storage
+    .from("contratos")
+    .upload(caminhoTermo, pdfBytes, { contentType: "application/pdf", upsert: true });
+
+  if (erroUpload) {
+    return { ok: false, mensagem: "Não foi possível gerar o termo de distrato. Tente de novo." };
+  }
+
+  await supabase.from("contratos").update({ caminho_termo_distrato: caminhoTermo }).eq("id", contractId);
+
   return transicionarContrato({
     contractId,
     de: "assinado",
     para: "distratado",
-    observacao: "Distrato registrado pela coordenação.",
+    observacao: `Distrato registrado pela coordenação. Motivo: ${motivoLimpo}`,
+  });
+}
+
+/** Fecha a cadeia do distrato (Seção 7: distratado → distrato_assinado) — mesma
+ * marcação presencial simples de `marcarContratoAssinado`, sem upload de arquivo
+ * novo (o termo em si já foi anexado em `distratarContrato`). */
+export async function marcarDistratoAssinado(contractId: string): Promise<ResultadoAcaoContrato> {
+  return transicionarContrato({
+    contractId,
+    de: "distratado",
+    para: "distrato_assinado",
+    observacao: "Recebimento do termo de distrato confirmado pela coordenação.",
   });
 }
 
@@ -301,7 +530,7 @@ async function dispararContratoEnviado(params: {
 
 export async function gerarUrlPdfContrato(
   contractId: string,
-  versao: "gerado" | "assinado" = "gerado",
+  versao: "gerado" | "assinado" | "distrato" = "gerado",
 ): Promise<{ ok: boolean; url?: string; mensagem?: string }> {
   const supabase = await createClient();
   const { organizationId, userId } = await obterContextoUsuario(supabase);
@@ -309,19 +538,24 @@ export async function gerarUrlPdfContrato(
 
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("caminho_pdf, caminho_pdf_assinado")
+    .select("caminho_pdf, caminho_pdf_assinado, caminho_termo_distrato")
     .eq("id", contractId)
     .maybeSingle();
 
-  const caminho = versao === "assinado" ? contrato?.caminho_pdf_assinado : contrato?.caminho_pdf;
+  const caminhoPorVersao = {
+    gerado: contrato?.caminho_pdf,
+    assinado: contrato?.caminho_pdf_assinado,
+    distrato: contrato?.caminho_termo_distrato,
+  } as const;
+  const caminho = caminhoPorVersao[versao];
+
   if (!caminho) {
-    return {
-      ok: false,
-      mensagem:
-        versao === "assinado"
-          ? "Este contrato ainda não tem PDF assinado anexado."
-          : "Este contrato ainda não tem PDF gerado.",
-    };
+    const mensagens = {
+      gerado: "Este contrato ainda não tem PDF gerado.",
+      assinado: "Este contrato ainda não tem PDF assinado anexado.",
+      distrato: "Este contrato ainda não tem termo de distrato gerado.",
+    } as const;
+    return { ok: false, mensagem: mensagens[versao] };
   }
 
   try {

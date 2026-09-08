@@ -21,6 +21,7 @@ export interface ContratoListado {
   enviadoPara: string | null;
   pdfPath: string | null;
   signedPdfPath: string | null;
+  distratoTermPath: string | null;
 }
 
 interface LinhaContrato {
@@ -36,12 +37,13 @@ interface LinhaContrato {
   enviado_para: string | null;
   caminho_pdf: string | null;
   caminho_pdf_assinado: string | null;
+  caminho_termo_distrato: string | null;
   pessoas: { nome_completo: string; cpf: string } | null;
   regioes: { nome: string } | null;
 }
 
 const SELECAO_CONTRATO =
-  "id, pessoa_id, objeto, valor, valor_extenso, vigencia_inicio, vigencia_fim, status, canal_envio, enviado_para, caminho_pdf, caminho_pdf_assinado, pessoas ( nome_completo, cpf ), regioes ( nome )";
+  "id, pessoa_id, objeto, valor, valor_extenso, vigencia_inicio, vigencia_fim, status, canal_envio, enviado_para, caminho_pdf, caminho_pdf_assinado, caminho_termo_distrato, pessoas ( nome_completo, cpf ), regioes ( nome )";
 
 export async function listarContratos(): Promise<ContratoListado[]> {
   const supabase = await createClient();
@@ -69,6 +71,7 @@ export async function listarContratos(): Promise<ContratoListado[]> {
     enviadoPara: linha.enviado_para,
     pdfPath: linha.caminho_pdf,
     signedPdfPath: linha.caminho_pdf_assinado,
+    distratoTermPath: linha.caminho_termo_distrato,
   }));
 }
 
