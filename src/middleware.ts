@@ -11,7 +11,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const ROTAS_PUBLICAS = ["/login", "/verificacao", "/mfa", "/coleta"];
+const ROTAS_PUBLICAS = ["/login", "/verificacao", "/mfa", "/coleta", "/auth/callback"];
 
 // Recursos do PWA (Fase 4, item 2) que o navegador busca sem cookie de sessão:
 // o service worker, o manifesto, os ícones e a página de fallback offline. Sem

@@ -173,6 +173,11 @@ test("modo avião: registro entra na fila e sobe sozinho ao voltar a rede", asyn
   // E o banner de pendências some
   await expect(page.getByText(/registro\(s\) na fila/i)).toBeHidden({ timeout: 10_000 });
 
+  // O `router.refresh()` pós-sync pode recriar o contexto de execução — espera
+  // assentar antes de ler o IndexedDB.
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(300);
+
   const naFilaDepois = await page.evaluate(async () => {
     const req = indexedDB.open("comite-campo", 1);
     return await new Promise<number>((resolve) => {

@@ -237,13 +237,14 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# SMTP customizado apontando para o Resend (Seção 6: "autenticação e notificação saem
-# do mesmo domínio verificado"). Host/porta/usuário confirmados no Context 7
-# (resend.com/docs/send-with-nodemailer-smtp) — a senha é a RESEND_API_KEY.
-# No projeto hospedado, isto também precisa ser configurado em Authentication → Emails
-# → SMTP Settings do dashboard (config push nem sempre propaga segredos de SMTP).
+# SMTP customizado — DESLIGADO por decisão do usuário (2026-09-08): a autenticação
+# usa o e-mail embutido do Supabase por enquanto. O embutido tem limite baixo
+# (~3–4/hora) e não cumpre o NFR de SPF/DKIM/DMARC da Seção 10 — para produção de
+# volume, reativar isto apontando para um domínio verificado (Resend ou outro) e
+# ligar de novo em Authentication → Emails → SMTP Settings do dashboard hospedado.
+# Os exemplos de host/porta abaixo ficam como referência.
 [auth.email.smtp]
-enabled = true
+enabled = false
 host = "smtp.resend.com"
 port = 587
 user = "resend"
