@@ -7,7 +7,8 @@ import { Campo } from "@/components/campo";
 import { Selo } from "@/components/selo";
 import { Alerta } from "@/components/alerta";
 import { Badge } from "@/components/badge";
-import { enviarDadosColeta, ESTADO_INICIAL_ENVIAR_DADOS } from "./acoes";
+import { enviarDadosColeta } from "./acoes";
+import { ESTADO_INICIAL_ENVIAR_DADOS } from "./estado";
 
 /**
  * Fluxo real (Fase 2, itens 2 e 3) — 3 etapas, não as 4 do desenho original: a

@@ -10,7 +10,8 @@ import { Modal } from "@/components/modal";
 import { OcrDocumento } from "@/components/ocr-documento";
 import { EstadoVazio } from "@/components/estado-vazio";
 import { Alerta } from "@/components/alerta";
-import { criarPessoa, ESTADO_INICIAL_CRIAR_PESSOA, gerarLinkColeta } from "./acoes";
+import { criarPessoa, gerarLinkColeta } from "./acoes";
+import { ESTADO_INICIAL_CRIAR_PESSOA } from "./estado";
 import type { PessoaListada, RegiaoOpcao } from "./dados";
 
 const FUNCOES_CONHECIDAS = [

@@ -8,11 +8,11 @@ import { Badge } from "@/components/badge";
 import { Alerta } from "@/components/alerta";
 import { Modal } from "@/components/modal";
 import {
-  ESTADO_INICIAL_SALVAR_TEMPLATE,
   alternarAtivoTemplate,
   expurgarDocumentosDaCampanha,
   salvarTemplate,
 } from "./acoes";
+import { ESTADO_INICIAL_SALVAR_TEMPLATE } from "./estado";
 import type { TemplateContrato } from "./dados";
 
 const MARCADORES = [

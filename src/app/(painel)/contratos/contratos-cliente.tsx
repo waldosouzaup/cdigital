@@ -8,9 +8,8 @@ import { Campo } from "@/components/campo";
 import { Modal } from "@/components/modal";
 import { Alerta } from "@/components/alerta";
 import { EstadoVazio } from "@/components/estado-vazio";
+import { ESTADO_INICIAL_EMITIR_CONTRATO, ESTADO_INICIAL_EMITIR_LOTE } from "./estado";
 import {
-  ESTADO_INICIAL_EMITIR_CONTRATO,
-  ESTADO_INICIAL_EMITIR_LOTE,
   distratarContrato,
   emitirContrato,
   emitirContratosEmLote,

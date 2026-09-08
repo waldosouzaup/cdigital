@@ -20,6 +20,7 @@ import { renderizarEmailContratoEnviado } from "@/emails/contrato-enviado";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
 import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
+import type { EstadoEmitirContrato, EstadoEmitirLote } from "./estado";
 
 export interface ResultadoAcaoContrato {
   ok: boolean;
@@ -39,13 +40,6 @@ function formatarDataBR(isoDate: string): string {
 // Emissão (item 8) — cria o contrato em rascunho, gera o PDF e transiciona para
 // "emitido" atomicamente.
 // ---------------------------------------------------------------------------
-
-export interface EstadoEmitirContrato {
-  status: "idle" | "sucesso" | "erro";
-  mensagem?: string;
-}
-
-export const ESTADO_INICIAL_EMITIR_CONTRATO: EstadoEmitirContrato = { status: "idle" };
 
 interface DadosParaEmissao {
   nomeCompleto: string;
@@ -228,15 +222,6 @@ export async function emitirContrato(
 // ---------------------------------------------------------------------------
 // Emissão em lote (item 9) — mesmo template/valor/vigência para N pessoas.
 // ---------------------------------------------------------------------------
-
-export interface EstadoEmitirLote {
-  status: "idle" | "sucesso" | "erro";
-  mensagem?: string;
-  sucessos?: number;
-  falhas?: { pessoaNome: string; motivo: string }[];
-}
-
-export const ESTADO_INICIAL_EMITIR_LOTE: EstadoEmitirLote = { status: "idle" };
 
 export async function emitirContratosEmLote(
   _estadoAnterior: EstadoEmitirLote,

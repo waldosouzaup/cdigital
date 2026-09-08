@@ -11,21 +11,13 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { obterContextoUsuario } from "@/lib/supabase/contexto-usuario";
 import { registerPersonWrite } from "@/lib/auditoria/registrar";
-import { validarEntradaPessoa, type EntradaPessoa } from "@/lib/pessoas/validacao";
+import { validarEntradaPessoa } from "@/lib/pessoas/validacao";
 import { gerarTokenColeta } from "@/lib/coleta/token";
 import { renderizarEmailLinkColeta } from "@/emails/link-coleta";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
 import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
-
-export interface EstadoCriarPessoa {
-  status: "idle" | "sucesso" | "erro" | "duplicada";
-  errors?: Partial<Record<keyof EntradaPessoa, string>>;
-  mensagem?: string;
-  pessoaExistenteId?: string;
-}
-
-export const ESTADO_INICIAL_CRIAR_PESSOA: EstadoCriarPessoa = { status: "idle" };
+import type { EstadoCriarPessoa } from "./estado";
 
 function campoTexto(formData: FormData, nome: string): string {
   const valor = formData.get(nome);

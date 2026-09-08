@@ -17,13 +17,7 @@ import {
   dataLiberacaoExpurgo,
   CARENCIA_PADRAO_DIAS,
 } from "@/lib/documentos/elegiveis-expurgo";
-
-export interface EstadoSalvarTemplate {
-  status: "idle" | "sucesso" | "erro";
-  mensagem?: string;
-}
-
-export const ESTADO_INICIAL_SALVAR_TEMPLATE: EstadoSalvarTemplate = { status: "idle" };
+import type { EstadoSalvarTemplate } from "./estado";
 
 function campoTexto(formData: FormData, nome: string): string {
   const valor = formData.get(nome);

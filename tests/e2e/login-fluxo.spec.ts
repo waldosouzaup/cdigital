@@ -100,6 +100,7 @@ test("coord_regiao: link mágico entra no painel sem MFA e enxerga só a própri
 });
 
 test("gestor: link mágico exige MFA; cadastra TOTP, verifica e entra (aal2)", async ({ page }) => {
+  test.setTimeout(120_000); // enroll do TOTP pode ter backoff por rate limit
   const email = "e2e-login-gestor@exemplo.invalid";
   // usuário novo a cada execução, para o cadastro de TOTP começar do zero
   const list = await admin.auth.admin.listUsers();
@@ -118,6 +119,18 @@ test("gestor: link mágico exige MFA; cadastra TOTP, verifica e entra (aal2)", a
     await page.goto(await linkMagico(email));
     // gestor é encaminhado para /mfa
     await page.waitForURL("**/mfa", { timeout: 20_000 });
+
+    // enroll do Supabase pode ter rate limit em execução cheia — recua e recarrega
+    for (let i = 0; i < 4; i++) {
+      const emErro = await page
+        .getByText(/Não foi possível iniciar a verificação/i)
+        .isVisible()
+        .catch(() => false);
+      if (!emErro) break;
+      await page.waitForTimeout(3000 * (i + 1));
+      await page.reload({ waitUntil: "networkidle" });
+      await page.waitForTimeout(1500);
+    }
 
     // QR real do Supabase (otpauth://…), não um placeholder
     const qrSrc = await page.locator("img").first().getAttribute("src");

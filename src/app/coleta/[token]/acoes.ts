@@ -7,13 +7,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-
-export interface EstadoEnviarDadosColeta {
-  status: "idle" | "sucesso" | "erro";
-  mensagem?: string;
-}
-
-export const ESTADO_INICIAL_ENVIAR_DADOS: EstadoEnviarDadosColeta = { status: "idle" };
+import type { EstadoEnviarDadosColeta } from "./estado";
 
 function campoOuNulo(formData: FormData, nome: string): string | null {
   const valor = formData.get(nome);
