@@ -301,6 +301,7 @@ async function dispararContratoEnviado(params: {
 
 export async function gerarUrlPdfContrato(
   contractId: string,
+  versao: "gerado" | "assinado" = "gerado",
 ): Promise<{ ok: boolean; url?: string; mensagem?: string }> {
   const supabase = await createClient();
   const { organizationId, userId } = await obterContextoUsuario(supabase);
@@ -308,19 +309,26 @@ export async function gerarUrlPdfContrato(
 
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("caminho_pdf")
+    .select("caminho_pdf, caminho_pdf_assinado")
     .eq("id", contractId)
     .maybeSingle();
 
-  if (!contrato?.caminho_pdf) {
-    return { ok: false, mensagem: "Este contrato ainda não tem PDF gerado." };
+  const caminho = versao === "assinado" ? contrato?.caminho_pdf_assinado : contrato?.caminho_pdf;
+  if (!caminho) {
+    return {
+      ok: false,
+      mensagem:
+        versao === "assinado"
+          ? "Este contrato ainda não tem PDF assinado anexado."
+          : "Este contrato ainda não tem PDF gerado.",
+    };
   }
 
   try {
     const url = await criarUrlAssinada({
       supabase,
       bucket: "contratos",
-      caminho: contrato.caminho_pdf,
+      caminho,
       documentId: contractId,
       organizationId,
       userId,

@@ -133,15 +133,53 @@ export function ContratosCliente({
     if (resultado.ok) router.refresh();
   }
 
-  async function handleVerTermo(contrato: ContratoListado) {
+  async function handleVerTermo(contrato: ContratoListado, versao: "gerado" | "assinado" = "gerado") {
     setProcessando(contrato.id);
-    const resultado = await gerarUrlPdfContrato(contrato.id);
+    const resultado = await gerarUrlPdfContrato(contrato.id, versao);
     setProcessando(null);
     if (!resultado.ok || !resultado.url) {
       mostrarFeedback("critico", resultado.mensagem ?? "PDF indisponível.");
       return;
     }
     window.open(resultado.url, "_blank", "noopener,noreferrer");
+  }
+
+  // --- Modal: Anexar PDF assinado (item 12) ----------------------------------
+  const [modalAssinaturaAberto, setModalAssinaturaAberto] = useState(false);
+  const [contratoParaAssinatura, setContratoParaAssinatura] = useState<ContratoListado | null>(null);
+  const [arquivoAssinatura, setArquivoAssinatura] = useState<File | null>(null);
+  const [enviandoAssinatura, setEnviandoAssinatura] = useState(false);
+
+  function abrirModalAssinatura(contrato: ContratoListado) {
+    setContratoParaAssinatura(contrato);
+    setArquivoAssinatura(null);
+    setModalAssinaturaAberto(true);
+  }
+
+  async function handleConfirmarAssinatura() {
+    if (!contratoParaAssinatura || !arquivoAssinatura) return;
+    setEnviandoAssinatura(true);
+
+    try {
+      const corpo = new FormData();
+      corpo.append("arquivo", arquivoAssinatura);
+      const resposta = await fetch(`/api/contratos/${contratoParaAssinatura.id}/assinatura`, {
+        method: "POST",
+        body: corpo,
+      });
+      const resultado = await resposta.json();
+
+      setModalAssinaturaAberto(false);
+      mostrarFeedback(
+        resposta.ok && resultado.ok ? "sucesso" : "critico",
+        resultado.mensagem ?? (resposta.ok ? "PDF assinado anexado." : "Falha ao enviar."),
+      );
+      if (resposta.ok && resultado.ok) router.refresh();
+    } catch {
+      mostrarFeedback("critico", "Falha de conexão ao enviar o PDF assinado.");
+    } finally {
+      setEnviandoAssinatura(false);
+    }
   }
 
   return (
@@ -258,14 +296,26 @@ export function ContratosCliente({
                           </button>
                         )}
                         {c.status === "enviado" && (
-                          <button
-                            type="button"
-                            disabled={ocupado}
-                            onClick={() => handleMarcarAssinado(c)}
-                            className="px-2 py-1 text-xs border border-success text-success hover:bg-success/10 cursor-pointer disabled:opacity-50"
-                          >
-                            Marcar Assinado
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              disabled={ocupado}
+                              onClick={() => abrirModalAssinatura(c)}
+                              className="px-2 py-1 text-xs border border-success text-success hover:bg-success/10 cursor-pointer disabled:opacity-50"
+                              title="Anexar o PDF assinado enviado pelo contratado"
+                            >
+                              Anexar PDF Assinado
+                            </button>
+                            <button
+                              type="button"
+                              disabled={ocupado}
+                              onClick={() => handleMarcarAssinado(c)}
+                              className="px-2 py-1 text-xs text-ink-muted hover:text-ink hover:underline cursor-pointer disabled:opacity-50"
+                              title="Assinatura feita presencialmente, sem arquivo"
+                            >
+                              Marcar Assinado (Presencial)
+                            </button>
+                          </>
                         )}
                         {c.status === "assinado" && (
                           <button
@@ -283,12 +333,23 @@ export function ContratosCliente({
                         <button
                           type="button"
                           disabled={ocupado || !c.pdfPath}
-                          onClick={() => handleVerTermo(c)}
+                          onClick={() => handleVerTermo(c, "gerado")}
                           className="px-2 py-1 text-xs text-ink hover:underline cursor-pointer disabled:opacity-40"
-                          title={c.pdfPath ? "Abrir PDF assinado digitalmente" : "PDF ainda não gerado"}
+                          title={c.pdfPath ? "Abrir o PDF gerado pelo sistema na emissão" : "PDF ainda não gerado"}
                         >
                           Ver Termo
                         </button>
+                        {c.signedPdfPath && (
+                          <button
+                            type="button"
+                            disabled={ocupado}
+                            onClick={() => handleVerTermo(c, "assinado")}
+                            className="px-2 py-1 text-xs text-success hover:underline cursor-pointer disabled:opacity-40"
+                            title="Abrir o PDF assinado anexado"
+                          >
+                            Ver Assinado
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -416,6 +477,42 @@ export function ContratosCliente({
           <p className="text-small text-ink">
             Contratado: <strong>{contratoParaDistrato?.pessoaNome}</strong>
           </p>
+        </div>
+      </Modal>
+
+      {/* MODAL: ANEXAR PDF ASSINADO (item 12) */}
+      <Modal
+        aberto={modalAssinaturaAberto}
+        aoFechar={() => setModalAssinaturaAberto(false)}
+        titulo="Anexar PDF Assinado"
+        descricao="Envie o contrato assinado que o contratado devolveu (escaneado ou fotografado em PDF)."
+        rotuloPrimario={enviandoAssinatura ? "Enviando…" : "Confirmar Assinatura"}
+        acaoPrimaria={handleConfirmarAssinatura}
+        desabilitarConfirmacao={!arquivoAssinatura || enviandoAssinatura}
+      >
+        <div className="space-y-4 text-small">
+          <p className="text-small text-ink">
+            Contratado: <strong>{contratoParaAssinatura?.pessoaNome}</strong>
+          </p>
+          <label
+            htmlFor="upload-assinatura"
+            className="block border-2 border-dashed border-line hover:border-seal p-6 text-center bg-surface/60 cursor-pointer transition-colors"
+          >
+            <input
+              id="upload-assinatura"
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(e) => setArquivoAssinatura(e.target.files?.[0] ?? null)}
+            />
+            <div className="space-y-1">
+              <div className="font-mono text-2xl text-seal">📄</div>
+              <div className="text-small font-medium text-ink">
+                {arquivoAssinatura ? arquivoAssinatura.name : "Selecionar arquivo PDF"}
+              </div>
+              <p className="text-xs text-ink-muted">Somente PDF, até 20 MB</p>
+            </div>
+          </label>
         </div>
       </Modal>
     </div>
