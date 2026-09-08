@@ -346,6 +346,13 @@ export const contracts = pgTable(
     deliveryChannel: deliveryChannelEnum("canal_envio"),
     sentTo: text("enviado_para"),
     signedAt: timestamp("assinado_em", { withTimezone: true }),
+    // Gap da Fase 1: a Seção 5 lista os campos de contratos mas não um caminho de
+    // Storage para o PDF gerado — o bucket `contratos` (Fase 1, Tarefa 7) já existia
+    // sem nenhuma coluna apontando pra ele. Fechado na Fase 2 junto com a emissão
+    // real (item 8). `pdfPath` é o PDF gerado pelo sistema na emissão; `signedPdfPath`
+    // fica para quando o item 12 (upload do PDF assinado) for implementado.
+    pdfPath: text("caminho_pdf"),
+    signedPdfPath: text("caminho_pdf_assinado"),
     ...timestamps,
   },
   (table) => [
