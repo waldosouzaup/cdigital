@@ -429,6 +429,17 @@ export const documents = pgTable(
       table.organizationId,
       table.hashSha256,
     ),
+    // "Reenvio cria versão + 1" (Fase 2, item 5) só é garantia de verdade com um
+    // índice único — sem isso, dois envios concorrentes do mesmo tipo de documento
+    // para a mesma pessoa poderiam colidir na mesma versão. Faltava desde a Fase 1
+    // (o plano original já previa isto); fechado junto com o upload real (Fase 2,
+    // migration 0006), que também trava por advisory lock antes de calcular a
+    // próxima versão.
+    uniqueIndex("documentos_pessoa_tipo_versao_idx").on(
+      table.personId,
+      table.type,
+      table.version,
+    ),
     organizationAndRegionPolicy(
       "documentos_organizacao_regiao",
       table.organizationId,
