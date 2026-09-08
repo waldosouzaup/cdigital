@@ -23,8 +23,19 @@ const ROTAS_PUBLICAS = ["/login", "/verificacao", "/mfa", "/coleta"];
 // acessível sem login, o que contraria a Seção 3 ("proteger páginas e dados" via
 // `getClaims()`). Painel não entra mais aqui: tudo que não está em `ROTAS_PUBLICAS`
 // nem é `/` exige sessão.
+// Bug encontrado na Fase 2 ao testar o upload de verdade: `/api/coleta/[token]/
+// documento` (sem sessão, por design) estava caindo no redirect de `/login` porque
+// só a página `/coleta/[token]` estava na lista, não a rota de API — uma chamada
+// `fetch()` recebendo de volta uma página de login em HTML não é um erro que dá
+// pra depurar pelo corpo da resposta. Rota de API nenhuma deve ser redirecionada
+// para uma tela: cada uma faz sua própria checagem (token, assinatura de webhook,
+// CRON_SECRET) e devolve JSON com o status certo, nunca um 307 para `/login`.
 function ehRotaPublica(pathname: string) {
-  return pathname === "/" || ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota));
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/api/") ||
+    ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota))
+  );
 }
 
 export async function middleware(request: NextRequest) {
