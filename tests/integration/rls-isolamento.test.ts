@@ -32,9 +32,10 @@ let orgBId: string;
 let regiaoAguasClarasId: string;
 let regiaoParanoaId: string;
 let pessoaOrgBId: string;
-let userAId: string; // gestor, org A, sem região
-let userBId: string; // gestor, org B
+let userAId: string; // auditor, org A
+let userBId: string; // auditor, org B
 let userCId: string; // coord_regiao, org A, região Águas Claras
+let userDId: string; // gestor, org A, SEM TOTP cadastrado (Seção 12: "login sem TOTP recusado para gestor")
 
 async function criarUsuario(email: string) {
   const { data, error } = await admin.auth.admin.createUser({
@@ -100,21 +101,26 @@ beforeAll(async () => {
   userAId = await criarUsuario("rls-teste-user-a@exemplo.invalid");
   userBId = await criarUsuario("rls-teste-user-b@exemplo.invalid");
   userCId = await criarUsuario("rls-teste-user-c@exemplo.invalid");
+  userDId = await criarUsuario("rls-teste-user-d@exemplo.invalid");
 
+  // "auditor" de propósito, não "gestor": gestor/coord_comite exigem aal2 (MFA) pela
+  // policy restritiva (Seção 3.1) — um login só de senha, sem desafio de TOTP, cairia
+  // nela e negaria tudo, inclusive o próprio dado da organização, misturando o teste
+  // de MFA com o de isolamento de organização (que é o que este teste quer isolar).
   await admin.from("usuarios").insert([
     {
       id: userAId,
       organizacao_id: orgAId,
       nome: "Usuário A",
       email: "rls-teste-user-a@exemplo.invalid",
-      papel: "gestor",
+      papel: "auditor",
     },
     {
       id: userBId,
       organizacao_id: orgBId,
       nome: "Usuário B",
       email: "rls-teste-user-b@exemplo.invalid",
-      papel: "gestor",
+      papel: "auditor",
     },
     {
       id: userCId,
@@ -124,14 +130,25 @@ beforeAll(async () => {
       papel: "coord_regiao",
       regiao_id: regiaoAguasClarasId,
     },
+    {
+      id: userDId,
+      organizacao_id: orgAId,
+      nome: "Usuário D",
+      email: "rls-teste-user-d@exemplo.invalid",
+      papel: "gestor",
+    },
   ]);
 }, 30000);
 
 afterAll(async () => {
-  await admin.from("usuarios").delete().in("id", [userAId, userBId, userCId].filter(Boolean));
+  await admin
+    .from("usuarios")
+    .delete()
+    .in("id", [userAId, userBId, userCId, userDId].filter(Boolean));
   await admin.auth.admin.deleteUser(userAId).catch(() => {});
   await admin.auth.admin.deleteUser(userBId).catch(() => {});
   await admin.auth.admin.deleteUser(userCId).catch(() => {});
+  await admin.auth.admin.deleteUser(userDId).catch(() => {});
   // Sem ON DELETE CASCADE de organizacoes para pessoas/regioes (Seção 5 não pede) —
   // precisa apagar os filhos antes, senão a FK bloqueia o delete da organização.
   if (orgBId) {
@@ -180,5 +197,18 @@ describe("RLS — coord_regiao só enxerga a própria região", () => {
     // Prova que a negação vem da policy de região, não da ausência de claim: o
     // usuário C precisa enxergar alguma pessoa da própria região.
     expect(regioesVisiveis.has(regiaoAguasClarasId)).toBe(true);
+  });
+});
+
+describe('RLS — MFA obrigatório para gestor (Seção 12: "login sem TOTP recusado")', () => {
+  it("gestor sem TOTP cadastrado (aal1) não lê nenhuma linha, nem da própria organização", async () => {
+    const clientD = await signIn("rls-teste-user-d@exemplo.invalid");
+
+    const { data: pessoasVisiveis, error } = await clientD.from("pessoas").select("id");
+    expect(error).toBeNull();
+
+    // A policy restritiva de MFA nega tudo para gestor/coord_comite sem aal2 — mesmo
+    // dado da própria organização fica invisível até o TOTP ser verificado.
+    expect(pessoasVisiveis).toEqual([]);
   });
 });

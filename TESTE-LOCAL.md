@@ -31,12 +31,12 @@ Para parar: `Ctrl+C` no terminal onde o `npm run dev` está rodando.
 
 O projeto tem duas partes em estágios bem diferentes agora:
 
-| Rota | Estado | O que significa |
-|---|---|---|
-| `/login` | **Real** — fala com o Supabase Auth de verdade | Digitar um e-mail cadastrado envia um link mágico de verdade |
-| `/verificacao` | **Real** | Tela de "confira seu e-mail", com botão de reenviar que também é real |
-| `/mfa` | **Real** | Cadastro/verificação de TOTP contra o Supabase Auth de verdade |
-| `/`, `/dashboard`, `/pessoas`, `/contratos`, `/documentos`, `/atividades`, `/configuracoes`, `/coleta/[token]` | **Mockup visual** | Dados fixos escritos no próprio código (`useState` com um array de exemplo) — **não vêm do banco**. Editar uma pessoa, mudar o status de um contrato etc. muda só o estado local da página no seu navegador; recarregar a página volta tudo ao exemplo original |
+| Rota                                                                                                           | Estado                                         | O que significa                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/login`                                                                                                       | **Real** — fala com o Supabase Auth de verdade | Digitar um e-mail cadastrado envia um link mágico de verdade                                                                                                                                                                                                    |
+| `/verificacao`                                                                                                 | **Real**                                       | Tela de "confira seu e-mail", com botão de reenviar que também é real                                                                                                                                                                                           |
+| `/mfa`                                                                                                         | **Real**                                       | Cadastro/verificação de TOTP contra o Supabase Auth de verdade                                                                                                                                                                                                  |
+| `/`, `/dashboard`, `/pessoas`, `/contratos`, `/documentos`, `/atividades`, `/configuracoes`, `/coleta/[token]` | **Mockup visual**                              | Dados fixos escritos no próprio código (`useState` com um array de exemplo) — **não vêm do banco**. Editar uma pessoa, mudar o status de um contrato etc. muda só o estado local da página no seu navegador; recarregar a página volta tudo ao exemplo original |
 
 Ou seja: hoje dá para **ver o design** de todas as telas, mas só o **login** é
 funcional de ponta a ponta contra o Supabase real. Ligar as telas de
