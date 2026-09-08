@@ -56,7 +56,9 @@ script já roda com `--no-file-parallelism`.
 ## 2. Entrar no sistema
 
 O login é por **link mágico** (sem senha). O e-mail sai pelo servidor embutido do
-Supabase (limite ~3–4/hora — ver Seção 7 para produção).
+Supabase, que tem um **limite fixo e baixo (~2–4/hora, devolve 429)** que não dá
+para elevar sem SMTP customizado. Para testar à vontade, prefira o atalho da
+Seção 2.3 (gera o link **sem enviar e-mail**).
 
 ### 2.1 Usuários
 
@@ -83,17 +85,25 @@ npm run db:provision-user -- voce+regiao@gmail.com  coord_regiao "Gama"     # 4�
    vezes, só o código.
 4. `coord_regiao`/`auditor` → vão direto para `/dashboard`.
 
-### 2.3 Login sem e-mail (atalho para testar papéis)
+### 2.3 Login sem e-mail (atalho recomendado para testar papéis)
 
-Os e-mails `@exemplo.invalid` não recebem mensagem — gere o link direto:
+Não consome cota de e-mail e não esbarra no 429. Gere o link para qualquer
+usuário provisionado:
 
 ```bash
 npx tsx --env-file=.env.local scripts/link-acesso.mjs teste-local@exemplo.invalid
+npx tsx --env-file=.env.local scripts/link-acesso.mjs teste-auditor@exemplo.invalid
+npx tsx --env-file=.env.local scripts/link-acesso.mjs teste-coord-comite@exemplo.invalid
+npx tsx --env-file=.env.local scripts/link-acesso.mjs apt.uplinux@gmail.com
 ```
 
-Cole a URL impressa no navegador (com o `npm run dev` rodando). Para `coord_regiao`
-e `auditor` você entra direto; para `gestor`/`coord_comite` cai em `/mfa` e precisa
-cadastrar o TOTP uma vez.
+Cole a URL impressa no navegador (com o `npm run dev` rodando). Cada link é de uso
+único e vale ~1 h. Para `coord_regiao`/`auditor` você entra direto; para
+`gestor`/`coord_comite` cai em `/mfa` e cadastra o TOTP uma vez (a partir daí é só
+o código de 6 dígitos).
+
+> **429 no `/login`?** É o limite do e-mail embutido do Supabase. Espere ~1 h ou
+> use este atalho. Para produção, configure um SMTP próprio (Seção 6).
 
 ---
 
