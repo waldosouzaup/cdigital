@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Campo } from "@/components/campo";
 import { Selo } from "@/components/selo";
 import { Badge, type StatusTipo } from "@/components/badge";
 import { Modal } from "@/components/modal";
+import { OcrDocumento } from "@/components/ocr-documento";
 import { EstadoVazio } from "@/components/estado-vazio";
 import { Alerta } from "@/components/alerta";
 import { criarPessoa, ESTADO_INICIAL_CRIAR_PESSOA, gerarLinkColeta } from "./acoes";
@@ -60,12 +62,19 @@ export function PessoasCliente({
   const formRef = useRef<HTMLFormElement>(null);
   const [estado, formAction, pendente] = useActionState(criarPessoa, ESTADO_INICIAL_CRIAR_PESSOA);
 
+  // Nome e CPF ficam controlados só para o OCR (item 3) poder preenchê-los depois
+  // que a pessoa confirmar a sugestão. Sem OCR, funcionam como campos normais.
+  const [novoNome, setNovoNome] = useState("");
+  const [novoCpf, setNovoCpf] = useState("");
+
   // Depois de cadastrar com sucesso: fecha o modal, limpa o formulário e busca a lista
   // de novo no servidor (o `revalidatePath` da action já invalidou o cache).
   useEffect(() => {
     if (estado.status === "sucesso") {
       setModalNovoAberto(false);
       formRef.current?.reset();
+      setNovoNome("");
+      setNovoCpf("");
       router.refresh();
     }
   }, [estado.status, router]);
@@ -89,6 +98,8 @@ export function PessoasCliente({
 
   function fecharModalNovo() {
     setModalNovoAberto(false);
+    setNovoNome("");
+    setNovoCpf("");
   }
 
   // Link público de coleta (Fase 2, item 2) — gera de verdade contra o banco
@@ -133,6 +144,12 @@ export function PessoasCliente({
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/pessoas/importar"
+            className="text-small font-medium text-seal underline decoration-seal/40 underline-offset-4"
+          >
+            Importar planilha
+          </Link>
           <Selo voz="selo" onClick={abrirModalNovo} className="text-xs">
             + Cadastrar Pessoa
           </Selo>
@@ -304,11 +321,27 @@ export function PessoasCliente({
             </Alerta>
           )}
 
+          <details className="border border-line bg-surface/40 text-xs">
+            <summary className="cursor-pointer px-3 py-2 font-medium text-ink">
+              Preencher a partir de uma foto do RG ou CNH
+            </summary>
+            <div className="p-3 pt-0">
+              <OcrDocumento
+                onConfirmar={({ nome, cpf }) => {
+                  if (nome) setNovoNome(nome);
+                  if (cpf) setNovoCpf(cpf);
+                }}
+              />
+            </div>
+          </details>
+
           <Campo
             rotulo="Nome Completo"
             id="novo-nome"
             name="fullName"
             required
+            value={novoNome}
+            onChange={(e) => setNovoNome(e.target.value)}
             placeholder="Nome civil do colaborador"
             erro={estado.status === "erro" ? estado.errors?.fullName : undefined}
           />
@@ -319,8 +352,10 @@ export function PessoasCliente({
             name="cpf"
             mono
             required
+            value={novoCpf}
+            onChange={(e) => setNovoCpf(e.target.value)}
             placeholder="000.000.000-00"
-            auxiliar="O sistema impedirá duplicatas dentro da mesma organização."
+            auxiliar="O sistema impedirá duplicatas dentro da mesma organização. Confira o CPF sugerido pelo OCR antes de salvar."
             erro={estado.status === "erro" ? estado.errors?.cpf : undefined}
           />
 
