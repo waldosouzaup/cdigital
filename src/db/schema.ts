@@ -350,9 +350,12 @@ export const contracts = pgTable(
     // Storage para o PDF gerado — o bucket `contratos` (Fase 1, Tarefa 7) já existia
     // sem nenhuma coluna apontando pra ele. Fechado na Fase 2 junto com a emissão
     // real (item 8). `pdfPath` é o PDF gerado pelo sistema na emissão; `signedPdfPath`
-    // fica para quando o item 12 (upload do PDF assinado) for implementado.
+    // é o PDF assinado anexado (item 12); `distratoTermPath` é o termo de distrato
+    // gerado (item 13) — mesmo contrato, nunca um registro novo (Seção 7: "sem
+    // apagar o contrato original").
     pdfPath: text("caminho_pdf"),
     signedPdfPath: text("caminho_pdf_assinado"),
+    distratoTermPath: text("caminho_termo_distrato"),
     ...timestamps,
   },
   (table) => [
