@@ -77,6 +77,23 @@ export async function registerPersonWrite(params: {
   });
 }
 
+export async function registerDocumentReview(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  userId: string | null;
+  documentId: string;
+  action: "aprovacao" | "rejeicao";
+}): Promise<void> {
+  await registrarAuditoria({
+    supabase: params.supabase,
+    organizationId: params.organizationId,
+    userId: params.userId,
+    action: params.action,
+    entity: "documentos",
+    entityId: params.documentId,
+  });
+}
+
 export async function registerContractWrite(params: {
   supabase: SupabaseClient;
   organizationId: string;
