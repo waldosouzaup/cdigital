@@ -9,8 +9,9 @@
  * `seed.ts` é quem precisa da fidelidade completa (é o teste de aceitação do
  * relatório consolidado da Seção 13); este arquivo só precisa existir em volume.
  */
+import { eq } from "drizzle-orm";
 import { db } from "./client";
-import { contracts, organizations, people } from "./schema";
+import { contracts, organizations, people, regions } from "./schema";
 import { amountInWords } from "@/lib/contratos/valor-extenso";
 import { generateValidCpf } from "@/lib/documentos/cpf";
 import type { ContractStatus } from "@/lib/contratos/maquina-estados";
@@ -56,27 +57,39 @@ async function inserirEmLotes<T>(linhas: T[], inserir: (lote: T[]) => Promise<un
 async function main() {
   console.log(`Semeando ${TOTAL_PESSOAS} pessoas e ${TOTAL_CONTRATOS} contratos de carga...`);
 
-  const [organizacao] = await db
-    .insert(organizations)
-    .values({ name: "Comitê Michelle — Eleição 2026", active: true })
-    .onConflictDoNothing()
-    .returning({ id: organizations.id });
+  // Busca por nome antes de inserir — organizations.name não tem índice único no
+  // banco (Seção 5 não pede isso; multi-tenant real permite nomes repetidos entre
+  // organizações diferentes), então `onConflictDoNothing()` não tinha nenhum
+  // conflito real para detectar e criava uma organização duplicada a cada
+  // execução. Achado ao rodar este script pela primeira vez na Fase 3 — nunca
+  // tinha sido executado de verdade antes (a Fase 1 só deixou o script pronto).
+  const organizacaoExistente = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.name, "Comitê Michelle — Eleição 2026"))
+    .limit(1);
 
-  const organizationId =
-    organizacao?.id ??
-    (
-      await db.query.organizations.findFirst({
-        where: (org, { eq }) => eq(org.name, "Comitê Michelle — Eleição 2026"),
-      })
-    )?.id;
+  let organizationId = organizacaoExistente[0]?.id;
+
+  if (!organizationId) {
+    const [organizacao] = await db
+      .insert(organizations)
+      .values({ name: "Comitê Michelle — Eleição 2026", active: true })
+      .returning({ id: organizations.id });
+    organizationId = organizacao?.id;
+  }
 
   if (!organizationId) {
     throw new Error("Não foi possível obter a organização para o seed de carga.");
   }
 
-  const regioesExistentes = await db.query.regions.findMany({
-    where: (regiao, { eq }) => eq(regiao.organizationId, organizationId),
-  });
+  // `db.query.*` (API relacional do Drizzle) exige `relations()` declaradas no
+  // schema, que este projeto não usa em lugar nenhum — troquei para o query
+  // builder simples (mesmo padrão do resto do projeto, ex. provision-user.ts).
+  const regioesExistentes = await db
+    .select({ id: regions.id })
+    .from(regions)
+    .where(eq(regions.organizationId, organizationId));
 
   if (regioesExistentes.length === 0) {
     throw new Error(
