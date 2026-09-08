@@ -541,3 +541,62 @@ curl GET /configuracoes sem sessão  → 307 → /login
 - **Item 13** — geração do termo de distrato como documento (hoje só a transição
   de estado).
 - **Item 14** — checklist de pendências por pessoa.
+
+---
+
+## Atualização — 2026-09-08: item 12 da Fase 2 (assinatura)
+
+### Registro de assinatura por upload do PDF assinado — real
+
+- **Decisão de arquitetura registrada em CONSULTAS.md**: Server Actions do Next.js
+  15 têm limite padrão de 1 MB de corpo — baixo demais para um PDF escaneado.
+  `POST /api/contratos/[id]/assinatura` é um Route Handler autenticado (não
+  público, ao contrário de `/api/coleta/*`) — mesmo padrão do upload de documentos
+  da Fase 2, item 3.
+- Valida: arquivo é `application/pdf` (só PDF — item 12 pede especificamente "PDF
+  assinado", diferente do item 3 que aceita imagem também), até 20 MB, contrato
+  precisa estar em `enviado`.
+- **Reaproveita a policy de Storage da própria Fase 1** para o bucket `contratos`
+  (autenticado, escrita por organização) — nenhuma migration nova precisou ser
+  escrita para isto, diferente do upload público da Fase 2 (que exigiu funções
+  SECURITY DEFINER porque não havia sessão).
+- Depois do upload: grava `caminho_pdf_assinado`, chama
+  `gravar_transicao_contrato(enviado, assinado)` (mesma RPC do item 10) — a
+  atomicidade e a trava otimista contra transição concorrente valem aqui também,
+  de graça.
+- **Marcação presencial** (já existia, sem arquivo) continua disponível como opção
+  separada — o coordenador escolhe: anexar PDF ou marcar manualmente.
+- `gerarUrlPdfContrato` ganhou um segundo parâmetro (`"gerado" | "assinado"`) para
+  gerar a URL assinada correta — a tela mostra "Ver Termo" (PDF gerado na emissão)
+  e, quando existe, "Ver Assinado" (o PDF que voltou assinado) como ações
+  separadas.
+
+### Testes novos, contra o Supabase real
+
+`tests/integration/assinatura-contrato.test.ts` (2 testes): upload real do PDF
+assinado no bucket `contratos` com o sufixo `_assinado.pdf`, grava o caminho,
+transiciona `enviado → assinado` pela mesma RPC, confirma `assinado_em` gravado; e
+que o coordenador consegue gerar uma URL assinada para o arquivo que anexou.
+
+### Checagem final
+
+```
+npx tsc --noEmit          → limpo
+npm run lint              → limpo
+npm run test:unit         → 94/94 (sem novos — item 12 não tem lógica pura nova)
+npm run test:integration  → 27/27
+npm run build             → limpo, 15 rotas
+curl POST /api/contratos/.../assinatura sem sessão → 401 JSON (não redireciona pra /login)
+```
+
+### Fase 2 — o que falta agora
+
+- **Item 9** — emissão em lote.
+- **Item 13** — geração do termo de distrato como documento (a transição de
+  estado já existe desde a rodada anterior).
+- **Item 14** — checklist de pendências por pessoa.
+
+Com isto, o ciclo de vida completo do contrato está real e testado: emitido → PDF
+gerado → enviado → e-mail disparado → assinado (por upload real ou marcação
+presencial) → distratado (só a transição). Falta lote, o documento de distrato em
+si, e o checklist.
