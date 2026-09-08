@@ -14,7 +14,7 @@
     "seed:carga": "tsx src/db/seed-carga.ts",
     "db:provision-user": "tsx src/db/provision-user.ts",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
+    "test:integration": "vitest run tests/integration --no-file-parallelism",
     "test:e2e": "playwright test",
     "format": "prettier --write ."
   },

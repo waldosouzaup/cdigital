@@ -839,3 +839,147 @@ aplicado à métrica calculada em vez de a um dado histórico fixo.
 O que fica pendente/fora do escopo desta verificação (já sinalizado): entrega real
 de e-mail (sem domínio no Resend — decisão do usuário desde a Fase 1), e Fase 4
 (campo e automações) ainda não iniciada.
+
+---
+
+# Fase 4 — Campo e automações (2026-09-08)
+
+Todos os 7 itens de entrega construídos e verificados contra o Supabase real
+(não só a UI). Processo igual ao das fases anteriores: consulta de skills antes de
+codar (registrada em `CONSULTAS.md`), TDD para toda função pura, verificação real
+além do teste automatizado, e commits pequenos por item.
+
+## Divergências do PROMPT (aprovadas / registradas)
+
+1. **§3 "pg_cron chamando Edge Function" → `pg_cron` + `net.http_post` → rotas
+   `/api/cron/*` do Next.js.** O deploy de Edge Function está bloqueado nesta
+   sessão (sem `SUPABASE_ACCESS_TOKEN`), e tanto o gate ("rota de cron sem
+   `CRON_SECRET` responde 401") quanto a §4 (`api/cron/`) apontam para rotas Next.
+   O Context 7 confirmou que `net.http_post` dispara qualquer URL. **Aprovado pelo
+   usuário.** `service_role` nessas rotas é uso que a §3.1 permite explicitamente
+   ("jobs do pg_cron e webhooks"). Segredos (`comite_app_url`, `comite_cron_secret`)
+   no Supabase Vault, definidos pelo operador no deploy.
+2. **"documentos ilegíveis" (item 7)** interpretado como linha que não passa: CPF
+   que não fecha o dígito verificador ou nome em branco. **Decisão do usuário.**
+3. **OCR (item 3) roda no navegador** com os assets (wasm + idioma) vindos do CDN
+   padrão do `tesseract.js`. Auto-hospedar (~5 MB) para OCR offline fica como
+   follow-up — o cadastro de pessoa já exige rede.
+4. **3 toques + `pessoa_id`**: `registros_atividade.pessoa_id` é NOT NULL, então a
+   pessoa (e a região) ficam lembradas no `localStorage`; no caso comum o fluxo é
+   3 toques (tipo → quantidade → registrar). **Decisão do usuário.**
+
+## O que foi entregue, por item
+
+- **Item 5 — `CRON_SECRET`**: `src/lib/cron/autorizar.ts` (comparação em tempo
+  constante, nega em qualquer dúvida). `CRON_SECRET` gerada em `.env.local`.
+- **Item 4 — `pg_cron` + 4 jobs**: `pg_cron`/`pg_net` habilitados no projeto
+  hospedado (`CREATE EXTENSION`, papel `postgres` — o bloqueio de CLI que o
+  handoff antecipava não se concretizou). Migration `0011` agenda
+  `comite_vigencia_a_vencer` (`0 10 * * *`), `comite_lembrete_assinatura`
+  (`15 10 * * *`), `comite_resumo_diario` (`0 11 * * 1-5` = 08:00 America/Sao_Paulo),
+  `comite_reprocessar_notificacoes` (`*/15 * * * *`). Rotas `/api/cron/*` são
+  cascas finas; a lógica está em `src/lib/cron/jobs.ts` (dependency-injected, como
+  `sendNotification`) e `src/lib/cron/selecao.ts` (puro). Reprocessamento reenvia
+  o `payload_reenvio` guardado na linha (migration `0012`), para em `tentativas >= 3`.
+- **Item 1 — registro em 3 toques**: `/atividades` real (era mockup). Fluxo
+  vertical, uma mão, 360 px: pessoa/tipo lembrados; chip de tipo → stepper de
+  quantidade → botão "Registrar" full-width sticky no rodapé. `dados.ts`/`acoes.ts`
+  no padrão estabelecido; `validarRegistroAtividade` puro e testado.
+- **Item 2 — PWA + fila offline**: `manifest.ts` + `public/sw.js` (casca offline
+  de `/atividades`, nunca faz cache de `/api/*`) + ícones. Fila em IndexedDB
+  (`idb`); `sincronizarFila` puro concilia com o servidor ao voltar o `online`.
+  Indicador honesto "N na fila".
+- **Item 3 — OCR**: `tesseract.js` no navegador; `extrairSugestoesDocumento`
+  (puro) acha nome + CPF (valida o dígito). Bloco recolhido no modal de cadastro;
+  saída editável; "Usar estes dados" só preenche o formulário — a gravação
+  continua sendo o "Salvar" do cadastro. Duas confirmações humanas.
+- **Item 7 — importação de planilha**: `/pessoas/importar`. `lerPlanilhaPessoas`
+  (exceljs) + `analisarLinhas` (puro) classificam em prontas / duplicatas (CPF
+  repetido na planilha OU já no banco — as duas ocorrências) / ilegíveis. Grava
+  só as prontas, só no clique; `gravarImportacao` re-classifica no servidor.
+- **Item 6 — retenção/expurgo**: `documentosParaExpurgo` (puro). Migration `0013`:
+  `documentos.expurgado_em` + tabela `expurgos` (append-only) + RPC
+  `registrar_expurgo_documento` (registra e marca na mesma transação, idempotente).
+  Ação `expurgarDocumentosDaCampanha` (só gestor) na aba LGPD das Configurações —
+  registra antes de apagar o objeto no Storage, nunca há arquivo apagado sem registro.
+
+## Achados reais desta fase, corrigidos na hora
+
+1. **`atividades/acoes.ts` (item 1) exportava `ESTADO_INICIAL_REGISTRO` (objeto) de
+   um arquivo `"use server"`** → Next.js 15.5 responde HTTP 500 ("a use server
+   file can only export async functions"). Passou pelos testes de unidade,
+   integração e screenshot do item 1 porque a Server Action nunca foi de fato
+   **invocada** ali; só apareceu quando a sincronização da fila offline (item 2)
+   chamou `registrarAtividade` de verdade. Removido (a tela usa `useTransition`).
+2. **Middleware respondia `307 → /login` para `/sw.js`, `/manifest.webmanifest`,
+   `/offline` e `/icons/`** (a regra de rota pública não os cobria) → o service
+   worker não registrava e o PWA não instalava. Tornados públicos em `middleware.ts`.
+3. **Colisão com a trilha de design paralela**: durante o item 1, outro processo
+   reescreveu `atividades-cliente.tsx` **duas vezes** no tema escuro do mockup
+   (`bg-[#0c1628]`, `text-white`), divergente dos `text-ink`/`border-line` que as
+   telas reais das Fases 2–3 usam, e com afirmação de "consolidação para o TSE"
+   que a landing page evita. Levado ao usuário; decisão dele: restaurar a versão
+   de 3 toques em tokens "papel oficial". Commitada logo para travar.
+4. **`test:integration` em paralelo quebrava ~5 testes, incluindo testes das
+   Fases 2–3** (`rls-isolamento`, `emissao-contrato`): contenção de fixture — todos
+   criam/apagam usuários e linhas na mesma organização "Comitê Michelle". Em série
+   (`--no-file-parallelism`, agora no script) os 16 arquivos / 55 testes passam
+   100%. Não é regressão da Fase 4.
+5. **`vitest.config`**: os testes que importam `src/emails/*.tsx` falhavam
+   ("invalid JS syntax") porque o transformador do Vite nesta versão é **oxc** e
+   respeita o `"jsx": "preserve"` do tsconfig. Corrigido com
+   `oxc: { jsx: { runtime: "automatic" } }` — só afeta os testes.
+
+## Verificação do gate — cada item com prova concreta
+
+| # | Item do gate | Resultado | Prova |
+|---|---|:--:|---|
+| 1 | `CONSULTAS.md` registra Context 7 (`pg_cron`, Edge Functions, `tesseract.js`) + front-end-design (fluxo de campo em 360 px) | ✅ | Seção "Fase 4" do `CONSULTAS.md`: `pg_cron`/`pg_net` (mudança de arquitetura), `tesseract.js` v6, `idb`, front-end-design item 1 (360 px, uma mão) e itens 3/7 (telas de OCR e importação) |
+| 2 | Registro em modo avião entra na fila e sobe sozinho ao restaurar a rede | ✅ | `tests/e2e/atividade-offline.spec.ts` (viewport 360): offline → IndexedDB `comite-campo` tem 1, `registros_atividade` tem 0; `online` → `registros_atividade` tem 1 com `sincronizado_em` preenchido, fila zera, banner some. + `sincronizarFila` unit (4 testes) |
+| 3 | Fluxo completo utilizável com uma só mão em viewport de 360 px | ✅ | Screenshot 360 px (`/atividades`): pessoa/região lembradas + "Trocar"; chips de tipo 2-up com alvo ≥ 56 px; stepper −/+ de quantidade com atalhos; botão "3 · Registrar atividade" full-width, sticky no rodapé (zona do polegar). Sem rolagem horizontal. `validarRegistroAtividade` unit (9 testes) |
+| 4 | OCR nunca grava sem confirmação — teste prova isso | ✅ | `tests/e2e/ocr-confirmacao.spec.ts`: sobe uma foto de RG, o `tesseract.js` roda no navegador e sugere nome + CPF → **0 linhas** em `pessoas`; clicar "Usar estes dados" só preenche o formulário → **ainda 0 linhas**. `extrairSugestoesDocumento` unit (7 testes): só devolve `{nome, cpf, confianca}`, sem nenhum caminho de escrita |
+| 5 | Rodar o job de vigência duas vezes no mesmo dia envia um único e-mail por contrato | ✅ | `tests/integration/gate-fase4-cron.test.ts` contra o Supabase real: `jobVigenciaAVencer` 2× no mesmo `hoje` → a 2ª execução tem `enviados: 0` e `duplicados ≥ 1`; exatamente 1 linha `vigencia_a_vencer` por (contrato, destinatário); o transporte de e-mail é chamado só nas mensagens novas; o contrato não muda de estado |
+| 6 | Rota de cron sem `CRON_SECRET` responde 401 | ✅ | `curl` ao vivo contra `next dev`: `/api/cron/{vigencia,lembrete-assinatura,resumo-diario,reprocessar-notificacoes}` sem header → **401**; header errado → **401**; header certo → **200**. `autorizarCron` unit (6 testes) + asserção de 401 na rota real em `gate-fase4-cron.test.ts` |
+| 7 | Fuso horário correto: o resumo das 8h de Brasília não sai às 5h nem às 11h | ✅ | `src/lib/cron/agenda.ts`: 08:00 America/Sao_Paulo (UTC-3 fixo, sem horário de verão desde 2019) → cron `0 11 * * 1-5` em UTC. Unit: `horaBrasiliaParaUtc(8) === 11` (e explicitamente `!== 5`, `!== 8`). O `cron.job` real do Supabase tem gravado exatamente `0 11 * * 1-5` para `comite_resumo_diario` — asserção via `DATABASE_URL` em `gate-fase4-cron.test.ts`. Guarda extra `ehDiaUtil` no próprio job |
+| 8 | Importação de planilha com 2 CPFs repetidos sinaliza os 2 antes de gravar | ✅ | `tests/integration/importar-planilha.test.ts`: `.xlsx` real com o mesmo CPF nas linhas 2 e 4 → **ambas** em `duplicatas`; a linha com CPF inválido vai para `invalidos`; a que já existe no banco vai para `duplicatas` por outro motivo; **0 linhas gravadas** durante a conferência. `analisarLinhas` unit (7 testes), incluindo "checa validade antes de duplicidade" |
+
+## Fase 4 — gate: 8 de 8 itens verdes
+
+Item 6 (retenção/expurgo) não tem linha própria no gate mas é entrega da fase:
+provado por `elegiveis-expurgo` unit (5 testes) + `tests/integration/expurgo-retencao.test.ts`
+(a RPC grava `expurgos` e marca `documentos.expurgado_em` na mesma transação, é
+idempotente, o objeto some do Storage).
+
+## Checagem automatizada final
+
+```
+npm run lint              → limpo (1 warning em src/app/page.tsx — arquivo da
+                            trilha de design paralela, não desta fase)
+npx tsc --noEmit          → limpo
+npm run test:unit         → 178/178 (27 arquivos; +37 nesta fase)
+npm run test:integration  → 55/55 (16 arquivos; roda em série — ver achado 4)
+npx playwright test       → 2/2 (fila offline em 360 px; OCR sem gravação)
+npm run build             → limpo, 22 rotas (as 4 /api/cron, /atividades,
+                            /manifest.webmanifest, /offline, /pessoas/importar)
+```
+
+## Pendências e follow-ups (não bloqueiam o gate)
+
+- **Entrega real de e-mail**: sem domínio verificado no Resend (decisão do usuário
+  desde a Fase 1). Os jobs de cron disparam, mas o envio fica `falhou` até haver
+  domínio — a mecânica de idempotência/fila/reprocessamento está testada com
+  transporte controlado, sem depender disso.
+- **`pg_cron` → entrega real**: o `net.http_post` só alcança a aplicação quando
+  houver URL pública (Netlify). Hoje: `cron.job` agendado e conferido; rotas
+  conferidas por `curl` direto; Vault com placeholders. No deploy, o operador roda
+  `vault.update_secret` para `comite_app_url` e `comite_cron_secret`.
+- **`/pessoas/importar`** carrega `exceljs` no cliente (258 kB, code-split). Mover
+  o parse para um Route Handler é um follow-up.
+- **OCR offline**: auto-hospedar os assets do `tesseract.js` (~5 MB) para o OCR
+  funcionar sem rede.
+- **Tema do painel**: `(painel)/layout.tsx` (mockup escuro, não commitado) diverge
+  dos tokens "papel oficial" das telas reais — pré-existente, afeta todas as telas
+  do painel igualmente.
+
+**Fase 4 fechada. Aguardando revisão do usuário antes de considerar o projeto
+pronto para produção.**
