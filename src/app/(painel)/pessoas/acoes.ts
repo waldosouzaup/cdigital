@@ -9,13 +9,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { obterContextoUsuario } from "@/lib/supabase/contexto-usuario";
 import { registerPersonWrite } from "@/lib/auditoria/registrar";
 import { validarEntradaPessoa, type EntradaPessoa } from "@/lib/pessoas/validacao";
 import { gerarTokenColeta } from "@/lib/coleta/token";
 import { renderizarEmailLinkColeta } from "@/emails/link-coleta";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
-import { createResendTransport } from "@/lib/notificacoes/transporte";
+import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
 
 export interface EstadoCriarPessoa {
   status: "idle" | "sucesso" | "erro" | "duplicada";
@@ -48,10 +49,7 @@ export async function criarPessoa(
   }
 
   const supabase = await createClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const claims = claimsData?.claims as Record<string, unknown> | undefined;
-  const organizationId = claims?.organizacao_id as string | undefined;
-  const userId = (claims?.sub as string | undefined) ?? null;
+  const { organizationId, userId } = await obterContextoUsuario(supabase);
 
   if (!organizationId) {
     return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
@@ -133,9 +131,7 @@ export async function gerarLinkColeta(
   diasValidade: number = VALIDADE_PADRAO_DIAS,
 ): Promise<EstadoGerarLinkColeta> {
   const supabase = await createClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const claims = claimsData?.claims as Record<string, unknown> | undefined;
-  const organizationId = claims?.organizacao_id as string | undefined;
+  const { organizationId } = await obterContextoUsuario(supabase);
 
   if (!organizationId) {
     return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
@@ -189,10 +185,7 @@ export async function gerarLinkColeta(
   // este envio real falha hoje — mas fica gravado em `notificacoes` como `falhou`,
   // não derruba a geração do link (Seção 6, regra 3), e o teste de idempotência
   // (chave determinística por link) segue válido independente disso.
-  const transporte = createResendTransport(
-    process.env.RESEND_API_KEY ?? "",
-    process.env.RESEND_FROM ?? "Comitê Digital <nao-responda@exemplo.invalid>",
-  );
+  const transporte = transporteEmailPadrao();
 
   const resultadoEnvio = await sendNotification({
     supabase,

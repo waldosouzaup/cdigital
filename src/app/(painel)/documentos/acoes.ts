@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { obterContextoUsuario } from "@/lib/supabase/contexto-usuario";
 import {
   registerDocumentReview,
   registerPersonWrite,
@@ -20,7 +21,7 @@ import { renderizarEmailPessoaApta } from "@/emails/pessoa-apta";
 import { renderizarEmailDocumentoRejeitado } from "@/emails/documento-rejeitado";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
-import { createResendTransport } from "@/lib/notificacoes/transporte";
+import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
 
 export interface ResultadoAcaoDocumento {
   ok: boolean;
@@ -28,25 +29,9 @@ export interface ResultadoAcaoDocumento {
   pessoaFicouApta?: boolean;
 }
 
-async function contextoUsuario(supabase: SupabaseClient) {
-  const { data } = await supabase.auth.getClaims();
-  const claims = data?.claims as Record<string, unknown> | undefined;
-  return {
-    organizationId: claims?.organizacao_id as string | undefined,
-    userId: (claims?.sub as string | undefined) ?? null,
-  };
-}
-
-function transporteEmail() {
-  return createResendTransport(
-    process.env.RESEND_API_KEY ?? "",
-    process.env.RESEND_FROM ?? "Comitê Digital <nao-responda@exemplo.invalid>",
-  );
-}
-
 export async function aprovarDocumento(documentoId: string): Promise<ResultadoAcaoDocumento> {
   const supabase = await createClient();
-  const { organizationId, userId } = await contextoUsuario(supabase);
+  const { organizationId, userId } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
 
   const { data: documento, error } = await supabase
@@ -90,7 +75,7 @@ export async function rejeitarDocumento(
   }
 
   const supabase = await createClient();
-  const { organizationId, userId } = await contextoUsuario(supabase);
+  const { organizationId, userId } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
 
   const { data: documento, error } = await supabase
@@ -138,7 +123,7 @@ export async function gerarUrlDocumento(
   documentoId: string,
 ): Promise<{ ok: boolean; url?: string; mensagem?: string }> {
   const supabase = await createClient();
-  const { organizationId, userId } = await contextoUsuario(supabase);
+  const { organizationId, userId } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
 
   const { data: documento } = await supabase
@@ -258,7 +243,7 @@ async function dispararPessoaApta(params: {
   // sair, porque a chave é a mesma.
   await sendNotification({
     supabase,
-    transport: transporteEmail(),
+    transport: transporteEmailPadrao(),
     organizationId,
     type: "pessoa_apta",
     recipientEmail: destinatario.email,
@@ -308,7 +293,7 @@ async function dispararDocumentoRejeitadoManual(params: {
 
   await sendNotification({
     supabase,
-    transport: transporteEmail(),
+    transport: transporteEmailPadrao(),
     organizationId,
     type: "documento_rejeitado",
     recipientEmail: pessoa.email,
