@@ -695,3 +695,51 @@ item separadamente, mas cada um dos 14 itens de entrega já tem código real por
 trás, testado (unitário + integração contra o Supabase real) e, nos itens desta
 última rodada, também verificado manualmente ponta a ponta contra o banco de
 produção real.
+
+---
+
+# Gate de saída da Fase 2 — resultado
+
+Rodado a pedido explícito do usuário em 2026-09-08, depois dos 14 itens de entrega
+terem código real. Cada linha abaixo tem prova concreta, não "parece que funciona".
+
+| # | Item do gate | Resultado | Prova |
+|---|---|:--:|---|
+| 1 | `CONSULTAS.md` registra Context 7 (Storage, Resend, React Email) + front-end-design (pessoas, upload, coleta) | ✅ | Entradas conferidas: Storage (linha 42), Resend/webhook (linhas 41/43/44), React Email (linha 52), front-end-design pessoas/documentos/coleta/lote (linhas 53/124/138/157) |
+| 2 | Pessoa cadastrada → recebe link por e-mail → envia documento → contrato emitido, enviado e assinado — sem sair da aplicação | ✅ | `tests/integration/gate-fase2-e2e-completo.test.ts` — 9 passos encadeados contra o Supabase real: cadastro → link (`link_coleta` enviada) → validação do link (anon) → upload real com hash+dimensão → aprovação → `pessoa_apta` disparada → emissão com PDF real (`%PDF-` confirmado) e valor por extenso da biblioteca → envio com `contrato_enviado` → assinatura → trilha final: exatamente 3 eventos em `eventos_contrato` e 3 notificações `enviada` |
+| 3 | Upload de imagem 72×72 px recusado com mensagem compreensível | ✅ | `tests/unit/documentos/upload.test.ts` + verificação manual ao vivo (Fase 2, item 3): `curl -F` real contra o servidor rodando devolveu a mensagem exata sobre resolução baixa |
+| 4 | Upload do mesmo arquivo duas vezes recusado na segunda, apontando o existente | ✅ | `tests/integration/upload-coleta.test.ts` — mesmo hash recusado, `existente_tipo`/`existente_criado_em` devolvidos |
+| 5 | R$ 3.553,00 → valor por extenso exato (+ 2.200/4.353/1.500) | ✅* | `tests/unit/valor-extenso.test.ts` — os 4 valores conferem. *Divergência deliberada e já registrada em CONSULTAS.md desde a Fase 1: o texto do gate pede vírgula depois de "mil" (`três mil, quinhentos...`), a biblioteca `extenso` segue a gramática numeral real do português e não usa essa vírgula — mantido o valor real da biblioteca, não um texto artificial só para bater com o exemplo |
+| 6 | Transição inválida (`emitido`→`assinado`) rejeitada com erro explicativo | ✅ (corrigido durante esta rodada) | `tests/unit/maquina-estados.test.ts` (camada de aplicação) **+** achado real: a RPC `gravar_transicao_contrato` não validava o grafo por conta própria — um usuário autenticado comum pulava estados chamando a RPC direto. Corrigido na migration 0009 (grafo duplicado dentro da função SQL) e coberto por `tests/integration/gate-fase2-transicao-invalida.test.ts`, que também confirma que a transição válida correspondente continua funcionando |
+| 7 | Toda transição bem-sucedida gerou linha em `eventos_contrato` | ✅ | `tests/integration/emissao-contrato.test.ts` e o passo 9 do teste E2E completo (3 transições → exatamente 3 eventos, na ordem certa) |
+| 8 | `contrato_enviado` disparado duas vezes para o mesmo contrato envia um único e-mail | ✅ | `tests/integration/gate-fase2-notificacao-contrato.test.ts` — chamada dupla com a mesma chave: primeira `sent:true`, segunda `sent:false (duplicate)`, transporte de e-mail chamado uma única vez, uma única linha em `notificacoes` |
+| 9 | Simular queda do Resend: contrato continua `enviado`, notificação fica `falhou` | ✅ | Mesmo arquivo acima — transporte falso sempre retornando erro: `notificacoes.status = 'falhou'`, `contratos.status` continua `'enviado'`, sem exceção subindo |
+| 10 | Nenhum arquivo no Storage tem nome escolhido por humano | ✅ | Grep confirma: `arquivo.name`/nome digitado só alimenta `nome_original` (dado, não caminho); todo `caminho_storage`/`caminho_pdf` é montado por `organizacao_id`/`token`/`tipo`/`pessoa_id`/`versao` — nunca por texto do usuário. Confirmado também no passo 4 do teste E2E: caminho gerado bate exatamente com o padrão esperado, nome original (com espaços e acento) só aparece na coluna `nome_original` |
+| 11 | Nenhum bucket é público — objeto sem URL assinada é negado | ✅ | `documentos`/`contratos`: `public = false` no banco. Testado ao vivo: acesso direto ao objeto (sem URL assinada, com e sem `anon` key) devolveu `400`/"Object not found" nos dois buckets |
+
+## Gate de saída da Fase 2: **11 de 11 itens verdes**
+
+Diferente do gate da Fase 1 (que fechou 8/9, com o item de e-mail pendente por falta
+de domínio no Resend), **este gate fecha 100%** — os itens de notificação foram
+verificados com transporte controlado (nunca dependendo do Resend real ter domínio
+verificado), exatamente como a Seção 6 permite: o que importa é a mecânica de
+idempotência/falha, não a entrega real, que já está documentada como pendência
+separada desde a Fase 1.
+
+## Achado real desta verificação (não existia antes de rodar o gate)
+
+Rodar o gate a sério — testando a chamada direta da RPC, não só o caminho feliz pela
+UI — encontrou uma lacuna de defesa em profundidade: `gravar_transicao_contrato`
+confiava inteiramente na validação de `canTransition()` do lado da aplicação para
+impedir transições inválidas, mas a própria função no banco não verificava isso.
+Como a RPC é `GRANT ... TO authenticated` (não restrita a nenhuma rota específica),
+qualquer usuário autenticado da organização conseguiria pular estados chamando a
+função diretamente. Corrigido na hora (migration 0009), com teste de regressão
+permanente. Este é exatamente o tipo de achado que rodar o gate de propósito, em vez
+de só confiar no que já "parecia pronto", existe para pegar.
+
+## O que o gate NÃO cobre (fora do escopo desta fase, já sinalizado)
+
+- Entrega real de e-mail (sem domínio verificado no Resend — decisão do usuário,
+  Fase 1 e 2).
+- Fase 3 (dashboard tempo real) e Fase 4 (campo/automações) — ainda não iniciadas.
