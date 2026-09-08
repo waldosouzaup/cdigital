@@ -1,0 +1,76 @@
+/**
+ * Leitura de pessoas/regiões para a Fase 2 — sempre pelo cliente com RLS do usuário
+ * (`server.ts`), nunca `admin.ts` (regra de ESLint em `eslint.config.mjs` já proíbe
+ * isso dentro de `(painel)`). Isolamento por organização/região vem de graça da
+ * policy — esta camada não filtra nada por conta própria.
+ */
+import { createClient } from "@/lib/supabase/server";
+
+export interface RegiaoOpcao {
+  id: string;
+  nome: string;
+}
+
+export interface PessoaListada {
+  id: string;
+  nomeCompleto: string;
+  cpf: string;
+  telefone: string | null;
+  funcao: string | null;
+  regiaoId: string | null;
+  regiaoNome: string | null;
+  apta: boolean;
+  statusContrato: string | null;
+}
+
+interface LinhaPessoa {
+  id: string;
+  nome_completo: string;
+  cpf: string;
+  telefone: string | null;
+  funcao: string | null;
+  regiao_id: string | null;
+  apta: boolean;
+  regioes: { nome: string } | null;
+  contratos: { status: string; criado_em: string }[] | null;
+}
+
+export async function listarRegioes(): Promise<RegiaoOpcao[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("regioes").select("id, nome").order("nome");
+  if (error) throw new Error("Não foi possível carregar as regiões.");
+  return data ?? [];
+}
+
+export async function listarPessoas(): Promise<PessoaListada[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pessoas")
+    .select(
+      "id, nome_completo, cpf, telefone, funcao, apta, regiao_id, regioes ( nome ), contratos ( status, criado_em )",
+    )
+    .order("criado_em", { ascending: false })
+    .returns<LinhaPessoa[]>();
+
+  if (error) throw new Error("Não foi possível carregar as pessoas.");
+
+  return (data ?? []).map((linha) => {
+    // "Mais recente" entre os contratos da pessoa — hoje quase sempre 0 ou 1, mas o
+    // caso de distrato+recontratação (Seção 7) pode gerar mais de um.
+    const maisRecente = [...(linha.contratos ?? [])].sort(
+      (a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime(),
+    )[0];
+
+    return {
+      id: linha.id,
+      nomeCompleto: linha.nome_completo,
+      cpf: linha.cpf,
+      telefone: linha.telefone,
+      funcao: linha.funcao,
+      regiaoId: linha.regiao_id,
+      regiaoNome: linha.regioes?.nome ?? null,
+      apta: linha.apta,
+      statusContrato: maisRecente?.status ?? null,
+    };
+  });
+}
