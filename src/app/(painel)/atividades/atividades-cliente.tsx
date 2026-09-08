@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alerta } from "@/components/alerta";
 import { Campo } from "@/components/campo";
 import { Selo } from "@/components/selo";
 import { EstadoVazio } from "@/components/estado-vazio";
+import {
+  contarFila,
+  enfileirarAtividade,
+  lerFilaAtividades,
+  removerDaFila,
+} from "@/lib/atividades/fila-offline";
+import { sincronizarFila } from "@/lib/atividades/sincronizar-fila";
+import type { EntradaRegistroAtividade } from "@/lib/atividades/registro-rapido";
 import { registrarAtividade } from "./acoes";
 import type { PessoaOpcao, RegiaoOpcao, RegistroAtividadeListado } from "./dados";
 
@@ -61,7 +69,72 @@ export function AtividadesCliente({
   const [trocarPessoa, setTrocarPessoa] = useState(false);
 
   const [erros, setErros] = useState<Record<string, string>>({});
-  const [aviso, setAviso] = useState<{ tom: "sucesso" | "critico"; texto: string } | null>(null);
+  const [aviso, setAviso] = useState<{
+    tom: "sucesso" | "critico" | "atencao";
+    texto: string;
+  } | null>(null);
+  const [pendentes, setPendentes] = useState(0);
+  const [sincronizando, setSincronizando] = useState(false);
+
+  /** Envia um registro pela Server Action, traduzindo o resultado para a fila. */
+  const enviarPelaRede = useCallback(async (entrada: EntradaRegistroAtividade) => {
+    const r = await registrarAtividade(entrada);
+    return {
+      ok: r.status === "sucesso",
+      // Erro de validação (tem `erros`) não adianta reenviar; erro genérico é transitório.
+      descartavel: r.status === "erro" && Boolean(r.erros),
+    };
+  }, []);
+
+  const sincronizar = useCallback(async () => {
+    if (sincronizando) return;
+    setSincronizando(true);
+    try {
+      const resultado = await sincronizarFila({
+        lerFila: lerFilaAtividades,
+        enviar: enviarPelaRede,
+        remover: removerDaFila,
+      });
+      const restam = await contarFila();
+      setPendentes(restam);
+      if (resultado.enviados > 0) {
+        setAviso({
+          tom: "sucesso",
+          texto: `${resultado.enviados} registro(s) da fila subiram.`,
+        });
+        router.refresh();
+      }
+      if (resultado.descartados > 0) {
+        setAviso({
+          tom: "atencao",
+          texto: `${resultado.descartados} registro(s) da fila foram recusados e removidos.`,
+        });
+      }
+    } finally {
+      setSincronizando(false);
+    }
+  }, [enviarPelaRede, router, sincronizando]);
+
+  // Ao montar: conta a fila e, se houver rede, tenta subir o que ficou pendente.
+  useEffect(() => {
+    contarFila()
+      .then((n) => {
+        setPendentes(n);
+        if (n > 0 && navigator.onLine) void sincronizar();
+      })
+      .catch(() => {});
+    // `sincronizar` é estável o bastante; rodar só na montagem é o desejado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sobe a fila sozinha quando o sinal volta.
+  useEffect(() => {
+    function aoVoltarRede() {
+      void sincronizar();
+    }
+    window.addEventListener("online", aoVoltarRede);
+    return () => window.removeEventListener("online", aoVoltarRede);
+  }, [sincronizar]);
 
   // Recupera a última pessoa/tipo. Sem pessoa lembrada, já abre o seletor.
   useEffect(() => {
@@ -94,24 +167,55 @@ export function AtividadesCliente({
     setQuantidade((q) => Math.max(1, q + delta));
   }
 
+  function limparAposGravar() {
+    gravarLocal(LS_PESSOA, pessoaId);
+    if (tipo) gravarLocal(LS_TIPO, tipo);
+    setObservacao("");
+    setMostrarObs(false);
+  }
+
   function enviar() {
     setAviso(null);
     setErros({});
+    const entrada: EntradaRegistroAtividade = {
+      pessoaId,
+      regiaoId: pessoa?.regiaoId ?? undefined,
+      tipo,
+      quantidade,
+      observacao,
+      data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()),
+    };
+
     iniciarEnvio(async () => {
-      const resultado = await registrarAtividade({
-        pessoaId,
-        regiaoId: pessoa?.regiaoId ?? undefined,
-        tipo,
-        quantidade,
-        observacao,
-        data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()),
-      });
+      // Sem sinal: vai direto para a fila local, sem tentar a rede.
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await enfileirarAtividade(entrada);
+        setPendentes(await contarFila());
+        limparAposGravar();
+        setAviso({
+          tom: "atencao",
+          texto: `Sem sinal. ${tipo} de ${pessoa?.nome ?? "—"} entrou na fila e sobe sozinha quando a rede voltar.`,
+        });
+        return;
+      }
+
+      let resultado;
+      try {
+        resultado = await registrarAtividade(entrada);
+      } catch {
+        // A chamada de rede falhou (offline intermitente) — guarda na fila.
+        await enfileirarAtividade(entrada);
+        setPendentes(await contarFila());
+        limparAposGravar();
+        setAviso({
+          tom: "atencao",
+          texto: "Falha de rede. O registro entrou na fila e sobe sozinho quando a conexão voltar.",
+        });
+        return;
+      }
 
       if (resultado.status === "sucesso") {
-        gravarLocal(LS_PESSOA, pessoaId);
-        if (tipo) gravarLocal(LS_TIPO, tipo);
-        setObservacao("");
-        setMostrarObs(false);
+        limparAposGravar();
         setAviso({ tom: "sucesso", texto: `${tipo} de ${pessoa?.nome ?? "—"} registrada.` });
         router.refresh();
       } else if (resultado.erros) {
@@ -292,11 +396,34 @@ export function AtividadesCliente({
         )}
       </section>
 
+      {pendentes > 0 && (
+        <div className="mt-5">
+          <Alerta
+            tom="atencao"
+            titulo={`${pendentes} registro(s) na fila`}
+            acao={
+              <button
+                type="button"
+                onClick={() => void sincronizar()}
+                disabled={sincronizando}
+                className="text-small font-medium text-seal underline decoration-seal/40 underline-offset-4 disabled:opacity-50"
+              >
+                {sincronizando ? "Enviando…" : "Tentar agora"}
+              </button>
+            }
+          >
+            Ainda não subiram. Sobem sozinhos quando a rede voltar — nada se perde.
+          </Alerta>
+        </div>
+      )}
+
       {aviso && (
         <div className="mt-5">
           <Alerta
-            tom={aviso.tom === "sucesso" ? "sucesso" : "critico"}
-            titulo={aviso.tom === "sucesso" ? "Registrado" : "Não deu"}
+            tom={aviso.tom}
+            titulo={
+              aviso.tom === "sucesso" ? "Registrado" : aviso.tom === "atencao" ? "Na fila" : "Não deu"
+            }
           >
             {aviso.texto}
           </Alerta>

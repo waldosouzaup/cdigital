@@ -13,6 +13,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const ROTAS_PUBLICAS = ["/login", "/verificacao", "/mfa", "/coleta"];
 
+// Recursos do PWA (Fase 4, item 2) que o navegador busca sem cookie de sessão:
+// o service worker, o manifesto, os ícones e a página de fallback offline. Sem
+// isso o middleware responde 307 → /login e o app não fica instalável nem abre
+// offline.
+const RECURSOS_PWA = ["/sw.js", "/manifest.webmanifest", "/offline", "/icons/"];
+
 // A landing (`/`) é pública, mas com correspondência exata — `startsWith("/")` pegaria
 // o site inteiro.
 //
@@ -34,6 +40,7 @@ function ehRotaPublica(pathname: string) {
   return (
     pathname === "/" ||
     pathname.startsWith("/api/") ||
+    RECURSOS_PWA.some((rota) => pathname === rota || pathname.startsWith(rota)) ||
     ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota))
   );
 }

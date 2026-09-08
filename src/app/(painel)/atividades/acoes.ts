@@ -26,8 +26,6 @@ export interface EstadoRegistroAtividade {
   marca?: number;
 }
 
-export const ESTADO_INICIAL_REGISTRO: EstadoRegistroAtividade = { status: "idle" };
-
 /** "Hoje" no fuso de Brasília — a atividade de campo é registrada no relógio local. */
 function hojeSaoPaulo(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
