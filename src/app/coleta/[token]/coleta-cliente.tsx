@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { Marca } from "@/components/marca";
 import { Campo } from "@/components/campo";
@@ -10,10 +10,11 @@ import { Badge } from "@/components/badge";
 import { enviarDadosColeta, ESTADO_INICIAL_ENVIAR_DADOS } from "./acoes";
 
 /**
- * Fluxo real (Fase 2, item 2) — 2 etapas, não as 4 do desenho original: a pessoa já
- * foi cadastrada pelo coordenador (nome/CPF/região), então não faz sentido pedir de
- * novo. O upload de documento (item 3) ainda não existe — fica sinalizado como "em
- * breve" na etapa de revisão, não escondido.
+ * Fluxo real (Fase 2, itens 2 e 3) — 3 etapas, não as 4 do desenho original: a
+ * pessoa já foi cadastrada pelo coordenador (nome/CPF/região), então não faz
+ * sentido pedir de novo. O upload de documento (etapa 2) valida do lado do
+ * servidor (`/api/coleta/[token]/documento`) — o que aparece aqui de imediato
+ * (tamanho, prévia) é só conveniência, quem decide de verdade é o servidor.
  */
 export function ColetaCliente({
   token,
@@ -24,9 +25,15 @@ export function ColetaCliente({
   primeiroNome: string;
   organizacaoNome: string;
 }) {
-  const [etapa, setEtapa] = useState<1 | 2>(1);
+  const [etapa, setEtapa] = useState<1 | 2 | 3>(1);
   const [consentimento, setConsentimento] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Etapa 2 — documento
+  const [enviandoDocumento, setEnviandoDocumento] = useState(false);
+  const [erroDocumento, setErroDocumento] = useState<string | null>(null);
+  const [documentoEnviado, setDocumentoEnviado] = useState(false);
+  const [nomeArquivoEnviado, setNomeArquivoEnviado] = useState<string | null>(null);
 
   const enviarComToken = enviarDadosColeta.bind(null, token);
   const [estado, formAction, pendente] = useActionState(
@@ -36,8 +43,48 @@ export function ColetaCliente({
 
   if (estado.status === "sucesso") {
     return (
-      <TelaSucesso primeiroNome={primeiroNome} organizacaoNome={organizacaoNome} token={token} />
+      <TelaSucesso
+        primeiroNome={primeiroNome}
+        organizacaoNome={organizacaoNome}
+        token={token}
+        documentoEnviado={documentoEnviado}
+      />
     );
+  }
+
+  async function handleArquivoSelecionado(evento: ChangeEvent<HTMLInputElement>) {
+    const arquivo = evento.target.files?.[0];
+    if (!arquivo) return;
+
+    setErroDocumento(null);
+    setEnviandoDocumento(true);
+    setDocumentoEnviado(false);
+
+    try {
+      const corpo = new FormData();
+      corpo.append("arquivo", arquivo);
+
+      const resposta = await fetch(`/api/coleta/${token}/documento`, {
+        method: "POST",
+        body: corpo,
+      });
+      const resultado = await resposta.json();
+
+      if (!resposta.ok || !resultado.ok) {
+        setErroDocumento(resultado.motivo ?? "Não foi possível enviar o documento.");
+        return;
+      }
+
+      setDocumentoEnviado(true);
+      setNomeArquivoEnviado(arquivo.name);
+    } catch {
+      setErroDocumento("Falha de conexão ao enviar o documento. Tente novamente.");
+    } finally {
+      setEnviandoDocumento(false);
+      // Permite escolher o mesmo arquivo de novo (por exemplo, depois de corrigir
+      // e tentar de novo) — sem isso o navegador ignora uma segunda seleção idêntica.
+      evento.target.value = "";
+    }
   }
 
   return (
@@ -57,12 +104,17 @@ export function ColetaCliente({
       <main className="flex-1 mx-auto w-full max-w-md px-4 py-6">
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs font-mono text-ink-muted mb-2">
-            <span>ETAPA {etapa} DE 2</span>
-            <span>{etapa === 1 ? "DADOS COMPLEMENTARES" : "REVISÃO E ENVIO"}</span>
+            <span>ETAPA {etapa} DE 3</span>
+            <span>
+              {etapa === 1 && "DADOS COMPLEMENTARES"}
+              {etapa === 2 && "DOCUMENTO"}
+              {etapa === 3 && "REVISÃO E ENVIO"}
+            </span>
           </div>
-          <div className="grid grid-cols-2 gap-1.5 h-1 bg-line">
+          <div className="grid grid-cols-3 gap-1.5 h-1 bg-line">
             <div className={`h-full ${etapa >= 1 ? "bg-seal" : "bg-transparent"}`} />
             <div className={`h-full ${etapa >= 2 ? "bg-seal" : "bg-transparent"}`} />
+            <div className={`h-full ${etapa >= 3 ? "bg-seal" : "bg-transparent"}`} />
           </div>
         </div>
 
@@ -98,14 +150,7 @@ export function ColetaCliente({
                 type="email"
                 placeholder="seu@email.com"
               />
-              <Campo
-                rotulo="RG"
-                id="rg"
-                name="rg"
-                mono
-                required
-                placeholder="00.000.000-0"
-              />
+              <Campo rotulo="RG" id="rg" name="rg" mono required placeholder="00.000.000-0" />
               <Campo
                 rotulo="Data de nascimento"
                 id="dataNascimento"
@@ -149,26 +194,115 @@ export function ColetaCliente({
                 className="w-full py-3.5 text-base"
                 onClick={() => setEtapa(2)}
               >
-                Continuar para revisão →
+                Continuar para envio de documento →
               </Selo>
             </div>
           </div>
 
-          {/* ETAPA 2: REVISÃO, CONSENTIMENTO E ENVIO */}
+          {/* ETAPA 2: DOCUMENTO */}
           <div className={etapa === 2 ? "space-y-6" : "hidden"}>
+            <div className="space-y-2">
+              <h1 className="text-h1 font-semibold text-ink leading-tight">
+                Documento de Identidade
+              </h1>
+              <p className="text-small text-ink-muted leading-relaxed">
+                Fotografe seu <strong>RG</strong> (frente e verso) ou sua <strong>CNH aberta</strong>.
+                Certifique-se de que as informações estejam nítidas e sem reflexos.
+              </p>
+            </div>
+
+            <div className="border-t border-line pt-6 space-y-4">
+              <label
+                htmlFor="upload-doc"
+                className="block border-2 border-dashed border-line hover:border-seal p-6 text-center bg-surface/60 cursor-pointer transition-colors"
+              >
+                <input
+                  id="upload-doc"
+                  type="file"
+                  accept="image/jpeg,image/png,application/pdf"
+                  capture="environment"
+                  className="hidden"
+                  disabled={enviandoDocumento}
+                  onChange={handleArquivoSelecionado}
+                />
+                <div className="space-y-2">
+                  <div className="font-mono text-2xl text-seal">
+                    {enviandoDocumento ? "…" : documentoEnviado ? "✓" : "📷"}
+                  </div>
+                  <div className="text-small font-medium text-ink">
+                    {enviandoDocumento
+                      ? "Enviando e verificando…"
+                      : documentoEnviado
+                        ? `Enviado: ${nomeArquivoEnviado}`
+                        : "Tirar foto ou anexar documento"}
+                  </div>
+                  <p className="text-xs text-ink-muted">Formatos JPG, PNG ou PDF até 20 MB</p>
+                </div>
+              </label>
+
+              {erroDocumento && (
+                <Alerta tom="critico" titulo="Não foi possível aceitar este arquivo">
+                  {erroDocumento}
+                </Alerta>
+              )}
+
+              {documentoEnviado && (
+                <Alerta tom="sucesso" titulo="Documento recebido">
+                  Já pode avançar para a revisão final.
+                </Alerta>
+              )}
+
+              <div className="p-3 bg-surface border-l-2 border-info text-xs text-ink-muted space-y-1">
+                <strong>Dica de qualidade:</strong>
+                <p>
+                  Coloque o documento sobre uma mesa bem iluminada e evite usar o flash
+                  diretamente sobre o plástico de proteção.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-2">
+              <Selo
+                type="button"
+                voz="selo"
+                onClick={() => setEtapa(3)}
+                disabled={!documentoEnviado || enviandoDocumento}
+                className="w-full py-3.5 text-base"
+              >
+                Avançar para revisão →
+              </Selo>
+              {!documentoEnviado && (
+                <Selo
+                  type="button"
+                  voz="linha"
+                  onClick={() => setEtapa(3)}
+                  className="text-center text-xs"
+                >
+                  Enviar o documento depois, continuar sem ele por enquanto
+                </Selo>
+              )}
+              <Selo
+                type="button"
+                voz="linha"
+                onClick={() => setEtapa(1)}
+                className="text-center text-xs"
+              >
+                ← Voltar e revisar os dados
+              </Selo>
+            </div>
+          </div>
+
+          {/* ETAPA 3: REVISÃO, CONSENTIMENTO E ENVIO */}
+          <div className={etapa === 3 ? "space-y-6" : "hidden"}>
             <div className="space-y-2">
               <h1 className="text-h1 font-semibold text-ink leading-tight">
                 Revisão e Consentimento
               </h1>
               <p className="text-small text-ink-muted leading-relaxed">
-                Confira se os dados na etapa anterior estão corretos antes de enviar.
+                Confira se os dados e o documento das etapas anteriores estão corretos antes de
+                enviar.
               </p>
             </div>
-
-            <Alerta tom="informativo" titulo="Envio de documento chega em breve">
-              O envio da foto do RG/CNH por aqui ainda está sendo construído. Por enquanto, leve
-              o documento fisicamente à coordenação do seu comitê.
-            </Alerta>
 
             {estado.status === "erro" && (
               <Alerta tom="critico" titulo="Não foi possível concluir">
@@ -186,10 +320,11 @@ export function ColetaCliente({
                   className="mt-1 h-4 w-4 rounded border-line text-seal focus:ring-seal"
                 />
                 <span className="text-xs leading-relaxed text-ink">
-                  Declaro que as informações fornecidas são verídicas e autorizo sua utilização
-                  exclusiva para a <strong>formalização do contrato de trabalho temporário</strong>{" "}
-                  e para a <strong>prestação de contas eleitoral perante a Justiça Eleitoral</strong>,
-                  em conformidade com a Lei Geral de Proteção de Dados (LGPD).
+                  Declaro que as informações e o documento fornecidos são verídicos e autorizo sua
+                  utilização exclusiva para a{" "}
+                  <strong>formalização do contrato de trabalho temporário</strong> e para a{" "}
+                  <strong>prestação de contas eleitoral perante a Justiça Eleitoral</strong>, em
+                  conformidade com a Lei Geral de Proteção de Dados (LGPD).
                 </span>
               </label>
             </div>
@@ -208,10 +343,10 @@ export function ColetaCliente({
               <Selo
                 type="button"
                 voz="linha"
-                onClick={() => setEtapa(1)}
+                onClick={() => setEtapa(2)}
                 className="text-center text-xs"
               >
-                ← Voltar e revisar os dados
+                ← Voltar para o documento
               </Selo>
             </div>
           </div>
@@ -229,10 +364,12 @@ function TelaSucesso({
   primeiroNome,
   organizacaoNome,
   token,
+  documentoEnviado,
 }: {
   primeiroNome: string;
   organizacaoNome: string;
   token: string;
+  documentoEnviado: boolean;
 }) {
   return (
     <div className="min-h-screen bg-paper text-ink flex flex-col justify-between">
@@ -244,8 +381,8 @@ function TelaSucesso({
         <div className="space-y-2">
           <h1 className="text-h1 font-semibold text-ink">Cadastro recebido com sucesso!</h1>
           <p className="text-small text-ink-muted leading-relaxed">
-            Obrigado, <strong>{primeiroNome}</strong>. Seus dados foram recebidos pela coordenação
-            de {organizacaoNome}.
+            Obrigado, <strong>{primeiroNome}</strong>. Seus dados{documentoEnviado ? " e documento" : ""}{" "}
+            foram recebidos pela coordenação de {organizacaoNome}.
           </p>
         </div>
 
@@ -261,16 +398,25 @@ function TelaSucesso({
               </span>
             </p>
             <p>
-              Status: <span className="text-success font-medium">Dados recebidos</span>
+              Status:{" "}
+              <span className="text-success font-medium">
+                {documentoEnviado ? "Dados e documento recebidos" : "Dados recebidos"}
+              </span>
             </p>
           </div>
         </div>
 
+        {!documentoEnviado && (
+          <Alerta tom="atencao" titulo="Documento pendente">
+            Você concluiu sem enviar o documento de identidade. A coordenação vai entrar em
+            contato para pedir o envio separadamente.
+          </Alerta>
+        )}
+
         <div className="p-4 bg-paper border border-line text-xs text-ink-muted leading-relaxed">
           <strong>Próximos passos:</strong>
           <p className="mt-1">
-            A coordenação vai pedir a foto do seu documento separadamente e, assim que o contrato
-            for emitido, você receberá um novo link para assinatura.
+            Assim que o contrato for emitido, você receberá um novo link para assinatura.
           </p>
         </div>
 
