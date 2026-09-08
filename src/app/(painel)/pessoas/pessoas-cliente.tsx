@@ -78,7 +78,8 @@ export function PessoasCliente({
     const bateStatus =
       filtroStatus === "todos" ||
       (filtroStatus === "apta" && p.apta) ||
-      (filtroStatus === "pendente" && !p.apta);
+      (filtroStatus === "pendente" && !p.apta) ||
+      (filtroStatus === "com_pendencias" && p.pendencias.length > 0);
     return bateBusca && bateRegiao && bateStatus;
   });
 
@@ -180,6 +181,7 @@ export function PessoasCliente({
             <option value="todos">Todos os status</option>
             <option value="apta">Apenas aptos (doc aprovado)</option>
             <option value="pendente">Com pendência documental</option>
+            <option value="com_pendencias">Com qualquer pendência (checklist)</option>
           </select>
         </div>
       </div>
@@ -195,6 +197,7 @@ export function PessoasCliente({
                 <th className="p-3.5">Contato</th>
                 <th className="p-3.5 text-center">Aptidão</th>
                 <th className="p-3.5 text-center">Status Contratual</th>
+                <th className="p-3.5">Pendências</th>
                 <th className="p-3.5 text-right">Ações</th>
               </tr>
             </thead>
@@ -224,6 +227,23 @@ export function PessoasCliente({
                         <Badge status={statusBadge} />
                       ) : (
                         <span className="text-xs text-ink-muted">Sem contrato</span>
+                      )}
+                    </td>
+                    <td className="p-3.5">
+                      {p.pendencias.length === 0 ? (
+                        <Badge status="apta" rotuloPersonalizado="Em dia" />
+                      ) : (
+                        <ul className="space-y-1 text-[0.7rem] leading-tight max-w-[220px]">
+                          {p.pendencias.map((pend) => (
+                            <li
+                              key={pend.codigo}
+                              className={pend.severidade === "critica" ? "text-alert font-medium" : "text-ink-muted"}
+                            >
+                              {pend.severidade === "critica" ? "● " : "○ "}
+                              {pend.descricao}
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </td>
                     <td className="p-3.5 text-right space-x-2">

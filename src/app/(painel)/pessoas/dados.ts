@@ -5,6 +5,8 @@
  * policy — esta camada não filtra nada por conta própria.
  */
 import { createClient } from "@/lib/supabase/server";
+import { calcularPendencias, type Pendencia } from "@/lib/pessoas/pendencias";
+import type { ContractStatus } from "@/lib/contratos/maquina-estados";
 
 export interface RegiaoOpcao {
   id: string;
@@ -21,6 +23,9 @@ export interface PessoaListada {
   regiaoNome: string | null;
   apta: boolean;
   statusContrato: string | null;
+  /** Fase 2, item 14 — checklist de pendências, já calculado a partir do estado
+   * real de documentos/aptidão/contrato desta pessoa. */
+  pendencias: Pendencia[];
 }
 
 interface LinhaPessoa {
@@ -33,6 +38,7 @@ interface LinhaPessoa {
   apta: boolean;
   regioes: { nome: string } | null;
   contratos: { status: string; criado_em: string }[] | null;
+  documentos: { tipo: string; status: "pendente" | "aprovado" | "rejeitado"; versao: number }[] | null;
 }
 
 export async function listarRegioes(): Promise<RegiaoOpcao[]> {
@@ -47,7 +53,8 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
   const { data, error } = await supabase
     .from("pessoas")
     .select(
-      "id, nome_completo, cpf, telefone, funcao, apta, regiao_id, regioes ( nome ), contratos ( status, criado_em )",
+      "id, nome_completo, cpf, telefone, funcao, apta, regiao_id, regioes ( nome ), " +
+        "contratos ( status, criado_em ), documentos ( tipo, status, versao )",
     )
     .order("criado_em", { ascending: false })
     .returns<LinhaPessoa[]>();
@@ -60,6 +67,7 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
     const maisRecente = [...(linha.contratos ?? [])].sort(
       (a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime(),
     )[0];
+    const statusContrato = (maisRecente?.status ?? null) as ContractStatus | null;
 
     return {
       id: linha.id,
@@ -70,7 +78,12 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
       regiaoId: linha.regiao_id,
       regiaoNome: linha.regioes?.nome ?? null,
       apta: linha.apta,
-      statusContrato: maisRecente?.status ?? null,
+      statusContrato,
+      pendencias: calcularPendencias({
+        documentos: linha.documentos ?? [],
+        apta: linha.apta,
+        contratoStatus: statusContrato,
+      }),
     };
   });
 }
