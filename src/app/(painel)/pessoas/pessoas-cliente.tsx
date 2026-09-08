@@ -8,7 +8,7 @@ import { Badge, type StatusTipo } from "@/components/badge";
 import { Modal } from "@/components/modal";
 import { EstadoVazio } from "@/components/estado-vazio";
 import { Alerta } from "@/components/alerta";
-import { criarPessoa, ESTADO_INICIAL_CRIAR_PESSOA } from "./acoes";
+import { criarPessoa, ESTADO_INICIAL_CRIAR_PESSOA, gerarLinkColeta } from "./acoes";
 import type { PessoaListada, RegiaoOpcao } from "./dados";
 
 const FUNCOES_CONHECIDAS = [
@@ -52,6 +52,9 @@ export function PessoasCliente({
   const [modalNovoAberto, setModalNovoAberto] = useState(false);
   const [modalLinkAberto, setModalLinkAberto] = useState(false);
   const [linkGerado, setLinkGerado] = useState("");
+  const [emailEnviado, setEmailEnviado] = useState(false);
+  const [erroLink, setErroLink] = useState<string | null>(null);
+  const [gerandoLinkPara, setGerandoLinkPara] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
@@ -87,14 +90,23 @@ export function PessoasCliente({
     setModalNovoAberto(false);
   }
 
-  // Link público de coleta (Fase 2, item 2) ainda não existe de verdade — geração de
-  // token, validade e RLS do acesso sem login ficam para a próxima parte da fase.
-  // Isto continua um placeholder deliberado, não uma regressão.
-  function handleGerarLinkColeta(p?: PessoaListada) {
-    const sufixo = Math.random().toString(36).substring(2, 10);
-    const token = p ? `p${p.id}-${sufixo}` : sufixo;
-    const url = `${window.location.origin}/coleta/${token}`;
-    setLinkGerado(url);
+  // Link público de coleta (Fase 2, item 2) — gera de verdade contra o banco
+  // (links_coleta + token aleatório) e tenta enviar por e-mail via Resend.
+  async function handleGerarLinkColeta(p: PessoaListada) {
+    setGerandoLinkPara(p.id);
+    setErroLink(null);
+    const resultado = await gerarLinkColeta(p.id);
+    setGerandoLinkPara(null);
+
+    if (resultado.status === "erro") {
+      setErroLink(resultado.mensagem ?? "Não foi possível gerar o link.");
+      setLinkGerado("");
+      setModalLinkAberto(true);
+      return;
+    }
+
+    setLinkGerado(resultado.url ?? "");
+    setEmailEnviado(Boolean(resultado.emailEnviado));
     setCopiado(false);
     setModalLinkAberto(true);
   }
@@ -120,9 +132,6 @@ export function PessoasCliente({
         </div>
 
         <div className="flex items-center gap-3">
-          <Selo voz="neutro" onClick={() => handleGerarLinkColeta()} className="text-xs">
-            🔗 Gerar Link de Coleta
-          </Selo>
           <Selo voz="selo" onClick={abrirModalNovo} className="text-xs">
             + Cadastrar Pessoa
           </Selo>
@@ -221,10 +230,11 @@ export function PessoasCliente({
                       <button
                         type="button"
                         onClick={() => handleGerarLinkColeta(p)}
-                        className="text-xs text-seal hover:underline cursor-pointer"
-                        title="Enviar link de coleta exclusivo"
+                        disabled={gerandoLinkPara === p.id}
+                        className="text-xs text-seal hover:underline cursor-pointer disabled:opacity-50 disabled:no-underline"
+                        title="Gerar link de coleta exclusivo"
                       >
-                        Link
+                        {gerandoLinkPara === p.id ? "Gerando…" : "Link"}
                       </button>
                     </td>
                   </tr>
@@ -340,19 +350,36 @@ export function PessoasCliente({
         aberto={modalLinkAberto}
         aoFechar={() => setModalLinkAberto(false)}
         titulo="Link de Coleta Exclusivo"
-        descricao="Envie este link para o contratado preencher os dados e enviar a foto do documento pelo celular."
-        rotuloPrimario={copiado ? "Copiado com Sucesso ✓" : "Copiar Link"}
-        acaoPrimaria={handleCopiarLink}
+        descricao="Envie este link para o contratado preencher os dados complementares pelo celular."
+        rotuloPrimario={erroLink ? undefined : copiado ? "Copiado com Sucesso ✓" : "Copiar Link"}
+        acaoPrimaria={erroLink ? undefined : handleCopiarLink}
       >
         <div className="space-y-4">
-          <div className="p-3 bg-paper border border-line flex items-center justify-between">
-            <span className="font-mono text-xs text-ink truncate select-all">{linkGerado}</span>
-          </div>
+          {erroLink ? (
+            <Alerta tom="critico" titulo="Não foi possível gerar o link">
+              {erroLink}
+            </Alerta>
+          ) : (
+            <>
+              <div className="p-3 bg-paper border border-line flex items-center justify-between">
+                <span className="font-mono text-xs text-ink truncate select-all">
+                  {linkGerado}
+                </span>
+              </div>
 
-          <Alerta tom="informativo" titulo="Ainda um link de demonstração">
-            A geração real de token, validade e envio por e-mail (Fase 2, item 2) ainda não
-            foi construída — este link não funciona de ponta a ponta.
-          </Alerta>
+              {emailEnviado ? (
+                <Alerta tom="sucesso" titulo="E-mail enviado">
+                  O link também foi enviado por e-mail para esta pessoa.
+                </Alerta>
+              ) : (
+                <Alerta tom="atencao" titulo="E-mail não enviado">
+                  A pessoa não tem e-mail cadastrado, ou o envio falhou (sem domínio verificado no
+                  Resend — decisão registrada em PROGRESSO-FASE-2-3-4.md). Copie e envie o link
+                  manualmente, por WhatsApp por exemplo.
+                </Alerta>
+              )}
+            </>
+          )}
         </div>
       </Modal>
     </div>
