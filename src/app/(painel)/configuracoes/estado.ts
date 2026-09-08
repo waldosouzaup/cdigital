@@ -9,3 +9,11 @@ export interface EstadoSalvarTemplate {
 }
 
 export const ESTADO_INICIAL_SALVAR_TEMPLATE: EstadoSalvarTemplate = { status: "idle" };
+
+export interface EstadoIdentidadeComite {
+  status: "idle" | "sucesso" | "erro";
+  erros?: { nome?: string; cnpj?: string };
+  mensagem?: string;
+}
+
+export const ESTADO_INICIAL_IDENTIDADE: EstadoIdentidadeComite = { status: "idle" };

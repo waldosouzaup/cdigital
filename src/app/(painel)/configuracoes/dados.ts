@@ -13,6 +13,23 @@ export interface TemplateContrato {
   ativo: boolean;
 }
 
+export interface IdentidadeComite {
+  nome: string;
+  cnpj: string | null;
+}
+
+/** Identidade do comitê (nome + CNPJ) da organização do usuário logado. */
+export async function buscarIdentidadeComite(): Promise<IdentidadeComite> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("organizacoes")
+    .select("nome, cnpj")
+    .maybeSingle();
+
+  if (error) throw new Error("Não foi possível carregar a identidade do comitê.");
+  return { nome: data?.nome ?? "", cnpj: data?.cnpj ?? null };
+}
+
 export async function listarTemplates(): Promise<TemplateContrato[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

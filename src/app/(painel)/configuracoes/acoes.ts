@@ -17,7 +17,8 @@ import {
   dataLiberacaoExpurgo,
   CARENCIA_PADRAO_DIAS,
 } from "@/lib/documentos/elegiveis-expurgo";
-import type { EstadoSalvarTemplate } from "./estado";
+import { validarIdentidadeComite } from "@/lib/organizacao/validacao";
+import type { EstadoIdentidadeComite, EstadoSalvarTemplate } from "./estado";
 
 function campoTexto(formData: FormData, nome: string): string {
   const valor = formData.get(nome);
@@ -65,6 +66,46 @@ export async function salvarTemplate(
 
   revalidatePath("/configuracoes");
   return { status: "sucesso", mensagem: id ? "Modelo atualizado." : "Modelo criado." };
+}
+
+/**
+ * Item 4 — edição da identidade do comitê (nome + CNPJ). Só gestor (a policy
+ * `organizacoes_update_gestor` da migration 0014 já barra os demais papéis; a
+ * checagem aqui devolve uma mensagem clara em vez de um erro genérico de RLS).
+ */
+export async function salvarIdentidadeComite(
+  _estadoAnterior: EstadoIdentidadeComite,
+  formData: FormData,
+): Promise<EstadoIdentidadeComite> {
+  const validacao = validarIdentidadeComite({
+    nome: campoTexto(formData, "nome"),
+    cnpj: campoTexto(formData, "cnpj"),
+  });
+  if (!validacao.ok) {
+    return { status: "erro", erros: validacao.erros };
+  }
+
+  const supabase = await createClient();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims as Record<string, unknown> | undefined;
+  const organizationId = claims?.organizacao_id as string | undefined;
+
+  if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login de novo." };
+  if (claims?.papel !== "gestor") {
+    return { status: "erro", mensagem: "Só o gestor pode editar a identidade do comitê." };
+  }
+
+  const { error } = await supabase
+    .from("organizacoes")
+    .update({ nome: validacao.valores.nome, cnpj: validacao.valores.cnpj })
+    .eq("id", organizationId);
+
+  if (error) {
+    return { status: "erro", mensagem: "Não foi possível salvar a identidade do comitê." };
+  }
+
+  revalidatePath("/configuracoes");
+  return { status: "sucesso", mensagem: "Identidade do comitê atualizada." };
 }
 
 /**

@@ -177,7 +177,22 @@ expurgar ainda". (Automatizado: `tests/integration/expurgo-retencao.test.ts`.)
 
 ---
 
-## 5. Publicar na Netlify
+## 5. Administração (feedback do coordenador — itens 2, 3 e 4)
+
+- **Regiões de Atuação** (`/regioes`, link no menu e no cabeçalho de `/pessoas`):
+  como **gestor**, adicione uma região → ela aparece no seletor "Região de
+  Atuação" do cadastro de pessoa. Renomeie inline. Não há exclusão (FK de
+  pessoas/contratos). (Automatizado: `tests/e2e/server-actions.spec.ts`.)
+- **Identidade do Comitê** (`/configuracoes` → primeira seção): como **gestor**,
+  edite Nome e CNPJ → **Salvar identidade** → recarregue: persiste em
+  `organizacoes`. CNPJ é validado por dígito verificador.
+- **Tema**: o painel agora renderiza sempre no tema escuro, independente do modo
+  do sistema operacional (antes, em modo claro, texto escuro ficava invisível
+  sobre o fundo escuro fixo).
+
+---
+
+## 6. Publicar na Netlify
 
 1. **Conectar o repositório** na Netlify. Ela detecta Next.js (App Router,
    Server Actions, Route Handlers e `middleware.ts` funcionam pelo Next Runtime).
@@ -209,7 +224,7 @@ expurgar ainda". (Automatizado: `tests/integration/expurgo-retencao.test.ts`.)
 
 ---
 
-## 6. O que ainda falta para produção "de verdade"
+## 7. O que ainda falta para produção "de verdade"
 
 | Item | Situação | O que fazer |
 | --- | --- | --- |

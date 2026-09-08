@@ -10,10 +10,11 @@ import { Modal } from "@/components/modal";
 import {
   alternarAtivoTemplate,
   expurgarDocumentosDaCampanha,
+  salvarIdentidadeComite,
   salvarTemplate,
 } from "./acoes";
-import { ESTADO_INICIAL_SALVAR_TEMPLATE } from "./estado";
-import type { TemplateContrato } from "./dados";
+import { ESTADO_INICIAL_IDENTIDADE, ESTADO_INICIAL_SALVAR_TEMPLATE } from "./estado";
+import type { IdentidadeComite, TemplateContrato } from "./dados";
 
 const MARCADORES = [
   "{{nome}}",
@@ -28,14 +29,22 @@ const MARCADORES = [
 
 export function ConfiguracoesCliente({
   templatesIniciais,
+  identidadeInicial,
 }: {
   templatesIniciais: TemplateContrato[];
+  identidadeInicial: IdentidadeComite;
 }) {
   const router = useRouter();
 
-  // Identidade do comitê — cosmético, fora do escopo da Fase 2, não persiste.
-  const [nomeComite, setNomeComite] = useState("Comitê Central — Eleições 2026");
-  const [cnpj, setCnpj] = useState("00.000.000/0001-00");
+  // Identidade do comitê (item 4) — real: grava em `organizacoes` (só gestor).
+  const [estadoIdentidade, salvarIdentidadeAction, salvandoIdentidade] = useActionState(
+    salvarIdentidadeComite,
+    ESTADO_INICIAL_IDENTIDADE,
+  );
+  const identidadeFormRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (estadoIdentidade.status === "sucesso") router.refresh();
+  }, [estadoIdentidade.status, router]);
 
   // Editor de modelos — real
   const [modalAberto, setModalAberto] = useState(false);
@@ -129,31 +138,55 @@ export function ConfiguracoesCliente({
         </Selo>
       </div>
 
-      {/* DADOS DA ORGANIZAÇÃO ELEITORAL — cosmético, fora do escopo da Fase 2 */}
+      {/* IDENTIFICAÇÃO DO COMITÊ ELEITORAL — real (item 4), grava em `organizacoes` */}
       <section className="border border-line bg-surface p-6 space-y-6">
         <div className="regua">
           <h2 className="text-h2 font-semibold text-ink">Identificação do Comitê Eleitoral</h2>
           <p className="text-xs text-ink-muted">
-            Dados vinculados ao Cadastro Nacional da Pessoa Jurídica da campanha e aos relatórios
-            do TSE.
+            Nome e CNPJ da campanha, usados nos contratos e relatórios. Só o gestor edita.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+        <form
+          ref={identidadeFormRef}
+          action={salvarIdentidadeAction}
+          className="grid grid-cols-1 gap-6 pt-2 sm:grid-cols-2"
+        >
           <Campo
             rotulo="Razão Social / Nome do Comitê"
             id="nome-comite"
-            value={nomeComite}
-            onChange={(e) => setNomeComite(e.target.value)}
+            name="nome"
+            required
+            defaultValue={identidadeInicial.nome}
+            erro={estadoIdentidade.status === "erro" ? estadoIdentidade.erros?.nome : undefined}
           />
           <Campo
             rotulo="CNPJ Eleitoral da Campanha"
             id="cnpj"
+            name="cnpj"
             mono
-            value={cnpj}
-            onChange={(e) => setCnpj(e.target.value)}
+            defaultValue={identidadeInicial.cnpj ?? ""}
+            placeholder="00.000.000/0001-00"
+            erro={estadoIdentidade.status === "erro" ? estadoIdentidade.erros?.cnpj : undefined}
           />
-        </div>
+          <div className="sm:col-span-2 flex items-center gap-3">
+            <Selo
+              voz="selo"
+              type="submit"
+              carregando={salvandoIdentidade}
+              textoCarregando="Salvando…"
+              className="text-xs"
+            >
+              Salvar identidade
+            </Selo>
+            {estadoIdentidade.status === "sucesso" && (
+              <span className="text-xs text-success">{estadoIdentidade.mensagem}</span>
+            )}
+            {estadoIdentidade.status === "erro" && estadoIdentidade.mensagem && (
+              <span className="text-xs text-alert">{estadoIdentidade.mensagem}</span>
+            )}
+          </div>
+        </form>
       </section>
 
       {/* MODELOS DE MINUTA CONTRATUAL — real (Fase 2, item 7) */}

@@ -144,3 +144,118 @@ test("salvarTemplate: a Server Action grava o modelo quando o gestor clica em Sa
     // O gestor persistente NÃO é apagado — o fator TOTP é reaproveitado.
   }
 });
+
+test("salvarIdentidadeComite: o gestor edita nome/CNPJ e o valor persiste (item 4)", async ({
+  page,
+  context,
+}) => {
+  const email = "e2e-persist-gestor@exemplo.invalid";
+  const user = (await admin.auth.admin.listUsers()).data.users.find((u) => u.email === email)!;
+  await admin.auth.admin.updateUserById(user.id, { password: SENHA });
+  await admin.from("usuarios").upsert({
+    id: user.id,
+    organizacao_id: orgId,
+    nome: "Gestor SA (persistente)",
+    email,
+    papel: "gestor",
+  });
+
+  const { data: original } = await admin
+    .from("organizacoes")
+    .select("nome, cnpj")
+    .eq("id", orgId)
+    .single();
+  const novoNome = `${original!.nome} (teste ${Date.now() % 100000})`;
+
+  try {
+    await autenticarContextoAal2(context, email, SENHA);
+    await page.goto("/configuracoes", { waitUntil: "networkidle" });
+
+    await page.locator("#nome-comite").fill(novoNome);
+    await page.locator("#cnpj").fill("11.222.333/0001-81"); // CNPJ válido
+    await page.getByRole("button", { name: /Salvar identidade/i }).click();
+
+    await expect
+      .poll(
+        async () => {
+          const { data } = await admin
+            .from("organizacoes")
+            .select("nome, cnpj")
+            .eq("id", orgId)
+            .single();
+          return data;
+        },
+        { timeout: 15_000 },
+      )
+      .toEqual({ nome: novoNome, cnpj: "11.222.333/0001-81" });
+  } finally {
+    // Restaura o valor original da organização real.
+    await admin
+      .from("organizacoes")
+      .update({ nome: original!.nome, cnpj: original!.cnpj })
+      .eq("id", orgId);
+  }
+});
+
+test("criarRegiao / renomearRegiao: o gestor cadastra e renomeia uma região (item 2)", async ({
+  page,
+  context,
+}) => {
+  const email = "e2e-persist-gestor@exemplo.invalid";
+  const user = (await admin.auth.admin.listUsers()).data.users.find((u) => u.email === email)!;
+  await admin.auth.admin.updateUserById(user.id, { password: SENHA });
+  await admin.from("usuarios").upsert({
+    id: user.id,
+    organizacao_id: orgId,
+    nome: "Gestor SA (persistente)",
+    email,
+    papel: "gestor",
+  });
+
+  const nome1 = `Região Teste ${Date.now() % 100000}`;
+  const nome2 = `${nome1} Renomeada`;
+
+  try {
+    await autenticarContextoAal2(context, email, SENHA);
+    await page.goto("/regioes", { waitUntil: "networkidle" });
+
+    await page.locator("#nova-regiao").fill(nome1);
+    await page.getByRole("button", { name: /Adicionar região/i }).click();
+
+    await expect
+      .poll(async () => {
+        const { count } = await admin
+          .from("regioes")
+          .select("id", { count: "exact", head: true })
+          .eq("organizacao_id", orgId)
+          .eq("nome", nome1);
+        return count ?? 0;
+      }, { timeout: 15_000 })
+      .toBe(1);
+
+    // aparece no seletor de região do cadastro de pessoa
+    await page.goto("/pessoas", { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: /Cadastrar Pessoa/i }).click();
+    await expect(page.locator(`#novo-regiao option:has-text("${nome1}")`)).toHaveCount(1);
+
+    // renomear
+    await page.goto("/regioes", { waitUntil: "networkidle" });
+    await page.getByRole("listitem").filter({ hasText: nome1 }).getByRole("button", { name: /Renomear/i }).click();
+    await page.locator("input[name='nome']").last().fill(nome2);
+    await page.getByRole("button", { name: /^Salvar$/i }).click();
+
+    await expect
+      .poll(async () => {
+        const { count } = await admin
+          .from("regioes")
+          .select("id", { count: "exact", head: true })
+          .eq("organizacao_id", orgId)
+          .eq("nome", nome2);
+        return count ?? 0;
+      }, { timeout: 15_000 })
+      .toBe(1);
+  } finally {
+    // admin ignora a policy (sem DELETE para o gestor, mas o teste limpa o seu).
+    await admin.from("regioes").delete().eq("organizacao_id", orgId).ilike("nome", `${nome1}%`);
+  }
+});

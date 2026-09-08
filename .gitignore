@@ -53,3 +53,4 @@ supabase/.branches
 
 # vitest / coverage
 /coverage
+tests/e2e/.secrets/

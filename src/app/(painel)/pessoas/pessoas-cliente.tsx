@@ -146,6 +146,12 @@ export function PessoasCliente({
 
         <div className="flex items-center gap-3">
           <Link
+            href="/regioes"
+            className="text-small font-medium text-seal underline decoration-seal/40 underline-offset-4"
+          >
+            Regiões
+          </Link>
+          <Link
             href="/pessoas/importar"
             className="text-small font-medium text-seal underline decoration-seal/40 underline-offset-4"
           >

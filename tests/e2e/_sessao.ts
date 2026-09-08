@@ -1,5 +1,7 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { createHmac } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 /**
@@ -108,23 +110,43 @@ export async function autenticarContextoAal2(
   });
   if (erroLogin || !login.session) throw erroLogin ?? new Error("sem sessão");
 
-  const fatores = await anon.auth.mfa.listFactors();
-  let factorId = fatores.data?.totp?.find((f) => f.status === "verified")?.id;
+  // O secret do TOTP só aparece no enroll. Guardamos num arquivo gitignored para
+  // reaproveitar o fator (challenge+verify, sem novo enroll — evita o rate limit).
+  const arquivoSecret = path.resolve(
+    "tests/e2e/.secrets",
+    `${email.replace(/[^a-z0-9]/gi, "_")}.txt`,
+  );
+  let secret = existsSync(arquivoSecret) ? readFileSync(arquivoSecret, "utf8").trim() : "";
 
-  if (!factorId) {
+  const fatores = await anon.auth.mfa.listFactors();
+  const fatorVerificado = fatores.data?.totp?.find((f) => f.status === "verified");
+
+  let factorId: string;
+  if (fatorVerificado && secret) {
+    factorId = fatorVerificado.id;
+  } else {
+    // Sem fator, ou fator sem secret conhecido: apaga os existentes pelo admin
+    // (não precisa de aal2) e cadastra do zero.
+    for (const f of fatores.data?.totp ?? []) {
+      await admin.auth.admin.mfa.deleteFactor({ id: f.id, userId: login.user!.id }).catch(() => {});
+    }
     const enroll = await anon.auth.mfa.enroll({ factorType: "totp" });
     if (enroll.error || !enroll.data) throw enroll.error ?? new Error("enroll falhou");
-    const secret = enroll.data.totp.secret;
-    const challenge = await anon.auth.mfa.challenge({ factorId: enroll.data.id });
-    if (challenge.error) throw challenge.error;
-    const verify = await anon.auth.mfa.verify({
-      factorId: enroll.data.id,
-      challengeId: challenge.data.id,
-      code: totp(secret),
-    });
-    if (verify.error) throw verify.error;
+    secret = enroll.data.totp.secret;
     factorId = enroll.data.id;
+    mkdirSync(path.dirname(arquivoSecret), { recursive: true });
+    writeFileSync(arquivoSecret, secret);
   }
+
+  // Sempre eleva a sessão ATUAL para aal2 (ter fator verificado != sessão aal2).
+  const challenge = await anon.auth.mfa.challenge({ factorId });
+  if (challenge.error) throw challenge.error;
+  const verify = await anon.auth.mfa.verify({
+    factorId,
+    challengeId: challenge.data.id,
+    code: totp(secret),
+  });
+  if (verify.error) throw verify.error;
 
   const { data: sess } = await anon.auth.getSession();
   const payload = "base64-" + Buffer.from(JSON.stringify(sess.session)).toString("base64");

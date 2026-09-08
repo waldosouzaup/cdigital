@@ -197,6 +197,15 @@ export const organizations = pgTable(
       to: authenticatedRole,
       using: sql`${table.id} = (select public.organizacao_id())`,
     }),
+    // Item 4: o gestor edita a identidade (nome/CNPJ) da própria organização.
+    // Migration 0014. A restritiva de MFA continua valendo por cima.
+    pgPolicy("organizacoes_update_gestor", {
+      as: "permissive",
+      for: "update",
+      to: authenticatedRole,
+      using: sql`${table.id} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+      withCheck: sql`${table.id} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+    }),
     mfaGatePolicy("organizacoes_mfa"),
   ],
 );
@@ -223,6 +232,21 @@ export const regions = pgTable(
       for: "select",
       to: authenticatedRole,
       using: sql`${table.organizationId} = (select public.organizacao_id())`,
+    }),
+    // Item 2: o gestor cria/renomeia regiões da própria organização (migration
+    // 0015). Sem DELETE — FK de pessoas/contratos/atividades/documentos/usuarios.
+    pgPolicy("regioes_insert_gestor", {
+      as: "permissive",
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+    }),
+    pgPolicy("regioes_update_gestor", {
+      as: "permissive",
+      for: "update",
+      to: authenticatedRole,
+      using: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+      withCheck: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
     }),
     mfaGatePolicy("regioes_mfa"),
   ],
