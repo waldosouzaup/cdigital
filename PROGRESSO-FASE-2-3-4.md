@@ -377,3 +377,67 @@ npm run build             → limpo, 14 rotas
   `pessoas.apta`. Isso é o próximo pedaço natural (mesa de triagem, já existe como
   mockup em `/documentos`).
 - OCR (sugestão de nome/CPF a partir do documento) é Fase 4, não esta.
+
+---
+
+## Atualização — 2026-09-08: item 6 da Fase 2 (mesa de triagem)
+
+### Aprovar/rejeitar documento e marcar pessoa apta — real
+
+- **`src/lib/pessoas/aptidao.ts`** (TDD): `pessoaEstaApta(documentos)` — função pura,
+  considera só a versão mais recente de cada tipo obrigatório
+  (`DOCUMENTOS_OBRIGATORIOS`, hoje só `documento_identidade`) e exige todas
+  aprovadas. Separada do banco de propósito: a lista de tipos obrigatórios só tende
+  a crescer, e a regra precisa continuar certa quando isso acontecer.
+- **`(painel)/documentos/acoes.ts`**: `aprovarDocumento`/`rejeitarDocumento` /
+  `gerarUrlDocumento`. Depois de toda aprovação **e** toda rejeição,
+  `reavaliarAptidao` roda de novo — não só no caminho feliz: rejeitar um documento de
+  uma pessoa que já estava apta **revoga** a aptidão, não só deixa de concedê-la.
+- **`pessoa_apta`** dispara para o "coordenador responsável" — interpretado como o
+  `coord_regiao` da região da pessoa; sem um, cai para qualquer `coord_comite` da
+  organização (a Seção 6 não define esse termo com precisão; decisão registrada
+  aqui por não estar no documento original).
+- **Rejeição manual gera um novo link de coleta automaticamente** (reaproveita
+  `gerarTokenColeta`) e manda por `documento_rejeitado` com esse link — mais útil que
+  reaproveitar um token antigo que pode já estar expirado ou usado.
+- **`gerarUrlDocumento`** reaproveita `criarUrlAssinada` (Fase 1), que já grava o
+  log de auditoria de leitura sozinha.
+- `registerDocumentReview` novo em `auditoria/registrar.ts` (ação `aprovacao`/
+  `rejeicao`, entidade `documentos`) — Fase 1 item 10 só cobria pessoas/contratos.
+
+### Limitação conhecida e documentada (não corrigida agora)
+
+A chave de idempotência de `pessoa_apta` é só `pessoaId` (não por evento). Se uma
+pessoa perder a aptidão (documento rejeitado depois de aprovado) e reconquistá-la
+depois, o e-mail de `pessoa_apta` **não volta a sair** — mesma chave, o índice único
+recusa o segundo envio. Aceitável para o caminho comum (a pessoa fica apta uma vez),
+registrado aqui para não ser esquecido se isso importar depois.
+
+### Testes novos, contra o Supabase real
+
+`tests/integration/documentos-triagem.test.ts` (4 testes): prova algo que nenhum
+teste anterior tinha coberto — que a policy de RLS de `documentos` (Fase 1,
+`organizationAndRegionPolicy`, `for: "all"`) permite `UPDATE` por um usuário
+autenticado comum, não só `SELECT`/`INSERT`. Também aplica `pessoaEstaApta` ao dado
+real pós-aprovação e pós-rejeição, confirmando que a função pura decide igual ao que
+a Server Action decidiria.
+
+### Checagem final
+
+```
+npx tsc --noEmit          → limpo
+npm run lint              → limpo
+npm run test:unit         → 84/84 (6 novos: regra de aptidão)
+npm run test:integration  → 22/22 (RLS + webhook + CPF duplicado + links_coleta + upload + triagem)
+npm run build             → limpo, 14 rotas
+curl GET /documentos sem sessão → 307 → /login
+```
+
+### O que ainda falta
+
+- Só o tipo `documento_identidade` existe — quando o upload ganhar mais tipos
+  (comprovante de residência, dados bancários), `DOCUMENTOS_OBRIGATORIOS` cresce e a
+  mesa de triagem já lida com isso sem mudar (o rótulo é só um mapa).
+- A limitação de idempotência de `pessoa_apta` acima.
+- Emissão de contrato (itens 7–13 da Fase 2) — a pessoa agora pode ficar `apta` de
+  verdade, mas nada ainda gera contrato a partir disso.
