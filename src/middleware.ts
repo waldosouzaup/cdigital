@@ -13,6 +13,20 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const ROTAS_PUBLICAS = ["/login", "/verificacao", "/mfa", "/coleta"];
 
+// A landing (`/`) é pública, mas com correspondência exata — `startsWith("/")` pegaria
+// o site inteiro.
+//
+// BUG encontrado e corrigido na Fase 2: esta função chegou a incluir as rotas do
+// painel (`/dashboard`, `/pessoas` etc.) na lista de "públicas", o que fazia o
+// middleware nunca redirecionar usuário não autenticado para fora delas — o RLS ainda
+// impedia o dado de vazar (sem JWT, a policy nega tudo), mas a casca da tela ficava
+// acessível sem login, o que contraria a Seção 3 ("proteger páginas e dados" via
+// `getClaims()`). Painel não entra mais aqui: tudo que não está em `ROTAS_PUBLICAS`
+// nem é `/` exige sessão.
+function ehRotaPublica(pathname: string) {
+  return pathname === "/" || ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota));
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -40,9 +54,7 @@ export async function middleware(request: NextRequest) {
   const { data, error } = await supabase.auth.getClaims();
   const autenticado = !error && data?.claims != null;
 
-  const ehRotaPublica = ROTAS_PUBLICAS.some((rota) => request.nextUrl.pathname.startsWith(rota));
-
-  if (!autenticado && !ehRotaPublica) {
+  if (!autenticado && !ehRotaPublica(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
