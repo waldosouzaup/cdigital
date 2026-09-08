@@ -23,6 +23,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgPolicy,
@@ -544,6 +545,10 @@ export const notifications = pgTable(
     attempts: integer("tentativas").notNull().default(0),
     error: text("erro"),
     sentAt: timestamp("enviada_em", { withTimezone: true }),
+    // Payload já renderizado (assunto/HTML/texto), guardado para o job de
+    // reprocessamento da Fase 4 reenviar sem re-renderizar o template. Sem PII
+    // (Seção 6, regra 7). Migration 0012.
+    resendPayload: jsonb("payload_reenvio"),
     ...timestamps,
   },
   (table) => [

@@ -45,6 +45,10 @@ export async function sendNotification(
       entidade_id: params.entityId,
       chave_idempotencia: params.idempotencyKey,
       status: "enfileirada",
+      // Guardado para o job de reprocessamento (Fase 4, item 4) reenviar sem
+      // re-renderizar o template por tipo. Os templates não carregam PII
+      // (Seção 6, regra 7), então é seguro persistir aqui.
+      payload_reenvio: { subject: params.subject, html: params.html, text: params.text },
     })
     .select("id")
     .single();

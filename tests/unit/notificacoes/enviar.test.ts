@@ -75,6 +75,21 @@ describe("sendNotification", () => {
     expect(supabase.calls.update[0]).toMatchObject({ status: "enviada", resend_id: "resend-abc" });
   });
 
+  it("guarda o payload de reenvio (subject/html/text) na linha, para o job de reprocessamento", async () => {
+    const supabase = createFakeSupabase({ insertResult: { data: { id: "notif-1" }, error: null } });
+    const transport = createFakeTransport({ ok: false, error: "rate_limit_exceeded" });
+
+    await sendNotification({ supabase: supabase as never, transport, ...paramsBase });
+
+    expect(supabase.calls.insert[0]).toMatchObject({
+      payload_reenvio: {
+        subject: paramsBase.subject,
+        html: paramsBase.html,
+        text: paramsBase.text,
+      },
+    });
+  });
+
   it("não envia quando a chave de idempotência já existe (violação de unique)", async () => {
     const supabase = createFakeSupabase({
       insertResult: { data: null, error: { code: "23505", message: "duplicate key" } },
