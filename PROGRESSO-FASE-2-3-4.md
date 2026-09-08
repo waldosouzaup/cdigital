@@ -600,3 +600,98 @@ Com isto, o ciclo de vida completo do contrato está real e testado: emitido →
 gerado → enviado → e-mail disparado → assinado (por upload real ou marcação
 presencial) → distratado (só a transição). Falta lote, o documento de distrato em
 si, e o checklist.
+
+---
+
+## Atualização — 2026-09-08: itens 9, 13 e 14 da Fase 2 — Fase 2 completa
+
+Com esta rodada, **todos os 14 itens da Fase 2 têm implementação real**, não só os
+6 "principais" das rodadas anteriores.
+
+### Item 9 — Emissão em lote
+
+- Extraído `emitirContratoParaPessoa` (núcleo compartilhado entre emissão individual
+  e em lote) de dentro de `emitirContrato` — mesma sequência (rascunho → PDF →
+  Storage → transição), reaproveitada sem duplicar código.
+- `emitirContratosEmLote`: mesmo modelo/valor/vigência para N pessoas selecionadas
+  por checkbox. **Sequencial, não `Promise.all`** — cada emissão já faz 3–4
+  chamadas de rede (insert, geração de PDF, upload, RPC); paralelizar dezenas de
+  pessoas de uma vez arriscaria esgotar conexões no ambiente serverless. Uma
+  falha isolada (ex.: pessoa não encontrada) não derruba o lote inteiro — o
+  resultado final mostra sucessos e falhas separadamente.
+- **Verificação manual real**: rodei o laço exato do lote contra o Supabase de
+  verdade com 2 pessoas reais + 1 id inexistente de propósito — resultado: 2
+  sucessos, 1 falha isolada e relatada, sem travar o processamento. Limpo depois.
+
+### Item 13 — Termo de distrato como documento
+
+- Novo campo `caminho_termo_distrato` em `contratos` (migration 0008) — terceiro
+  caminho de PDF na mesma linha (ao lado de `caminho_pdf` e `caminho_pdf_assinado`),
+  nunca um registro novo: "sem apagar o contrato original" continua garantido
+  porque é sempre a mesma linha sendo enriquecida, nunca substituída.
+- `distratarContrato` agora exige um motivo, gera um PDF de verdade (reaproveita
+  `gerarPdfContrato`) citando objeto/valor/vigência do contrato original + o
+  motivo, sobe pro Storage, só então transiciona `assinado → distratado`.
+- Novo `marcarDistratoAssinado` fecha a cadeia (`distratado → distrato_assinado`),
+  a mesma marcação presencial simples do item 12, sem exigir um segundo upload.
+- **Verificação manual real**: gerei um contrato `assinado`, rodei a sequência
+  completa (termo → distratado → distrato_assinado), conferi a cadeia de 2 eventos
+  em `eventos_contrato` e que a linha do contrato original nunca foi apagada — só
+  enriquecida. Limpo depois.
+
+### Item 14 — Checklist de pendências por pessoa
+
+- `src/lib/pessoas/pendencias.ts` (TDD, 9 testes): função pura
+  `calcularPendencias(fatos)` — reaproveita `DOCUMENTOS_OBRIGATORIOS` de
+  `aptidao.ts` (nunca duplica a lista), considera só a versão mais recente de
+  cada documento, e só cobra pendência de contrato depois que a pessoa já está
+  apta (sem contrato antes disso não é pendência, é a ordem natural).
+- Nova coluna "Pendências" em `/pessoas`, com um novo filtro "Com qualquer
+  pendência (checklist)" — distinto do filtro antigo "Com pendência documental"
+  (que só olhava `apta`, sem contar o que falta no contrato).
+- **Achado real ao verificar contra o dado semeado na Fase 1** (registrado em
+  CONSULTAS.md): as pessoas do `seed.ts` têm `apta = true` gravado direto, sem
+  nenhuma linha em `documentos` por trás — o checklist aponta corretamente
+  "Documento de identidade não enviado" para todas. Não é bug do checklist: é o
+  checklist revelando, com razão, que o atalho do seed da Fase 1 nunca gerou
+  documentação real. Não corrigido agora (fora do escopo desta rodada).
+
+### Checagem final
+
+```
+npx tsc --noEmit          → limpo
+npm run lint              → limpo
+npm run test:unit         → 104/104 (10 novos: checklist de pendências)
+npm run test:integration  → 27/27 (sem novos — itens 9/13/14 verificados manualmente
+                              contra o banco real, ver acima, em vez de testes
+                              automatizados redundantes com o que já estava coberto)
+npm run build             → limpo, 15 rotas
+curl GET /pessoas e /contratos sem sessão → 307 → /login
+```
+
+## Fase 2 — status final: 14 de 14 itens com implementação real
+
+| # | Item | Status |
+|---|---|---|
+| 1 | CRUD de pessoas + CPF duplicado | ✅ |
+| 2 | Link público de coleta | ✅ |
+| 3 | Upload de documento validado | ✅ |
+| 4 | Nomenclatura gerada pelo sistema | ✅ (todo caminho de Storage desta fase é gerado, nunca digitado) |
+| 5 | Versionamento de documento | ✅ |
+| 6 | Aprovação marca pessoa apta | ✅ |
+| 7 | Editor de templates | ✅ |
+| 8 | Emissão com PDF e valor por extenso | ✅ |
+| 9 | Emissão em lote | ✅ |
+| 10 | Máquina de estados em transação | ✅ |
+| 11 | Registro de envio + contrato_enviado | ✅ |
+| 12 | Registro de assinatura (upload ou presencial) | ✅ |
+| 13 | Distrato gerando termo | ✅ |
+| 14 | Checklist de pendências | ✅ |
+
+Isto **não é o mesmo** que o gate de saída formal da Fase 2 (Seção do PROMPT com
+os itens específicos de teste, como "upload de imagem 72×72 recusado", "R$ 3.553,00
+gera o extenso certo" etc.) — aquele gate precisa ser rodado e conferido item a
+item separadamente, mas cada um dos 14 itens de entrega já tem código real por
+trás, testado (unitário + integração contra o Supabase real) e, nos itens desta
+última rodada, também verificado manualmente ponta a ponta contra o banco de
+produção real.
