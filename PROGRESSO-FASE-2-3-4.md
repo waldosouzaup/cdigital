@@ -743,3 +743,99 @@ de só confiar no que já "parecia pronto", existe para pegar.
 - Entrega real de e-mail (sem domínio verificado no Resend — decisão do usuário,
   Fase 1 e 2).
 - Fase 3 (dashboard tempo real) e Fase 4 (campo/automações) — ainda não iniciadas.
+
+---
+
+# Fase 3 — Dashboard em tempo real (2026-09-08)
+
+Todos os 7 itens de entrega da Fase 3 construídos e verificados contra o Supabase
+real (não só a UI): matriz objeto×status, Realtime com degradação, detalhamento
+progressivo em 2 cliques, visão regional, funil, central de pendências, exportação
+PDF/XLSX.
+
+## Preparação
+
+- **`seed:carga` rodado pela primeira vez de verdade** (existia desde a Fase 1, nunca
+  executado). Achado real e corrigido: `organizations.name` não tem índice único, então
+  `onConflictDoNothing()` criava uma organização duplicada a cada tentativa; e as duas
+  chamadas usavam `db.query.*` (API relacional do Drizzle), que depende de
+  `relations()` nunca declaradas neste projeto — sempre voltava vazio. Corrigido
+  (`db.select().from().where()`, mesmo padrão de `provision-user.ts`), organização
+  duplicada removida (sem filhos), reexecutado com sucesso. **Total real agora: 582
+  pessoas, 2.082 contratos** (82 do seed fiel da Fase 1 + 500/2.000 de carga).
+
+## Itens 1, 5, 6 — Matriz, funil e central de pendências
+
+- `src/lib/dashboard/agregacoes.ts` (TDD): `computarMatrizObjetoStatus` (só conta
+  `ACTIVE_BOARD_STATUSES` — rascunho é transitório, distrato/cancelado têm visão
+  própria) e `computarFunil` (um contrato distratado conta como tendo alcançado
+  "assinado" — passou por lá antes; `cancelado` não conta em nenhum estágio além de
+  "apto", conservadoramente, porque não dá pra saber de qual ponto ele saiu sem o
+  histórico de eventos).
+- Central de pendências reaproveita `calcularPendencias` (Fase 2, item 14) por
+  pessoa, agregada por código — mesma regra de negócio, sem duplicar.
+
+## Item 2 — Realtime com degradação
+
+- Canal único assinando `contratos`, `pessoas`, `documentos`, `notificacoes` — as
+  duas últimas entraram na publicação `supabase_realtime` só agora (migration 0010;
+  só `contratos`/`pessoas`/`registros_atividade` estavam lá desde a Fase 1).
+- `channel.subscribe((status) => ...)` trata os 4 estados que o Context 7 confirmou
+  (`SUBSCRIBED`/`CHANNEL_ERROR`/`TIMED_OUT`/`CLOSED`) — nos três últimos, liga um
+  `setInterval` de 5s como fallback de polling; volta a desligar assim que
+  `SUBSCRIBED` for recebido de novo.
+- RLS aplicada automaticamente por linha, usando o JWT da conexão — nenhuma policy
+  nova precisou ser escrita além da tabela estar na publicação.
+
+## Item 3 — Detalhamento progressivo (2 cliques)
+
+Todo número (funil, célula da matriz, card de região, linha da central de
+pendências) abre um modal com a lista nominal filtrada (1º clique, sem round-trip —
+filtra a lista já carregada). De dentro do modal, clicar numa pessoa (2º clique)
+chama `gerarUrlParaDrillDown` e abre o documento ou o PDF do contrato mais recente
+numa aba nova.
+
+## Item 4 — Visão por região
+
+Cobertura documental = % de pessoas aptas na região; região sem nenhuma pessoa
+mostra **"não informado"**, nunca `0%` — mesmo cuidado da Seção 11 com Taguatinga,
+aplicado à métrica calculada em vez de a um dado histórico fixo.
+
+## Item 7 — Exportação PDF + XLSX
+
+- **Decisão de arquitetura registrada em CONSULTAS.md**: a versão de `xlsx`
+  (SheetJS) publicada no npm tem duas vulnerabilidades sem correção disponível pelo
+  próprio npm (Prototype Pollution, ReDoS); instalar da CDN oficial do SheetJS foi
+  bloqueado pelo classificador de permissões do ambiente (corretamente — é instalar
+  de fora do registro npm). Troquei para `exceljs`, sem essas vulnerabilidades.
+- PDF institucional reaproveita a engine `pdf-lib` da Fase 2, com tabelas em texto
+  monoespaçado (colunas alinhadas por espaço).
+- Exportações voltam da Server Action como base64 (Server Actions não serializam
+  `Buffer`/`Uint8Array` cru) — o cliente decodifica e monta o download.
+
+## Achados reais desta fase, corrigidos na hora
+
+1. **`seed:carga` duplicava organização** e usava uma API do Drizzle que sempre
+   voltava vazia — acima.
+2. **Realtime: `SUBSCRIBED` não garante que o listener de replicação já esteja
+   pronto do lado do servidor** — um teste que disparava a mudança logo após o ack
+   falhava por perder o evento; corrigido com uma folga de 500ms (só no teste; o
+   componente real do dashboard não tem esse problema porque não depende de
+   cronometrar uma mudança que ele mesmo dispara).
+
+## Verificação do gate — cada item com prova real, não só teste automatizado
+
+| # | Item do gate | Resultado | Prova |
+|---|---|:--:|---|
+| 1 | `CONSULTAS.md` registra Context 7 (Realtime) + front-end-design (painel do gestor) | ✅ | Entradas registradas nesta rodada |
+| 2 | Dashboard carrega em <2s com 500 pessoas e 2.000 contratos | ✅ | Medido contra o banco real com sessão real (RLS ativo): consulta pura 815ms; consulta + toda agregação em JS 1001ms, para **582 pessoas / 2.082 contratos** (acima do mínimo pedido) |
+| 3 | Teste e2e duas sessões: mudança aparece em <3s | ✅ | `tests/integration/gate-fase3-realtime.test.ts` — WebSocket real, cronometrado a partir do `UPDATE`, evento recebido e verificado |
+| 4 | `coord_regiao` não recebe evento de outra região (no socket) | ✅ | Mesmo arquivo — testado no nível do evento recebido pelo canal, não da tela: 0 eventos da região alheia, evento da própria região chega normalmente |
+| 5 | XLSX abre sem erro de fórmula e bate com a consulta ao banco | ✅ | Gerado com os 582 registros reais, recarregado com `exceljs` (não só checada a assinatura do arquivo) — 583 linhas (582 + cabeçalho), primeira/última pessoa conferidas |
+| 6 | Números do dashboard conferem com SELECT direto no banco | ✅ | `cadastrado/apto/emitido/enviado/assinado` e o total da matriz comparados um a um contra `SELECT COUNT` puro — bateram exatamente (582/582/532/431/231, matriz 1876) |
+
+## Fase 3 — gate: 6 de 6 itens verdes
+
+O que fica pendente/fora do escopo desta verificação (já sinalizado): entrega real
+de e-mail (sem domínio no Resend — decisão do usuário desde a Fase 1), e Fase 4
+(campo e automações) ainda não iniciada.
