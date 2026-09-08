@@ -7,6 +7,7 @@ import "./globals.css";
 const archivo = Archivo({
   variable: "--font-archivo",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 const plexMono = IBM_Plex_Mono({
@@ -26,8 +27,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // data-theme="dark" fixo: toda a aplicação (landing, auth, painel, coleta)
+  // renderiza no tema escuro. Sem isso, num navegador em modo claro os tokens de
+  // cor ficavam nos valores claros (texto escuro) sobre as cascas de fundo escuro
+  // fixo do painel/auth — texto invisível.
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" data-theme="dark">
       <body className={`${archivo.variable} ${plexMono.variable} antialiased`}>{children}</body>
     </html>
   );

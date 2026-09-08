@@ -1,36 +1,292 @@
 @import "tailwindcss";
 
 /*
- * Tokens de design — Tarefa 8 (telas de auth), processo de duas passadas da skill
- * front-end-design. Registro completo da revisão contra os defaults em CONSULTAS.md.
+ * Tokens de design — direção "papel oficial" (Tarefa 8, processo de duas passadas da
+ * skill front-end-design; registro em CONSULTAS.md).
  *
- * Direção: um comitê de campanha eleitoral lidando com contrato, documento e prazo —
- * seriedade institucional, não SaaS genérico. Paleta clara de "papel oficial", um
- * único acento (cor de selo/lacre), sem serifada de exposição nem cartão-com-sombra.
+ * Passe de elevação: a paleta NÃO mudou. O que mudou é a escala tipográfica, a régua
+ * de margem que marca linhas de registro, e o papel do mono — que agora carrega todo
+ * dado verificável (hora, identificador, CPF, estado, valor), enquanto a proporcional
+ * carrega texto escrito por gente. O tipo faz trabalho de informação, não só entrega.
+ *
+ * Direção: comitê de campanha lidando com contrato, documento e prazo — seriedade
+ * institucional, não SaaS genérico. Um único acento (cor de selo/lacre). Sem serifada
+ * de exposição, sem cartão-com-sombra, sem eyebrow em caixa alta.
  */
 :root {
-  --color-paper: #eceeeb; /* fundo — papel frio, não o creme #F4F1EA (tell) */
-  --color-ink: #1b2430; /* texto principal */
-  --color-ink-muted: #5b6472; /* texto secundário */
-  --color-seal: #b8752e; /* acento único — mais escuro que o terracota #D97757 (tell) */
-  --color-seal-ink: #ffffff; /* texto sobre o acento */
-  --color-line: #d4d2c9; /* hairlines e divisores */
-  --color-alert: #a23b33; /* erro — tom tijolo, não vermelho genérico */
+  --color-paper: #eceeeb;
+  --color-surface: #f5f6f4;
+  --color-ink: #1b2430;
+  --color-ink-muted: #5b6472;
+  --color-seal: #ffcc00; /* Dourado / Amarelo oficial da campanha */
+  --color-seal-ink: #070d18; /* Texto escuro sobre o amarelo */
+  --color-line: #d4d2c9;
+  --color-line-subtle: #e2e0d7;
+  --color-alert: #dc2626;
+  --color-success: #009c3b; /* Verde cívico oficial */
+  --color-warning: #f59e0b;
+  --color-info: #0284c7;
+
+  /* Cores de alta autoridade institucional do Comitê Digital */
+  --color-brand-green: #009c3b;
+  --color-brand-green-dark: #074e20;
+  --color-brand-yellow: #ffcc00;
+  --color-brand-yellow-hover: #ffd633;
+  --color-brand-blue: #002776;
+  --color-brand-navy: #070d18;
+  --color-brand-surface: #0d1728;
+  --color-brand-surface-elevated: #14223d;
+  --color-brand-line: #1e3256;
+  --color-brand-line-subtle: #162540;
+  --color-brand-text: #f8fafc;
+  --color-brand-text-muted: #94a3b8;
+
+  /* Régua de margem com acento de ouro */
+  --rule-margin: color-mix(in srgb, var(--color-brand-yellow) 60%, transparent);
+
+  /* Escala tipográfica */
+  --text-display: clamp(2.5rem, 1.6rem + 4vw, 4.25rem);
+  --text-h1: 1.75rem;
+  --text-h2: 1.25rem;
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-register: 0.8125rem;
+
+  --measure: 66ch;
+}
+
+/* Valores do tema escuro. Aplicados quando o SO está em modo escuro OU quando
+   `data-theme="dark"` está no <html> (o padrão fixo da aplicação — ver
+   src/app/layout.tsx). O bloco é duplicado porque `@media` e um seletor de
+   atributo não podem ser combinados numa única regra. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-paper: #070d18;
+    --color-surface: #0d1728;
+    --color-ink: #f8fafc;
+    --color-ink-muted: #94a3b8;
+    --color-seal: #ffcc00;
+    --color-seal-ink: #070d18;
+    --color-line: #1e3256;
+    --color-line-subtle: #162540;
+    --color-alert: #ef4444;
+    --color-success: #22c55e;
+    --color-warning: #fbbf24;
+    --color-info: #38bdf8;
+    --rule-margin: color-mix(in srgb, var(--color-brand-yellow) 70%, transparent);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #070d18;
+  --color-surface: #0d1728;
+  --color-ink: #f8fafc;
+  --color-ink-muted: #94a3b8;
+  --color-seal: #ffcc00;
+  --color-seal-ink: #070d18;
+  --color-line: #1e3256;
+  --color-line-subtle: #162540;
+  --color-alert: #ef4444;
+  --color-success: #22c55e;
+  --color-warning: #fbbf24;
+  --color-info: #38bdf8;
+  --rule-margin: color-mix(in srgb, var(--color-brand-yellow) 70%, transparent);
 }
 
 @theme inline {
   --color-paper: var(--color-paper);
+  --color-surface: var(--color-surface);
   --color-ink: var(--color-ink);
   --color-ink-muted: var(--color-ink-muted);
   --color-seal: var(--color-seal);
   --color-seal-ink: var(--color-seal-ink);
   --color-line: var(--color-line);
+  --color-line-subtle: var(--color-line-subtle);
   --color-alert: var(--color-alert);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-info: var(--color-info);
+
+  --color-brand-green: var(--color-brand-green);
+  --color-brand-green-dark: var(--color-brand-green-dark);
+  --color-brand-yellow: var(--color-brand-yellow);
+  --color-brand-yellow-hover: var(--color-brand-yellow-hover);
+  --color-brand-blue: var(--color-brand-blue);
+  --color-brand-navy: var(--color-brand-navy);
+  --color-brand-surface: var(--color-brand-surface);
+  --color-brand-surface-elevated: var(--color-brand-surface-elevated);
+  --color-brand-line: var(--color-brand-line);
+  --color-brand-line-subtle: var(--color-brand-line-subtle);
+  --color-brand-text: var(--color-brand-text);
+  --color-brand-text-muted: var(--color-brand-text-muted);
+
   --font-sans: var(--font-archivo);
   --font-mono: var(--font-plex-mono);
+
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-elevation: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-dropdown: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.06);
+  --shadow-gold: 0 0 20px -3px rgba(255, 204, 0, 0.35);
+
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
 }
 
 body {
   background: var(--color-paper);
   color: var(--color-ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
 }
+
+/* Foco visível acessível em amarelo ouro */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand-yellow);
+  outline-offset: 2px;
+}
+
+/* Régua de margem cívica */
+.regua {
+  padding-left: 1.25rem;
+  border-left: 2px solid var(--rule-margin);
+}
+
+/* Card temático da campanha */
+.card-campaign {
+  background-color: var(--color-brand-surface);
+  border: 1px solid var(--color-brand-line);
+  color: var(--color-brand-text);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.4);
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-campaign:hover {
+  border-color: color-mix(in srgb, var(--color-brand-yellow) 40%, var(--color-brand-line));
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+}
+
+/* Botão Amarelo Ouro de Alta Conversão */
+.btn-gold {
+  background-color: var(--color-brand-yellow);
+  color: #070d18;
+  font-weight: 700;
+  border-radius: 9999px;
+  box-shadow: 0 2px 8px rgba(255, 204, 0, 0.3);
+  transition: all 150ms ease-out;
+}
+
+.btn-gold:hover {
+  background-color: var(--color-brand-yellow-hover);
+  box-shadow: 0 4px 16px rgba(255, 204, 0, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-gold:active {
+  transform: scale(0.98);
+}
+
+/* Fundo da campanha verde com profundidade */
+.bg-campaign-green {
+  background: radial-gradient(circle at 50% 20%, #0da143 0%, #009c3b 45%, #054f21 100%);
+}
+
+/* Fundo azul marinho noite de comando */
+.bg-campaign-navy {
+  background: radial-gradient(ellipse at top, #112240 0%, #070d18 70%);
+}
+
+/* Fundo Azul Cobalto / Royal Patriótico da referência */
+.bg-campaign-royal {
+  background: linear-gradient(135deg, #0056b3 0%, #004085 60%, #002752 100%);
+}
+
+/* Fundo Marfim Suave de Alto Contraste */
+.bg-campaign-cream {
+  background-color: #faf9f5;
+}
+
+/* Botões Pílula de Alto Impacto do Projeto Gráfico */
+.btn-campaign-yellow {
+  background-color: #ffd200;
+  color: #002040;
+  font-weight: 800;
+  border-radius: 9999px;
+  box-shadow: 0 4px 14px rgba(255, 210, 0, 0.4);
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-campaign-yellow:hover {
+  background-color: #ffe033;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 210, 0, 0.55);
+}
+
+.btn-campaign-yellow:active {
+  transform: scale(0.98);
+}
+
+.btn-campaign-green {
+  background-color: #009c3b;
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 9999px;
+  box-shadow: 0 4px 14px rgba(0, 156, 59, 0.35);
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-campaign-green:hover {
+  background-color: #008733;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 156, 59, 0.5);
+}
+
+.btn-campaign-green:active {
+  transform: scale(0.98);
+}
+
+/* Cunha diagonal dourada do Hero da referência */
+.hero-wedge-yellow {
+  clip-path: polygon(25% 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+
+/* O único momento de movimento: o registro do hero se preenche uma vez, no load. */
+@keyframes registro-entra {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.registro-linha {
+  opacity: 0;
+  animation: registro-entra 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .registro-linha {
+    opacity: 1;
+    animation: none;
+  }
+}
+
+/* Oculta o indicador de desenvolvimento do Next.js (ícone N no canto inferior) */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dev-tools-button],
+#nextjs-dev-overlay {
+  display: none !important;
+}
+
