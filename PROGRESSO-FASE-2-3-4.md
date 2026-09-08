@@ -205,3 +205,84 @@ curl GET /pessoas sem sessão → 307 → /login (antes: 200, bug)
 Fase 2 gate: ainda 0/11 fechado formalmente (nenhum item do gate em si virou ✅ ainda,
 porque o gate pede o fluxo ponta a ponta completo), mas o item 1 já tem código real,
 testado, rodando contra o Supabase de verdade — não é mais só a casca visual.
+
+---
+
+## Atualização — 2026-09-07 (mesmo dia, continuação): item 2 da Fase 2
+
+A pedido do usuário ("sim, continue"), o item 2 saiu do papel também.
+
+### Link público de coleta — real, ponta a ponta
+
+- **`supabase/migrations/0005_links_coleta_publico.sql`** — duas funções
+  `SECURITY DEFINER` (mesmo padrão do `custom_access_token_hook` da Fase 1, já
+  anotado como plano em `src/db/schema.ts` desde então): `validar_link_coleta(token)`
+  devolve só `pessoa_id`, primeiro nome e organização (Seção 6: "nada além do
+  primeiro nome"); `enviar_dados_coleta(...)` grava os dados complementares e marca
+  `usado_em` com `FOR UPDATE` (trava contra duplo envio simultâneo do mesmo link).
+  Aplicada no banco real com o mesmo contorno de sempre (`postgres-js` direto, já que
+  `drizzle-kit migrate` trava no pooler).
+  **Isto não usa `admin.ts`/service_role** — é exatamente a exceção que a própria
+  Seção 3.1 prevê (função de banco com privilégio próprio, não a chave da aplicação
+  em rota de usuário), e o comentário deixado no schema desde a Fase 1 já apontava
+  para este desenho.
+- **`src/lib/coleta/token.ts`** — gerador de token (TDD: RED confirmado antes da
+  implementação), 32 caracteres de `crypto.randomBytes`, base64url.
+- **`src/emails/link-coleta.tsx`** — primeiro uso real do `react-email` no projeto
+  (instalado desde a Fase 1, nunca usado até agora). Conteúdo restrito a
+  primeiro nome + link + prazo, como a Seção 6 exige.
+- **`(painel)/pessoas/acoes.ts`** — `gerarLinkColeta(pessoaId, dias)`: cria a linha em
+  `links_coleta` (RLS normal, usuário autenticado), tenta enviar por Resend via a
+  infraestrutura de notificação da Fase 1 (idempotente, nunca lança). Sem domínio
+  verificado, o envio real falha e fica `falhou` em `notificacoes` — comportamento
+  esperado e já tratado, não um bug novo.
+- **`coleta/[token]/page.tsx` + `coleta-cliente.tsx` + `acoes.ts`** — a tela deixou de
+  ser mockup. Fluxo real reduzido a 2 etapas (dados complementares → revisão e
+  consentimento LGPD → envio), porque a pessoa já foi cadastrada pelo coordenador
+  (nome/CPF não são pedidos de novo). **Upload de documento (item 3) foi deixado de
+  fora deliberadamente** — a tela avisa isso explicitamente ao usuário, não esconde.
+- Botão "Gerar Link de Coleta" do cabeçalho de `/pessoas` foi removido — não fazia
+  sentido sem uma pessoa associada; só resta a ação por linha da tabela, ligada à
+  Server Action de verdade.
+
+### Testes novos, contra o Supabase real
+
+`tests/integration/links-coleta.test.ts` — chama as duas funções pelo **cliente
+anon**, exatamente como a página pública faz: token válido é aceito e devolve só o
+esperado; token expirado e token inexistente são recusados; dados são gravados e o
+link marcado como usado; um segundo envio pelo mesmo link é recusado sem sobrescrever
+o que já foi salvo (prova de "expiração no uso").
+
+### Achado operacional durante a verificação manual
+
+Depois de criar os arquivos novos, `GET /coleta/[token]` respondeu **500** com um erro
+enganoso ("`next/headers` não é suportado no diretório `pages/`") — investigado e
+confirmado como **cache `.next` obsoleto do servidor de dev que já estava rodando
+antes dos arquivos novos existirem**, não um bug de código: matando o processo,
+limpando `.next` e subindo um servidor novo, a mesma rota respondeu 200 de primeira.
+Reforça a lição já registrada em `PROGRESSO.md`: um único `next dev` por vez, e
+reiniciar depois de mudança estrutural grande (arquivo novo em rota existente).
+
+### Checagem final
+
+```
+npx tsc --noEmit          → limpo
+npm run lint              → limpo
+npm run test:unit         → 67/67 (3 novos: gerador de token)
+npm run test:integration  → 13/13 (RLS + webhook + CPF duplicado + links_coleta)
+npm run build             → limpo, 13 rotas (pessoas e coleta/[token] como ƒ dinâmicas)
+curl GET /pessoas sem sessão      → 307 → /login
+curl GET /coleta/token-inválido   → 200, "Link inválido ou expirado"
+curl GET /coleta/[token-real]     → 200, saudação com o primeiro nome correto
+```
+
+### O que do item 2 ainda falta
+
+- Upload de documento dentro do próprio `/coleta/[token]` (isso é o item 3, próximo
+  passo natural).
+- Validade configurável hoje é fixa em 7 dias por padrão no código
+  (`VALIDADE_PADRAO_DIAS`) — não há campo na UI para o coordenador escolher outro
+  prazo por link.
+- `gerarLinkColeta` não checa se já existe um link **ainda válido e não usado** para a
+  mesma pessoa antes de criar outro — hoje cada clique gera uma linha nova em
+  `links_coleta` (não é um bug de segurança, mas permite links órfãos acumularem).
