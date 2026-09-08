@@ -441,3 +441,103 @@ curl GET /documentos sem sessão → 307 → /login
 - A limitação de idempotência de `pessoa_apta` acima.
 - Emissão de contrato (itens 7–13 da Fase 2) — a pessoa agora pode ficar `apta` de
   verdade, mas nada ainda gera contrato a partir disso.
+
+---
+
+## Atualização — 2026-09-08: itens 7, 8, 10 e 11 da Fase 2 (emissão de contrato)
+
+### Editor de templates (item 7) — real
+
+- `(painel)/configuracoes/dados.ts` + `acoes.ts`: CRUD real de `templates_contrato`
+  (criar, editar, ativar/desativar). A seção "Modelos de Minuta Contratual" da tela
+  de Configurações deixou de ser decoração — o resto da tela (identidade do comitê,
+  LGPD) continua cosmético e não finge ser real.
+- Editor com botões que inserem cada um dos 8 marcadores no cursor do textarea.
+
+### Geração de PDF (item 8) — decisão de arquitetura registrada
+
+- **`pdf-lib`** em vez de Puppeteer/Chromium headless — decisão registrada em
+  CONSULTAS.md: evita empacotar um binário Chromium numa função serverless da
+  Netlify. Trade-off consciente: o `corpo_html` do template é convertido para texto
+  simples (`htmlParaTexto`) antes de virar PDF — não há fidelidade visual de CSS,
+  só parágrafos com quebra de linha automática.
+- `src/lib/contratos/marcadores.ts` (TDD) — substitui os 8 marcadores.
+- `src/lib/contratos/gerar-pdf.ts` (TDD) — gera o PDF com `pdf-lib`, paginação
+  automática quando o texto não cabe numa página.
+- **Verificação manual extra, além dos testes automatizados**: rodei o pipeline
+  completo (valor→extenso→marcadores→texto→PDF) com nome e endereço reais em
+  português (acentos, cedilha) e li o PDF gerado de volta — renderizou perfeito,
+  e R$ 3.553,00 virou "três mil quinhentos e cinquenta e três reais", batendo
+  exatamente com o valor de aceite da Seção 11.
+- Gap da Fase 1 corrigido de passagem: `contratos` não tinha coluna para o caminho
+  do PDF no Storage, apesar do bucket já existir desde a Tarefa 7. Adicionadas
+  `caminho_pdf` e `caminho_pdf_assinado` (esta última reservada para o item 12).
+
+### Máquina de estados com transação real (item 10)
+
+- Migration 0007: `gravar_transicao_contrato(contrato_id, status_anterior,
+  status_novo, observacao)` — função Postgres comum (**sem** `SECURITY DEFINER`,
+  diferente das funções de acesso público das migrations 0005/0006: aqui quem
+  chama é sempre autenticado, então a RLS de `contratos`/`eventos_contrato`
+  continua valendo). `UPDATE ... WHERE status = status_anterior` funciona como
+  trava otimista; se 0 linhas forem afetadas, a função lança erro e nada é
+  inserido em `eventos_contrato` — atomicidade de graça, porque uma chamada de
+  função é uma transação no Postgres. Resolve algo que o PostgREST não oferece
+  nativamente (transação entre duas chamadas `.insert()`/`.update()` separadas).
+- Teste de integração prova a trava: uma segunda transição com o `status_anterior`
+  errado é recusada, e o número de eventos gravados continua 1, não 2.
+
+### Registro de envio disparando contrato_enviado (item 11)
+
+- `enviarContrato` grava canal/destinatário, transiciona `emitido → enviado`,
+  dispara e-mail (chave de idempotência determinística por contrato — reforçada
+  pela própria trava otimista da RPC, que já impede um segundo clique de
+  completar a transição).
+- **Gap de honestidade registrado no próprio e-mail**: não existe ainda página
+  pública de assinatura (isso é o item 12), então o e-mail avisa que o contrato
+  foi emitido e que a coordenação vai entrar em contato — não promete um link de
+  assinatura que não existe.
+
+### Transições extras wireadas de brinde (não pedidas nominalmente nesta rodada, mas trivial dado o que já existia)
+
+- `marcarContratoAssinado` (enviado→assinado) e `distratarContrato`
+  (assinado→distratado) — a UI já existia como mockup pronta para isso.
+  **Distrato é só a transição de estado** — a geração do termo/documento em si
+  (item 13) continua pendente, e o modal avisa isso explicitamente.
+
+### Refatoração de sustentação
+
+`obterContextoUsuario` (leitura de claims) e `transporteEmailPadrao` (config do
+Resend) estavam duplicados em `pessoas/acoes.ts` e `documentos/acoes.ts` — extraídos
+para `src/lib/supabase/contexto-usuario.ts` e
+`src/lib/notificacoes/transporte-padrao.ts` antes de um terceiro arquivo
+(`contratos/acoes.ts`) repetir o mesmo código pela terceira vez.
+
+### Testes novos, contra o Supabase real
+
+`tests/integration/emissao-contrato.test.ts` (3 testes): transição atômica grava
+exatamente 1 evento; uma segunda transição com status de origem errado é recusada
+sem duplicar evento; upload real para o bucket `contratos` funciona para usuário
+autenticado (policy escrita na Fase 1, nunca exercida de verdade até agora).
+
+### Checagem final
+
+```
+npx tsc --noEmit          → limpo
+npm run lint              → limpo
+npm run test:unit         → 94/94 (10 novos: marcadores + PDF)
+npm run test:integration  → 25/25
+npm run build             → limpo, 14 rotas (contratos e configuracoes agora ƒ)
+curl GET /contratos sem sessão      → 307 → /login
+curl GET /configuracoes sem sessão  → 307 → /login
+```
+
+### O que ainda falta da Fase 2
+
+- **Item 9** — emissão em lote (a UI mockup tinha um modal para isso; não foi
+  wireado, fica para outra rodada).
+- **Item 12** — registro de assinatura por upload do PDF assinado (hoje só existe
+  a marcação manual "assinado", sem upload real nem página pública).
+- **Item 13** — geração do termo de distrato como documento (hoje só a transição
+  de estado).
+- **Item 14** — checklist de pendências por pessoa.
