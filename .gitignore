@@ -54,3 +54,6 @@ supabase/.branches
 # vitest / coverage
 /coverage
 tests/e2e/.secrets/
+
+# script de screenshot descartável (dev)
+_shot.mjs

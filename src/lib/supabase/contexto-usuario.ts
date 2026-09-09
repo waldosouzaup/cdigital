@@ -8,6 +8,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export interface ContextoUsuario {
   organizationId: string | undefined;
   userId: string | null;
+  /** `papel_usuario` do JWT — usado nas travas de papel das Server Actions. */
+  papel: string | undefined;
 }
 
 export async function obterContextoUsuario(supabase: SupabaseClient): Promise<ContextoUsuario> {
@@ -16,5 +18,6 @@ export async function obterContextoUsuario(supabase: SupabaseClient): Promise<Co
   return {
     organizationId: claims?.organizacao_id as string | undefined,
     userId: (claims?.sub as string | undefined) ?? null,
+    papel: claims?.papel as string | undefined,
   };
 }

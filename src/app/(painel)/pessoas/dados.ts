@@ -22,6 +22,8 @@ export interface PessoaListada {
   regiaoId: string | null;
   regiaoNome: string | null;
   apta: boolean;
+  /** "autoinscricao" quando a pessoa veio do link público `/inscricao/[slug]`. */
+  origem: string | null;
   statusContrato: string | null;
   /** Fase 2, item 14 — checklist de pendências, já calculado a partir do estado
    * real de documentos/aptidão/contrato desta pessoa. */
@@ -36,6 +38,7 @@ interface LinhaPessoa {
   funcao: string | null;
   regiao_id: string | null;
   apta: boolean;
+  origem: string | null;
   regioes: { nome: string } | null;
   contratos: { status: string; criado_em: string }[] | null;
   documentos: { tipo: string; status: "pendente" | "aprovado" | "rejeitado"; versao: number }[] | null;
@@ -53,7 +56,7 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
   const { data, error } = await supabase
     .from("pessoas")
     .select(
-      "id, nome_completo, cpf, telefone, funcao, apta, regiao_id, regioes ( nome ), " +
+      "id, nome_completo, cpf, telefone, funcao, apta, origem, regiao_id, regioes ( nome ), " +
         "contratos ( status, criado_em ), documentos ( tipo, status, versao )",
     )
     .order("criado_em", { ascending: false })
@@ -78,6 +81,7 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
       regiaoId: linha.regiao_id,
       regiaoNome: linha.regioes?.nome ?? null,
       apta: linha.apta,
+      origem: linha.origem,
       statusContrato,
       pendencias: calcularPendencias({
         documentos: linha.documentos ?? [],

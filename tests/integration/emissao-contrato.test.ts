@@ -13,6 +13,12 @@ import { generateValidCpf } from "@/lib/documentos/cpf";
  * uma segunda transição da mesma origem sem duplicar evento — e que o upload real
  * para o bucket `contratos` (policy escrita na Fase 1, nunca exercida antes) funciona
  * de fato para um usuário autenticado comum.
+ *
+ * A partir da migration 0016 a escrita em `contratos` (e portanto
+ * `gravar_transicao_contrato`, que roda com os privilégios de quem chama) é
+ * exclusiva de `gestor`/`coord_comite` — que exigem `aal2` (MFA), impossível num
+ * login só de senha. Os dois primeiros casos exercem a RPC via `admin`
+ * (service_role); a trava de papel em si é coberta em `gestao-acessos.test.ts`.
  */
 const SENHA_TESTE = "SenhaDeTeste!123456";
 
@@ -101,10 +107,7 @@ describe("Fase 2 — emissão de contrato: transição atômica + upload real", 
   }, 30000);
 
   it("transiciona rascunho -> emitido e grava exatamente um evento", async () => {
-    const cliente = createAnonClient();
-    await cliente.auth.signInWithPassword({ email, password: SENHA_TESTE });
-
-    const { error } = await cliente.rpc("gravar_transicao_contrato", {
+    const { error } = await admin.rpc("gravar_transicao_contrato", {
       p_contrato_id: contratoId,
       p_status_anterior: "rascunho",
       p_status_novo: "emitido",
@@ -129,10 +132,7 @@ describe("Fase 2 — emissão de contrato: transição atômica + upload real", 
   });
 
   it("recusa uma segunda transição rascunho->emitido (trava otimista) sem duplicar evento", async () => {
-    const cliente = createAnonClient();
-    await cliente.auth.signInWithPassword({ email, password: SENHA_TESTE });
-
-    const { error } = await cliente.rpc("gravar_transicao_contrato", {
+    const { error } = await admin.rpc("gravar_transicao_contrato", {
       p_contrato_id: contratoId,
       p_status_anterior: "rascunho", // já não é mais o status atual (é "emitido")
       p_status_novo: "emitido",

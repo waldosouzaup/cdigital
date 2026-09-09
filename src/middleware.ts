@@ -11,7 +11,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const ROTAS_PUBLICAS = ["/login", "/verificacao", "/mfa", "/coleta", "/auth/callback"];
+const ROTAS_PUBLICAS = [
+  "/login",
+  "/mfa",
+  "/coleta",
+  // Autoinscrição pública (Feature B) — `/inscricao/[slug]`, sem sessão. A Server
+  // Action da página faz POST para o próprio path, que também precisa ser público.
+  "/inscricao",
+];
 
 // Recursos do PWA (Fase 4, item 2) que o navegador busca sem cookie de sessão:
 // o service worker, o manifesto, os ícones e a página de fallback offline. Sem
@@ -71,11 +78,31 @@ export async function middleware(request: NextRequest) {
   // deixar o usuário sendo deslogado de forma difícil de depurar.
   const { data, error } = await supabase.auth.getClaims();
   const autenticado = !error && data?.claims != null;
+  const pathname = request.nextUrl.pathname;
 
-  if (!autenticado && !ehRotaPublica(request.nextUrl.pathname)) {
+  if (!autenticado && !ehRotaPublica(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
+  }
+
+  // Senha ainda temporária (flag em app_metadata, posta pelo provisionamento /
+  // convite): só pode ir para /definir-senha até trocar. `/api/*` e recursos de
+  // PWA passam; a própria /definir-senha e /login também.
+  if (autenticado) {
+    const appMetadata = (data?.claims as { app_metadata?: { must_change_password?: boolean } })
+      ?.app_metadata;
+    const deveTrocarSenha = appMetadata?.must_change_password === true;
+    const rotaLiberada =
+      pathname === "/definir-senha" ||
+      pathname === "/login" ||
+      pathname.startsWith("/api/") ||
+      RECURSOS_PWA.some((rota) => pathname === rota || pathname.startsWith(rota));
+    if (deveTrocarSenha && !rotaLiberada) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/definir-senha";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

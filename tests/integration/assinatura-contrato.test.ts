@@ -11,6 +11,11 @@ import { generateValidCpf } from "@/lib/documentos/cpf";
  * sequência que ele executa — upload real no bucket `contratos` com o sufixo
  * `_assinado.pdf`, gravação de `caminho_pdf_assinado`, e a transição
  * `enviado -> assinado` pela mesma RPC.
+ *
+ * A escrita em `contratos` passou a exigir `gestor`/`coord_comite` (migration 0016),
+ * que só existem com `aal2` — inatingível num login de senha. A gravação do caminho
+ * e a transição são exercidas via `admin`; o upload no Storage e a geração de URL
+ * assinada continuam pelo cliente autenticado comum (policies de Storage, Fase 1).
  */
 const SENHA_TESTE = "SenhaDeTeste!123456";
 
@@ -112,13 +117,13 @@ describe("Fase 2 — assinatura de contrato via upload do PDF assinado", () => {
       .upload(caminhoAssinado, conteudo, { contentType: "application/pdf", upsert: true });
     expect(erroUpload).toBeNull();
 
-    const { error: erroUpdate } = await cliente
+    const { error: erroUpdate } = await admin
       .from("contratos")
       .update({ caminho_pdf_assinado: caminhoAssinado })
       .eq("id", contratoId);
     expect(erroUpdate).toBeNull();
 
-    const { error: erroTransicao } = await cliente.rpc("gravar_transicao_contrato", {
+    const { error: erroTransicao } = await admin.rpc("gravar_transicao_contrato", {
       p_contrato_id: contratoId,
       p_status_anterior: "enviado",
       p_status_novo: "assinado",

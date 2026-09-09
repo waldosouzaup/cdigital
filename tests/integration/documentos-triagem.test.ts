@@ -7,13 +7,19 @@ import { pessoaEstaApta } from "@/lib/pessoas/aptidao";
  * Fase 2, item 6: "Documentação completa e aprovada marca a pessoa como apta."
  *
  * A Server Action (`(painel)/documentos/acoes.ts`) não dá para chamar direto do
- * Vitest — usa `cookies()` do Next.js, que só existe dentro de uma requisição real
- * (mesma limitação já registrada para `criarPessoa`, Fase 2 item 1). Este teste prova
- * a parte que a Server Action depende e que PODE ser verificada isoladamente: que a
- * policy de RLS de `documentos` (Fase 1, `organizationAndRegionPolicy`, `for: "all"`)
- * realmente permite `UPDATE` por um usuário autenticado comum — não só `SELECT`/
- * `INSERT` como os testes anteriores já cobriam — e que a regra pura
- * (`pessoaEstaApta`) bate com o que a Server Action faria com esse dado real.
+ * Vitest — usa `cookies()` do Next.js. Este teste prova as partes verificáveis
+ * isoladamente:
+ *
+ *   - desde a migration 0016, aprovar/rejeitar documento é EXCLUSIVO de
+ *     `gestor`/`coord_comite` (a Server Action checa o papel e as policies
+ *     `documentos_*` reforçam). Um `auditor` autenticado NÃO consegue mais o
+ *     `UPDATE` — só `SELECT`;
+ *   - com o documento aprovado (aqui via `admin`, já que `gestor`/`coord_comite`
+ *     exigem `aal2`, inatingível num login de senha), a regra pura `pessoaEstaApta`
+ *     bate com o que a Server Action faria;
+ *   - a RLS de `pessoas` continua permitindo `UPDATE` por um usuário autenticado
+ *     comum da organização (não foi endurecida — `coord_regiao` ainda administra
+ *     pessoas da própria região).
  */
 const SENHA_TESTE = "SenhaDeTeste!123456";
 
@@ -85,9 +91,9 @@ describe("Fase 2 — mesa de triagem: aprovação de documento marca pessoa apta
       .single();
     documentoId = documento!.id;
 
-    // "auditor" de propósito — sem restrição de MFA/região (mesma justificativa do
-    // rls-isolamento.test.ts), porque o que este teste isola é a permissão de UPDATE
-    // em `documentos`, não a política de MFA nem a de região.
+    // "auditor": um usuário autenticado da organização SEM poder de triagem. Serve
+    // para provar que a policy `documentos_mutacao_gestor_coord` (0016) barra a
+    // escrita, e que a RLS de `pessoas` continua liberada.
     const { data: authUser } = await admin.auth.admin.createUser({
       email,
       password: SENHA_TESTE,
@@ -106,23 +112,34 @@ describe("Fase 2 — mesa de triagem: aprovação de documento marca pessoa apta
     await admin.auth.admin.deleteUser(userId).catch(() => {});
   }, 30000);
 
-  it("usuário autenticado consegue aprovar o documento (RLS permite UPDATE, não só SELECT/INSERT)", async () => {
+  it("um auditor NÃO consegue aprovar o documento (trava de papel da migration 0016)", async () => {
     const cliente = createAnonClient();
     const { error: erroLogin } = await cliente.auth.signInWithPassword({ email, password: SENHA_TESTE });
     expect(erroLogin).toBeNull();
 
-    const { data, error } = await cliente
+    const { data } = await cliente
       .from("documentos")
       .update({ status: "aprovado", motivo_rejeicao: null })
       .eq("id", documentoId)
-      .select("id, status")
-      .single();
+      .select("id, status");
+    // A policy filtra a linha no UPDATE — nada é alterado e nada volta.
+    expect(data ?? []).toHaveLength(0);
 
-    expect(error).toBeNull();
-    expect(data?.status).toBe("aprovado");
+    const { data: doc } = await admin
+      .from("documentos")
+      .select("status")
+      .eq("id", documentoId)
+      .single();
+    expect(doc?.status).toBe("pendente");
   });
 
-  it("pessoaEstaApta, aplicada ao dado real pós-aprovação, decide apta", async () => {
+  it("com o documento aprovado, pessoaEstaApta decide apta a partir do dado real", async () => {
+    const { error } = await admin
+      .from("documentos")
+      .update({ status: "aprovado", motivo_rejeicao: null })
+      .eq("id", documentoId);
+    expect(error).toBeNull();
+
     const { data: documentos } = await admin
       .from("documentos")
       .select("tipo, status, versao")
@@ -131,7 +148,7 @@ describe("Fase 2 — mesa de triagem: aprovação de documento marca pessoa apta
     expect(pessoaEstaApta(documentos ?? [])).toBe(true);
   });
 
-  it("usuário autenticado consegue marcar a pessoa como apta (RLS de pessoas também permite UPDATE)", async () => {
+  it("a RLS de pessoas continua permitindo UPDATE por um usuário autenticado comum", async () => {
     const cliente = createAnonClient();
     await cliente.auth.signInWithPassword({ email, password: SENHA_TESTE });
 
@@ -147,13 +164,11 @@ describe("Fase 2 — mesa de triagem: aprovação de documento marca pessoa apta
   });
 
   it("rejeitar o mesmo documento depois reverte pessoaEstaApta para false", async () => {
-    const cliente = createAnonClient();
-    await cliente.auth.signInWithPassword({ email, password: SENHA_TESTE });
-
-    await cliente
+    const { error } = await admin
       .from("documentos")
       .update({ status: "rejeitado", motivo_rejeicao: "Teste de revogação de aptidão" })
       .eq("id", documentoId);
+    expect(error).toBeNull();
 
     const { data: documentos } = await admin
       .from("documentos")

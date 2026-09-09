@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createClient as createAdminClient, createClient } from "@supabase/supabase-js";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { generateValidCpf } from "@/lib/documentos/cpf";
 
 /**
@@ -9,32 +9,24 @@ import { generateValidCpf } from "@/lib/documentos/cpf";
  * A validação em `canTransition` (src/lib/contratos/maquina-estados.ts) já
  * impede isso na camada de aplicação, antes de qualquer chamada de rede — mas
  * achado real ao verificar o gate: a RPC `gravar_transicao_contrato` **por si só**
- * não validava o grafo, só a trava otimista de status. Testado na prática: um
- * usuário autenticado comum conseguia chamar a RPC diretamente e pular de
- * "emitido" para "assinado", ignorando "enviado" por completo. Corrigido na
- * migration 0009 (grafo duplicado dentro da própria função SQL) — este teste
- * existe para que essa correção nunca regrida silenciosamente.
+ * não validava o grafo, só a trava otimista de status. Corrigido na migration 0009
+ * (grafo duplicado dentro da própria função SQL) — este teste existe para que essa
+ * correção nunca regrida silenciosamente.
+ *
+ * As chamadas usam `admin` (service_role): desde a migration 0016 a escrita em
+ * `contratos` exige `gestor`/`coord_comite` (e portanto `aal2`), então o antigo
+ * "usuário autenticado comum" não consegue mais chamar a RPC — a trava de papel é
+ * coberta em `gestao-acessos.test.ts`. Aqui o alvo é o grafo de transições.
  */
-const SENHA_TESTE = "SenhaDeTeste!123456";
-
 const admin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-function createAnonClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-}
-
 describe("Gate Fase 2 — a RPC de transição recusa pular estados, mesmo chamada direto", () => {
   let orgId: string;
   let pessoaId: string;
   let contratoId: string;
-  let userId: string;
-  const email = "gate-transicao-invalida@exemplo.invalid";
 
   beforeAll(async () => {
     const { data: org } = await admin
@@ -68,25 +60,16 @@ describe("Gate Fase 2 — a RPC de transição recusa pular estados, mesmo chama
       .select("id")
       .single();
     contratoId = contrato!.id;
-
-    const { data: authUser } = await admin.auth.admin.createUser({ email, password: SENHA_TESTE, email_confirm: true });
-    userId = authUser!.user!.id;
-    await admin.from("usuarios").insert({ id: userId, organizacao_id: orgId, nome: "Auditor Teste", email, papel: "auditor" });
   }, 30000);
 
   afterAll(async () => {
     await admin.from("eventos_contrato").delete().eq("contrato_id", contratoId);
     await admin.from("contratos").delete().eq("id", contratoId);
-    await admin.from("usuarios").delete().eq("id", userId);
-    await admin.auth.admin.deleteUser(userId).catch(() => {});
     await admin.from("pessoas").delete().eq("id", pessoaId);
   }, 30000);
 
   it("recusa emitido -> assinado (pulando 'enviado') com erro explicativo, sem gravar evento nem mudar o status", async () => {
-    const cliente = createAnonClient();
-    await cliente.auth.signInWithPassword({ email, password: SENHA_TESTE });
-
-    const { error } = await cliente.rpc("gravar_transicao_contrato", {
+    const { error } = await admin.rpc("gravar_transicao_contrato", {
       p_contrato_id: contratoId,
       p_status_anterior: "emitido",
       p_status_novo: "assinado",
@@ -106,10 +89,7 @@ describe("Gate Fase 2 — a RPC de transição recusa pular estados, mesmo chama
   });
 
   it("a transição válida correspondente (emitido -> enviado) continua funcionando", async () => {
-    const cliente = createAnonClient();
-    await cliente.auth.signInWithPassword({ email, password: SENHA_TESTE });
-
-    const { error } = await cliente.rpc("gravar_transicao_contrato", {
+    const { error } = await admin.rpc("gravar_transicao_contrato", {
       p_contrato_id: contratoId,
       p_status_anterior: "emitido",
       p_status_novo: "enviado",

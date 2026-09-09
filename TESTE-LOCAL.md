@@ -1,7 +1,9 @@
 # Testar o sistema em localhost — passo a passo
 
-> Leia isto antes de testar: **nem toda tela que você vai ver é real ainda.** Ver a
-> seção 3 antes de estranhar um número que não muda quando você mexe no banco.
+> **DESATUALIZADO (era da Fase 1).** As telas hoje são todas reais e o login mudou
+> para **e-mail + senha** (não há mais link mágico nem `/auth/callback`, e o MFA é
+> opcional). Use **`COMO-TESTAR.md`** como referência atual. Este arquivo fica só
+> como histórico.
 
 ---
 

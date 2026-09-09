@@ -27,6 +27,14 @@ export interface ResultadoAcaoContrato {
   mensagem?: string;
 }
 
+// Trava de papel (migration 0016): emitir e transicionar contrato é exclusivo de
+// gestor e coord_comite. As policies `contratos_*` e o RLS de
+// `gravar_transicao_contrato` (invoker) já barram os demais; a checagem aqui
+// devolve mensagem clara.
+const PAPEIS_CONTRATO = ["gestor", "coord_comite"];
+const RECUSA_PAPEL_CONTRATO =
+  "Só gestores ou coordenadores de comitê podem emitir ou movimentar contratos.";
+
 function formatarValorBRL(valor: number): string {
   return `R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -185,8 +193,9 @@ export async function emitirContrato(
   if (!camposComuns.ok) return { status: "erro", mensagem: camposComuns.mensagem };
 
   const supabase = await createClient();
-  const { organizationId, userId } = await obterContextoUsuario(supabase);
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { status: "erro", mensagem: RECUSA_PAPEL_CONTRATO };
 
   const [{ data: pessoa }, { data: template }] = await Promise.all([
     supabase.from("pessoas").select("nome_completo, cpf, endereco").eq("id", pessoaId).maybeSingle(),
@@ -241,8 +250,9 @@ export async function emitirContratosEmLote(
   if (!camposComuns.ok) return { status: "erro", mensagem: camposComuns.mensagem };
 
   const supabase = await createClient();
-  const { organizationId, userId } = await obterContextoUsuario(supabase);
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { status: "erro", mensagem: RECUSA_PAPEL_CONTRATO };
 
   const { data: template } = await supabase
     .from("templates_contrato")
@@ -323,8 +333,9 @@ async function transicionarContrato(params: {
   }
 
   const supabase = await createClient();
-  const { organizationId, userId } = await obterContextoUsuario(supabase);
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL_CONTRATO };
 
   const { error } = await supabase.rpc("gravar_transicao_contrato", {
     p_contrato_id: params.contractId,
@@ -359,8 +370,9 @@ export async function enviarContrato(
   destinatario: string,
 ): Promise<ResultadoAcaoContrato> {
   const supabase = await createClient();
-  const { organizationId } = await obterContextoUsuario(supabase);
+  const { organizationId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL_CONTRATO };
 
   await supabase
     .from("contratos")
@@ -403,8 +415,9 @@ export async function distratarContrato(
   const supabase = await createClient();
   // userId não é usado aqui: transicionarContrato() já resolve o contexto do
   // usuário de novo por conta própria para o auditoria do evento de transição.
-  const { organizationId } = await obterContextoUsuario(supabase);
+  const { organizationId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL_CONTRATO };
 
   const { data: contrato } = await supabase
     .from("contratos")

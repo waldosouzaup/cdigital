@@ -38,7 +38,9 @@ export default function MfaPage() {
         return;
       }
 
-      // Fator já verificado -> não precisa fazer nada, segue para o painel.
+      // MFA/TOTP é OPCIONAL (migration 0018 — o RLS não exige mais `aal2`). Esta
+      // tela é só o cadastro/verificação voluntário, alcançável por "Segurança" em
+      // /configuracoes. Já tem fator verificado -> nada a fazer.
       const verificado = data?.totp?.find((f) => f.status === "verified");
       if (verificado) {
         router.replace("/dashboard");
@@ -247,8 +249,8 @@ export default function MfaPage() {
         </button>
 
         <div className="pt-2 text-center text-xs text-slate-400">
-          <Link href="/login" className="hover:text-brand-yellow hover:underline transition">
-            ← Voltar para o login
+          <Link href="/configuracoes" className="hover:text-brand-yellow hover:underline transition">
+            ← Voltar
           </Link>
         </div>
       </div>

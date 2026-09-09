@@ -96,9 +96,18 @@ export async function buscarDadosDashboard(): Promise<DadosDashboard> {
         .limit(50),
     ]);
 
-  if (erroPessoas) throw new Error("Não foi possível carregar os dados do dashboard (pessoas).");
-  if (erroRegioes) throw new Error("Não foi possível carregar os dados do dashboard (regiões).");
-  if (erroNotificacoes) throw new Error("Não foi possível carregar os dados do dashboard (notificações).");
+  if (erroPessoas) {
+    console.error("[dashboard] falha ao ler pessoas:", erroPessoas);
+    throw new Error("Não foi possível carregar os dados do dashboard (pessoas).");
+  }
+  if (erroRegioes) {
+    console.error("[dashboard] falha ao ler regiões:", erroRegioes);
+    throw new Error("Não foi possível carregar os dados do dashboard (regiões).");
+  }
+  if (erroNotificacoes) {
+    console.error("[dashboard] falha ao ler notificações:", erroNotificacoes);
+    throw new Error("Não foi possível carregar os dados do dashboard (notificações).");
+  }
 
   const pessoas: PessoaResumo[] = (pessoasBrutas ?? []).map((p) => {
     const contratoMaisRecente = [...(p.contratos ?? [])].sort(

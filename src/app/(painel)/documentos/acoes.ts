@@ -29,10 +29,17 @@ export interface ResultadoAcaoDocumento {
   pessoaFicouApta?: boolean;
 }
 
+// Trava de papel (migration 0016): aprovar/rejeitar documento é exclusivo de gestor
+// e coord_comite. As policies `documentos_*` já barram os demais; a checagem aqui
+// devolve mensagem clara em vez de erro genérico de RLS.
+const PAPEIS_TRIAGEM = ["gestor", "coord_comite"];
+const RECUSA_PAPEL = "Só gestores ou coordenadores de comitê podem validar documentos.";
+
 export async function aprovarDocumento(documentoId: string): Promise<ResultadoAcaoDocumento> {
   const supabase = await createClient();
-  const { organizationId, userId } = await obterContextoUsuario(supabase);
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_TRIAGEM.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL };
 
   const { data: documento, error } = await supabase
     .from("documentos")
@@ -75,8 +82,9 @@ export async function rejeitarDocumento(
   }
 
   const supabase = await createClient();
-  const { organizationId, userId } = await obterContextoUsuario(supabase);
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_TRIAGEM.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL };
 
   const { data: documento, error } = await supabase
     .from("documentos")

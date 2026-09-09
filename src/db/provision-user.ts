@@ -1,21 +1,25 @@
 /**
  * Provisiona um usuário real (Supabase Auth + linha em public.usuarios) — uso
- * administrativo, via linha de comando, enquanto a Fase 2 não constrói a tela de
- * gerenciamento de usuários.
+ * administrativo, via linha de comando (bootstrap do 1º gestor; o resto é feito
+ * pela tela `/equipe`).
  *
  * Uso: tsx src/db/provision-user.ts <email> <papel> [nome] [regiao]
  *   papel: gestor | coord_comite | coord_regiao | contratado | auditor
  *   regiao: nome da região (obrigatório só para coord_regiao)
  *
- * service_role é permitida aqui (Seção 3.1: "seed" e uso administrativo direto,
- * fora do caminho de requisição de usuário) — nunca rode isto a partir de uma rota
- * que atende sessão de usuário.
+ * Login é por e-mail + senha. Este script cria/redefine a senha para uma
+ * TEMPORÁRIA e a imprime; o usuário é obrigado a trocá-la no primeiro acesso.
+ *
+ * service_role é permitida aqui (Seção 3.1: uso administrativo direto, fora do
+ * caminho de requisição de usuário) — nunca rode isto a partir de uma rota que
+ * atende sessão de usuário.
  */
 import { createClient } from "@supabase/supabase-js";
 import { sql } from "drizzle-orm";
 import { db } from "./client";
 import { organizations, regions, users, type userRoleEnum } from "./schema";
 import { eq } from "drizzle-orm";
+import { gerarSenhaTemporaria } from "@/lib/auth/senha-temporaria";
 
 type Papel = (typeof userRoleEnum.enumValues)[number];
 const PAPEIS_VALIDOS: Papel[] = ["gestor", "coord_comite", "coord_regiao", "contratado", "auditor"];
@@ -62,16 +66,19 @@ async function main() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  // Sem senha — o login do Comitê Digital é por link mágico (Seção 3), não por senha.
+  // Login por e-mail + senha. A senha nasce temporária e o usuário é obrigado a
+  // trocá-la no primeiro acesso (flag em app_metadata, lida pelo middleware).
+  const senhaTemporaria = gerarSenhaTemporaria();
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email,
+    password: senhaTemporaria,
     email_confirm: true,
+    app_metadata: { must_change_password: true },
   });
 
   let userId: string;
   if (authError || !authUser.user) {
-    // Já existe (alguém pode ter tentado /login com este e-mail antes de ter linha
-    // em usuarios) — busca o id existente em vez de falhar.
+    // Já existe — recupera o id e redefine a senha para uma nova temporária.
     const [existente] = await db.execute<{ id: string }>(
       sql`select id from auth.users where email = ${email} limit 1`,
     );
@@ -80,7 +87,11 @@ async function main() {
       process.exit(1);
     }
     userId = existente.id;
-    console.log(`Usuário de autenticação já existia para ${email} — reaproveitando.`);
+    await admin.auth.admin.updateUserById(userId, {
+      password: senhaTemporaria,
+      app_metadata: { must_change_password: true },
+    });
+    console.log(`Usuário de autenticação já existia para ${email} — senha redefinida.`);
   } else {
     userId = authUser.user.id;
   }
@@ -101,14 +112,15 @@ async function main() {
     });
 
   console.log(
-    `Usuário provisionado: ${email} — papel "${papel}" em "${organizacao.name}"${nomeRegiao ? ` (região ${nomeRegiao})` : ""}.`,
+    `\nUsuário provisionado: ${email} — papel "${papel}" em "${organizacao.name}"${nomeRegiao ? ` (região ${nomeRegiao})` : ""}.`,
   );
-  console.log("Login: acessar /login, digitar este e-mail, abrir o link recebido.");
-  if (papel === "gestor" || papel === "coord_comite") {
-    console.log(
-      "MFA (TOTP) é obrigatório — a tela de login vai pedir o cadastro no primeiro acesso.",
-    );
-  }
+  console.log("─".repeat(60));
+  console.log(`  E-mail...............: ${email}`);
+  console.log(`  Senha temporária....: ${senhaTemporaria}`);
+  console.log("─".repeat(60));
+  console.log(
+    "Entregue a senha por um canal seguro. No 1º login o sistema obriga a troca.",
+  );
 }
 
 main()

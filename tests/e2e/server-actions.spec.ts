@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { admin, autenticarContextoAal2 } from "./_sessao";
+import { admin, autenticarContexto } from "./_sessao";
 
 const SENHA = "SenhaDeTeste!123456";
 
@@ -14,12 +14,19 @@ const SENHA = "SenhaDeTeste!123456";
 test.use({ viewport: { width: 1280, height: 900 } });
 
 async function entrar(page: import("@playwright/test").Page, email: string) {
-  const { data } = await admin.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-    options: { redirectTo: "http://localhost:3000/auth/callback" },
-  });
-  await page.goto(data!.properties!.action_link!);
+  // Garante uma senha definitiva conhecida (sem must_change_password) e loga pela UI.
+  const list = await admin.auth.admin.listUsers();
+  const user = list.data.users.find((u) => u.email === email);
+  if (user) {
+    await admin.auth.admin.updateUserById(user.id, {
+      password: SENHA,
+      app_metadata: { must_change_password: false },
+    });
+  }
+  await page.goto("/login");
+  await page.getByLabel("E-mail").fill(email);
+  await page.getByLabel("Senha").fill(SENHA);
+  await page.getByRole("button", { name: /^Entrar$/ }).click();
 }
 
 let orgId: string;
@@ -40,7 +47,9 @@ test("criarPessoa: a Server Action grava a pessoa quando o coordenador clica em 
   const nome = `Pessoa Server Action ${Date.now()}`;
   const list = await admin.auth.admin.listUsers();
   let user = list.data.users.find((u) => u.email === email);
-  if (!user) user = (await admin.auth.admin.createUser({ email, email_confirm: true })).data.user!;
+  if (!user)
+    user = (await admin.auth.admin.createUser({ email, password: SENHA, email_confirm: true })).data
+      .user!;
   const { data: reg } = await admin
     .from("regioes")
     .select("id, nome")
@@ -119,7 +128,7 @@ test("salvarTemplate: a Server Action grava o modelo quando o gestor clica em Sa
   try {
     // Sessão já em aal2 (enroll+verify pelo lado servidor; o fator é reaproveitado
     // em execuções seguintes). O foco do teste é a Server Action, não a tela de MFA.
-    await autenticarContextoAal2(context, email, SENHA);
+    await autenticarContexto(context, email, SENHA);
     await page.goto("/configuracoes", { waitUntil: "networkidle" });
     await page.getByRole("button", { name: /Novo Modelo de Contrato/i }).click();
     await page.locator("#template-nome").fill(nomeModelo);
@@ -168,7 +177,7 @@ test("salvarIdentidadeComite: o gestor edita nome/CNPJ e o valor persiste (item 
   const novoNome = `${original!.nome} (teste ${Date.now() % 100000})`;
 
   try {
-    await autenticarContextoAal2(context, email, SENHA);
+    await autenticarContexto(context, email, SENHA);
     await page.goto("/configuracoes", { waitUntil: "networkidle" });
 
     await page.locator("#nome-comite").fill(novoNome);
@@ -216,7 +225,7 @@ test("criarRegiao / renomearRegiao: o gestor cadastra e renomeia uma região (it
   const nome2 = `${nome1} Renomeada`;
 
   try {
-    await autenticarContextoAal2(context, email, SENHA);
+    await autenticarContexto(context, email, SENHA);
     await page.goto("/regioes", { waitUntil: "networkidle" });
 
     await page.locator("#nova-regiao").fill(nome1);

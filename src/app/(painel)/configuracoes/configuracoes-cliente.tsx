@@ -46,6 +46,23 @@ export function ConfiguracoesCliente({
     if (estadoIdentidade.status === "sucesso") router.refresh();
   }, [estadoIdentidade.status, router]);
 
+  // Slug da URL pública de autoinscrição (Feature B) — controlado, para o preview
+  // reagir enquanto digita.
+  const [slug, setSlug] = useState(identidadeInicial.slug ?? "");
+  const [origin, setOrigin] = useState("");
+  const [slugCopiado, setSlugCopiado] = useState(false);
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+  const urlInscricao = slug ? `${origin}/inscricao/${slug}` : "";
+
+  async function copiarUrlInscricao() {
+    if (!urlInscricao) return;
+    await navigator.clipboard.writeText(urlInscricao);
+    setSlugCopiado(true);
+    setTimeout(() => setSlugCopiado(false), 2000);
+  }
+
   // Editor de modelos — real
   const [modalAberto, setModalAberto] = useState(false);
   const [templateEmEdicao, setTemplateEmEdicao] = useState<TemplateContrato | null>(null);
@@ -143,7 +160,8 @@ export function ConfiguracoesCliente({
         <div className="regua">
           <h2 className="text-h2 font-semibold text-ink">Identificação do Comitê Eleitoral</h2>
           <p className="text-xs text-ink-muted">
-            Nome e CNPJ da campanha, usados nos contratos e relatórios. Só o gestor edita.
+            Nome e CNPJ da campanha (usados nos contratos e relatórios) e o endereço público de
+            autoinscrição. Só o gestor edita.
           </p>
         </div>
 
@@ -169,6 +187,33 @@ export function ConfiguracoesCliente({
             placeholder="00.000.000/0001-00"
             erro={estadoIdentidade.status === "erro" ? estadoIdentidade.erros?.cnpj : undefined}
           />
+
+          <div className="sm:col-span-2 space-y-2">
+            <Campo
+              rotulo="Endereço público de autoinscrição"
+              id="slug-inscricao"
+              name="slug"
+              mono
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              placeholder="comite-michelle-2026"
+              auxiliar="Link fixo para divulgar em canais e no portal. Deixe em branco para desativar a autoinscrição."
+              erro={estadoIdentidade.status === "erro" ? estadoIdentidade.erros?.slug : undefined}
+            />
+            {urlInscricao && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-mono text-seal select-all break-all">{urlInscricao}</span>
+                <button
+                  type="button"
+                  onClick={copiarUrlInscricao}
+                  className="border border-line px-2 py-0.5 text-ink-muted hover:text-ink"
+                >
+                  {slugCopiado ? "Copiado ✓" : "Copiar"}
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="sm:col-span-2 flex items-center gap-3">
             <Selo
               voz="selo"
@@ -270,10 +315,17 @@ export function ConfiguracoesCliente({
         <div className="space-y-3 pt-2 text-small text-ink-muted leading-relaxed">
           <div className="flex items-center justify-between border-b border-line pb-3">
             <div>
-              <strong className="text-ink block">MFA TOTP Obrigatório</strong>
-              <span className="text-xs">Exigido por política RLS para gestores e coordenadores.</span>
+              <strong className="text-ink block">Verificação em duas etapas (2FA / TOTP)</strong>
+              <span className="text-xs">
+                Camada opcional para a sua conta. Ative num app autenticador.
+              </span>
             </div>
-            <Badge status="aprovado">Ativado</Badge>
+            <a
+              href="/mfa"
+              className="shrink-0 border border-line px-2.5 py-1 text-xs font-medium text-seal hover:border-seal"
+            >
+              Configurar
+            </a>
           </div>
 
           <div className="flex items-center justify-between border-b border-line pb-3 pt-1">

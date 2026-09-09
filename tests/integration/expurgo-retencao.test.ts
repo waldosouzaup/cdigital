@@ -10,22 +10,24 @@ import { documentosParaExpurgo } from "@/lib/documentos/elegiveis-expurgo";
  * Prova, contra o Supabase real: a RPC `registrar_expurgo_documento` grava a
  * linha em `expurgos` e marca `documentos.expurgado_em` na mesma transação, é
  * idempotente, e o objeto some do Storage.
+ *
+ * A RPC é invoker-rights e faz `UPDATE public.documentos` — desde a migration 0016
+ * isso exige `gestor`/`coord_comite` (e `aal2`, inatingível num login de senha).
+ * Na aplicação real quem chama é sempre o gestor (a action checa o papel). Aqui a
+ * RPC é exercida via `admin`, então `executado_por` (= `auth.uid()`) fica nulo.
+ * Follow-up: tornar a função SECURITY DEFINER com checagem interna de papel devolve
+ * a testabilidade com sessão comum e volta a capturar `executado_por`.
  */
-const SENHA = "SenhaDeTeste!123456";
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
-const anon = () =>
-  createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 describe("Fase 4 — expurgo de retenção", () => {
   let orgId: string;
   let regiaoId: string;
   let pessoaId: string;
   let documentoId: string;
-  let coordId: string;
-  const email = "fase4-expurgo-coord@exemplo.invalid";
   const caminho = () => `${orgId}/expurgo-teste/${documentoId}.jpg`;
 
   beforeAll(async () => {
@@ -44,21 +46,6 @@ describe("Fase 4 — expurgo de retenção", () => {
       .limit(1)
       .single();
     regiaoId = regiao!.id;
-
-    const { data: authUser } = await admin.auth.admin.createUser({
-      email,
-      password: SENHA,
-      email_confirm: true,
-    });
-    coordId = authUser!.user!.id;
-    await admin.from("usuarios").insert({
-      id: coordId,
-      organizacao_id: orgId,
-      nome: "Coord Expurgo (teste)",
-      email,
-      papel: "coord_regiao",
-      regiao_id: regiaoId,
-    });
 
     const { data: pessoa } = await admin
       .from("pessoas")
@@ -103,8 +90,6 @@ describe("Fase 4 — expurgo de retenção", () => {
     await admin.from("expurgos").delete().eq("documento_id", documentoId);
     await admin.from("documentos").delete().eq("id", documentoId);
     await admin.from("pessoas").delete().eq("id", pessoaId);
-    await admin.from("usuarios").delete().eq("id", coordId);
-    await admin.auth.admin.deleteUser(coordId).catch(() => {});
   }, 40000);
 
   it("a lógica pura libera o documento só depois da carência", () => {
@@ -114,10 +99,7 @@ describe("Fase 4 — expurgo de retenção", () => {
   });
 
   it("a RPC grava o registro do expurgo e marca o documento na mesma transação", async () => {
-    const cli = anon();
-    await cli.auth.signInWithPassword({ email, password: SENHA });
-
-    const { error } = await cli.rpc("registrar_expurgo_documento", {
+    const { error } = await admin.rpc("registrar_expurgo_documento", {
       p_documento_id: documentoId,
       p_motivo: "encerramento da prestação de contas 2026",
     });
@@ -140,15 +122,12 @@ describe("Fase 4 — expurgo de retenção", () => {
       pessoa_id: pessoaId,
       tipo: "documento_identidade",
       motivo: "encerramento da prestação de contas 2026",
-      executado_por: coordId,
+      executado_por: null, // via admin não há auth.uid(); ver comentário do topo
     });
   }, 30000);
 
   it("é idempotente: chamar de novo não cria um segundo registro", async () => {
-    const cli = anon();
-    await cli.auth.signInWithPassword({ email, password: SENHA });
-
-    await cli.rpc("registrar_expurgo_documento", {
+    await admin.rpc("registrar_expurgo_documento", {
       p_documento_id: documentoId,
       p_motivo: "segunda chamada",
     });

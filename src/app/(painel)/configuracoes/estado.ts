@@ -12,7 +12,7 @@ export const ESTADO_INICIAL_SALVAR_TEMPLATE: EstadoSalvarTemplate = { status: "i
 
 export interface EstadoIdentidadeComite {
   status: "idle" | "sucesso" | "erro";
-  erros?: { nome?: string; cnpj?: string };
+  erros?: { nome?: string; cnpj?: string; slug?: string };
   mensagem?: string;
 }
 

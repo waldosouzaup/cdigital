@@ -80,6 +80,7 @@ export async function salvarIdentidadeComite(
   const validacao = validarIdentidadeComite({
     nome: campoTexto(formData, "nome"),
     cnpj: campoTexto(formData, "cnpj"),
+    slug: campoTexto(formData, "slug"),
   });
   if (!validacao.ok) {
     return { status: "erro", erros: validacao.erros };
@@ -97,10 +98,17 @@ export async function salvarIdentidadeComite(
 
   const { error } = await supabase
     .from("organizacoes")
-    .update({ nome: validacao.valores.nome, cnpj: validacao.valores.cnpj })
+    .update({
+      nome: validacao.valores.nome,
+      cnpj: validacao.valores.cnpj,
+      slug: validacao.valores.slug,
+    })
     .eq("id", organizationId);
 
   if (error) {
+    if ((error as { code?: string }).code === "23505") {
+      return { status: "erro", erros: { slug: "Esse endereço de inscrição já está em uso." } };
+    }
     return { status: "erro", mensagem: "Não foi possível salvar a identidade do comitê." };
   }
 

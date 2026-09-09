@@ -89,7 +89,8 @@ export function PessoasCliente({
       filtroStatus === "todos" ||
       (filtroStatus === "apta" && p.apta) ||
       (filtroStatus === "pendente" && !p.apta) ||
-      (filtroStatus === "com_pendencias" && p.pendencias.length > 0);
+      (filtroStatus === "com_pendencias" && p.pendencias.length > 0) ||
+      (filtroStatus === "autoinscritos" && p.origem === "autoinscricao");
     return bateBusca && bateRegiao && bateStatus;
   });
 
@@ -206,6 +207,7 @@ export function PessoasCliente({
             <option value="apta">Apenas aptos (doc aprovado)</option>
             <option value="pendente">Com pendência documental</option>
             <option value="com_pendencias">Com qualquer pendência (checklist)</option>
+            <option value="autoinscritos">Somente autoinscritos</option>
           </select>
         </div>
       </div>

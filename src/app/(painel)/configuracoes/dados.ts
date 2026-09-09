@@ -16,18 +16,20 @@ export interface TemplateContrato {
 export interface IdentidadeComite {
   nome: string;
   cnpj: string | null;
+  /** Slug da URL pública `/inscricao/<slug>` (Feature B). */
+  slug: string | null;
 }
 
-/** Identidade do comitê (nome + CNPJ) da organização do usuário logado. */
+/** Identidade do comitê (nome + CNPJ + slug) da organização do usuário logado. */
 export async function buscarIdentidadeComite(): Promise<IdentidadeComite> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("organizacoes")
-    .select("nome, cnpj")
+    .select("nome, cnpj, slug")
     .maybeSingle();
 
   if (error) throw new Error("Não foi possível carregar a identidade do comitê.");
-  return { nome: data?.nome ?? "", cnpj: data?.cnpj ?? null };
+  return { nome: data?.nome ?? "", cnpj: data?.cnpj ?? null, slug: data?.slug ?? null };
 }
 
 export async function listarTemplates(): Promise<TemplateContrato[]> {

@@ -44,8 +44,8 @@ E2E (precisa do `npm run dev` rodando noutro terminal):
 export $(grep -v '^#' .env.local | xargs) && npx playwright test
 ```
 
-Cobre: login por link mágico + MFA/TOTP real, fluxo de campo offline em 360 px,
-OCR sem gravação sem confirmação.
+Cobre: login por e-mail + senha e a troca obrigatória no 1º acesso, fluxo de campo
+offline em 360 px, OCR sem gravação sem confirmação.
 
 Se algum teste de integração falhar **só no conjunto** e passar isolado, é
 contenção da fixture compartilhada (a organização de teste é a mesma) — por isso o
@@ -55,55 +55,42 @@ script já roda com `--no-file-parallelism`.
 
 ## 2. Entrar no sistema
 
-O login é por **link mágico** (sem senha). O e-mail sai pelo servidor embutido do
-Supabase, que tem um **limite fixo e baixo (~2–4/hora, devolve 429)** que não dá
-para elevar sem SMTP customizado. Para testar à vontade, prefira o atalho da
-Seção 2.3 (gera o link **sem enviar e-mail**).
+O login é por **e-mail + senha** (sem link mágico, sem e-mail no caminho crítico).
+MFA/TOTP é **opcional** — camada extra da própria conta, em "Configurações →
+Verificação em duas etapas".
 
-### 2.1 Usuários
-
-| Papel | E-mail | Observação |
-| --- | --- | --- |
-| `gestor` | `apt.uplinux@gmail.com` | **exige MFA/TOTP** no 1º acesso |
-| `coord_comite` | `teste-coord-comite@exemplo.invalid` | exige MFA/TOTP |
-| `coord_regiao` | `teste-local@exemplo.invalid` | Águas Claras — **sem MFA** |
-| `auditor` | `teste-auditor@exemplo.invalid` | sem MFA |
-
-Provisionar outros:
+### 2.1 Provisionar o primeiro gestor (bootstrap)
 
 ```bash
-npm run db:provision-user -- voce+gestor@gmail.com  gestor
-npm run db:provision-user -- voce+regiao@gmail.com  coord_regiao "Gama"     # 4º arg = região
+npm run db:provision-user -- voce@exemplo.com gestor "Seu Nome"
 ```
 
-### 2.2 Login por e-mail (fluxo real)
+O comando imprime a **senha temporária**. Os demais usuários são criados pela tela
+`/equipe` (que também mostra a senha temporária, uma única vez).
 
-1. `http://localhost:3000/login` → digite o e-mail → **Enviar link de acesso**.
-2. Abra o e-mail (confira o spam) → clique no link → cai em `/auth/callback`.
-3. `gestor`/`coord_comite` → vão para `/mfa`: escaneie o QR num app autenticador
-   (Google Authenticator, Authy), digite os 6 dígitos → painel. Nas próximas
-   vezes, só o código.
-4. `coord_regiao`/`auditor` → vão direto para `/dashboard`.
-
-### 2.3 Login sem e-mail (atalho recomendado para testar papéis)
-
-Não consome cota de e-mail e não esbarra no 429. Gere o link para qualquer
-usuário provisionado:
+### 2.2 Migrar usuários antigos (uma vez, ao trocar do link mágico)
 
 ```bash
-npx tsx --env-file=.env.local scripts/link-acesso.mjs teste-local@exemplo.invalid
-npx tsx --env-file=.env.local scripts/link-acesso.mjs teste-auditor@exemplo.invalid
-npx tsx --env-file=.env.local scripts/link-acesso.mjs teste-coord-comite@exemplo.invalid
-npx tsx --env-file=.env.local scripts/link-acesso.mjs apt.uplinux@gmail.com
+npm run db:reset-senhas                       # todos os usuários existentes
+npm run db:reset-senhas -- apt.uplinux@gmail.com   # ou só alguns
 ```
 
-Cole a URL impressa no navegador (com o `npm run dev` rodando). Cada link é de uso
-único e vale ~1 h. Para `coord_regiao`/`auditor` você entra direto; para
-`gestor`/`coord_comite` cai em `/mfa` e cadastra o TOTP uma vez (a partir daí é só
-o código de 6 dígitos).
+Imprime a tabela `e-mail → senha temporária`. Todos caem na troca obrigatória no
+próximo login.
 
-> **429 no `/login`?** É o limite do e-mail embutido do Supabase. Espere ~1 h ou
-> use este atalho. Para produção, configure um SMTP próprio (Seção 6).
+### 2.3 Login
+
+1. `http://localhost:3000/login` → e-mail + senha → **Entrar**.
+2. Se a senha ainda é **temporária**, o sistema leva a `/definir-senha` — escolha
+   uma senha (mín. 8) e continue. Só depois disso o painel abre.
+3. `gestor`/`coord_comite` vão direto ao `/dashboard` (não há mais tela de MFA no
+   fluxo de login).
+
+### 2.4 Esqueci a senha
+
+Não há autoatendimento. Um **gestor** redefine pelo `/equipe` → **Redefinir senha**
+(gera nova temporária, mostrada uma vez). A senha do próprio gestor é redefinida
+por `npm run db:provision-user -- <email> gestor` (redefine se o usuário já existe).
 
 ---
 
@@ -202,8 +189,7 @@ expurgar ainda". (Automatizado: `tests/integration/expurgo-retencao.test.ts`.)
    - Confira que `CRON_SECRET` está preenchida.
 3. **Redirect URLs do Supabase**: no painel do Supabase → Authentication → URL
    Configuration → adicione `https://SEU-SITE.netlify.app` em **Site URL** e
-   `https://SEU-SITE.netlify.app/**` em **Redirect URLs** (senão o link mágico
-   volta para o lugar errado).
+   `https://SEU-SITE.netlify.app/**` em **Redirect URLs**.
 4. **Deploy.** Depois do primeiro deploy, ative os jobs de cron rodando no
    **SQL Editor** do Supabase:
    ```sql
@@ -228,7 +214,8 @@ expurgar ainda". (Automatizado: `tests/integration/expurgo-retencao.test.ts`.)
 
 | Item | Situação | O que fazer |
 | --- | --- | --- |
-| **E-mail transacional** | Servidor embutido do Supabase (~3–4/hora), sem SPF/DKIM/DMARC | Verificar um domínio no Resend (ou outro), reativar o SMTP customizado no painel do Supabase e em `supabase/config.toml` (`[auth.email.smtp] enabled = true`). É o NFR da Seção 10 |
+| **E-mail transacional** | Servidor embutido do Supabase (~3–4/hora), sem SPF/DKIM/DMARC | Só afeta notificações (Resend), não o login (que é senha). Verificar um domínio no Resend para as notificações de contrato/coleta saírem de fato |
+| **Login por senha / MFA opcional** | e-mail + senha; TOTP opcional; sem exigência de `aal2` no RLS (migration 0018) | Confirmar no painel do Supabase: Authentication → Providers → Email com "Confirm email" desligado; senha mínima. Rodar `db:reset-senhas` uma vez para os usuários legados |
 | **Cron entregando de verdade** | Agendado no `pg_cron`; só alcança a app com URL pública | Passo 4 da Seção 5 acima |
 | **Custom Access Token Hook** | Habilitado (a RLS funciona nos testes) | Confirmar no painel: Authentication → Hooks → Custom Access Token → `public.custom_access_token_hook` |
 | **Buckets de Storage** | `documentos` e `contratos` privados, políticas por organização | Confirmar no painel: Storage → nenhum bucket público |

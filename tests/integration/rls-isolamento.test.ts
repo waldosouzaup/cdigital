@@ -200,15 +200,16 @@ describe("RLS — coord_regiao só enxerga a própria região", () => {
   });
 });
 
-describe('RLS — MFA obrigatório para gestor (Seção 12: "login sem TOTP recusado")', () => {
-  it("gestor sem TOTP cadastrado (aal1) não lê nenhuma linha, nem da própria organização", async () => {
+describe("RLS — MFA deixou de ser obrigatório (migration 0018)", () => {
+  it("gestor em aal1 (login só de senha, sem TOTP) lê os dados da própria organização", async () => {
     const clientD = await signIn("rls-teste-user-d@exemplo.invalid");
 
     const { data: pessoasVisiveis, error } = await clientD.from("pessoas").select("id");
     expect(error).toBeNull();
 
-    // A policy restritiva de MFA nega tudo para gestor/coord_comite sem aal2 — mesmo
-    // dado da própria organização fica invisível até o TOTP ser verificado.
-    expect(pessoasVisiveis).toEqual([]);
+    // As policies restritivas `*_mfa` foram removidas na 0018 — o gestor opera em
+    // aal1; o TOTP virou camada opcional, sem trava no RLS. A policy de organização
+    // continua gateando: ele vê os dados da própria org, e só os dela.
+    expect((pessoasVisiveis ?? []).length).toBeGreaterThan(0);
   });
 });

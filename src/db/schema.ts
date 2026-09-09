@@ -140,19 +140,33 @@ function organizationAndRegionPolicy(
 }
 
 /**
- * MFA obrigatório para gestor e coord_comite (Seção 3, item 6 da Fase 1). Restritiva:
- * intersecta (AND) com toda policy permissiva da mesma tabela — nunca afrouxa nada
- * sozinha, só pode negar. Mesmo cuidado de performance das duas anteriores.
+ * Isolamento por organização + região na LEITURA (coord_regiao só enxerga a
+ * própria região), mas ESCRITA restrita a gestor e coord_comite (migration 0016 —
+ * decisão do coordenador: aprovar documento e emitir/transicionar contrato deixam
+ * de ser acessíveis a coord_regiao/auditor/contratado). A restritiva de MFA
+ * continua por cima.
  */
-function mfaGatePolicy(name: string) {
-  const condition = sql`(select public.papel()) NOT IN ('gestor', 'coord_comite') OR ((select auth.jwt()) ->> 'aal') = 'aal2'`;
-  return pgPolicy(name, {
-    as: "restrictive",
-    for: "all",
-    to: authenticatedRole,
-    using: condition,
-    withCheck: condition,
-  });
+function regionReadRoleWritePolicies(
+  prefix: string,
+  organizationIdColumn: AnyPgColumn,
+  regionIdColumn: AnyPgColumn,
+) {
+  const write = sql`${organizationIdColumn} = (select public.organizacao_id()) AND (select public.papel()) IN ('gestor', 'coord_comite')`;
+  return [
+    pgPolicy(`${prefix}_select`, {
+      as: "permissive",
+      for: "select",
+      to: authenticatedRole,
+      using: sql`${organizationIdColumn} = (select public.organizacao_id()) AND ((select public.papel()) <> 'coord_regiao' OR ${regionIdColumn} = (select public.regiao_id()))`,
+    }),
+    pgPolicy(`${prefix}_mutacao_gestor_coord`, {
+      as: "permissive",
+      for: "all",
+      to: authenticatedRole,
+      using: write,
+      withCheck: write,
+    }),
+  ];
 }
 
 /**
@@ -188,9 +202,15 @@ export const organizations = pgTable(
     name: text("nome").notNull(),
     cnpj: text("cnpj"),
     active: boolean("ativa").notNull().default(true),
+    // Slug da URL pública de autoinscrição `/inscricao/<slug>` (migration 0017).
+    // Único global (não multi-tenant) — o índice parcial abaixo.
+    slug: text("slug"),
     ...timestamps,
   },
   (table) => [
+    uniqueIndex("organizacoes_slug_idx")
+      .on(table.slug)
+      .where(sql`${table.slug} is not null`),
     pgPolicy("organizacoes_select", {
       as: "permissive",
       for: "select",
@@ -205,9 +225,7 @@ export const organizations = pgTable(
       to: authenticatedRole,
       using: sql`${table.id} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
       withCheck: sql`${table.id} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
-    }),
-    mfaGatePolicy("organizacoes_mfa"),
-  ],
+    }),  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -247,9 +265,7 @@ export const regions = pgTable(
       to: authenticatedRole,
       using: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
       withCheck: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
-    }),
-    mfaGatePolicy("regioes_mfa"),
-  ],
+    }),  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -269,6 +285,11 @@ export const users = pgTable(
     role: userRoleEnum("papel").notNull(),
     // Nulo exceto para coord_regiao (Seção 5).
     regionId: uuid("regiao_id").references(() => regions.id),
+    // Desativar acesso sem apagar a linha (migration 0016) — há FK de
+    // eventos_contrato/log_auditoria/expurgos apontando para usuarios.id. Usuário
+    // com ativo=false não recebe claim nenhuma: o custom_access_token_hook
+    // (migration 0016) filtra `ativo IS TRUE` no lookup.
+    active: boolean("ativo").notNull().default(true),
     ...timestamps,
   },
   (table) => [
@@ -277,8 +298,42 @@ export const users = pgTable(
       foreignColumns: [authUsers.id],
       name: "usuarios_id_auth_users_id_fk",
     }).onDelete("cascade"),
-    organizationPolicy("usuarios_organizacao", table.organizationId),
-    mfaGatePolicy("usuarios_mfa"),
+    // "email único por organização" (migration 0016) — um convite não cria duplicata.
+    uniqueIndex("usuarios_organizacao_id_email_idx").on(table.organizationId, table.email),
+    // coord_regiao obrigatoriamente tem região (migration 0016).
+    check(
+      "usuarios_regiao_obrigatoria_coord",
+      sql`${table.role} <> 'coord_regiao' OR ${table.regionId} is not null`,
+    ),
+    // Gestão de acessos (migration 0016): leitura para todos os autenticados da
+    // organização (o custom_access_token_hook e disparos de notificação leem
+    // usuarios), escrita só para o gestor. (A restritiva usuarios_mfa foi removida
+    // na 0018 — MFA deixou de ser obrigatório.)
+    pgPolicy("usuarios_select", {
+      as: "permissive",
+      for: "select",
+      to: authenticatedRole,
+      using: sql`${table.organizationId} = (select public.organizacao_id())`,
+    }),
+    pgPolicy("usuarios_insert_gestor", {
+      as: "permissive",
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+    }),
+    pgPolicy("usuarios_update_gestor", {
+      as: "permissive",
+      for: "update",
+      to: authenticatedRole,
+      using: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+      withCheck: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+    }),
+    pgPolicy("usuarios_delete_gestor", {
+      as: "permissive",
+      for: "delete",
+      to: authenticatedRole,
+      using: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+    }),
   ],
 );
 
@@ -307,13 +362,15 @@ export const people = pgTable(
     bankBranch: text("agencia"),
     bankAccount: text("conta"),
     eligible: boolean("apta").notNull().default(false),
+    // Origem do cadastro (migration 0017): "autoinscricao" quando veio do link
+    // público `/inscricao/[slug]`. NULL = legado / cadastro pelo painel.
+    origin: text("origem"),
     ...timestamps,
   },
   (table) => [
     // "CPF único por organização (impede a duplicata que hoje passa despercebida)"
     uniqueIndex("pessoas_organizacao_id_cpf_idx").on(table.organizationId, table.cpf),
     organizationAndRegionPolicy("pessoas_organizacao_regiao", table.organizationId, table.regionId),
-    mfaGatePolicy("pessoas_mfa"),
   ],
 );
 
@@ -337,7 +394,6 @@ export const contractTemplates = pgTable(
   },
   (table) => [
     organizationPolicy("templates_contrato_organizacao", table.organizationId),
-    mfaGatePolicy("templates_contrato_mfa"),
   ],
 );
 
@@ -391,12 +447,7 @@ export const contracts = pgTable(
       "ordem_datas",
       sql`${table.sentAt} IS NULL OR ${table.issuedAt} IS NULL OR ${table.sentAt} >= ${table.issuedAt}`,
     ),
-    organizationAndRegionPolicy(
-      "contratos_organizacao_regiao",
-      table.organizationId,
-      table.regionId,
-    ),
-    mfaGatePolicy("contratos_mfa"),
+    ...regionReadRoleWritePolicies("contratos", table.organizationId, table.regionId),
   ],
 );
 
@@ -425,9 +476,7 @@ export const contractEvents = pgTable(
     ...organizationReadInsertPolicies(
       "eventos_contrato_organizacao",
       sql`exists (select 1 from contratos c where c.id = ${table.contractId} and c.organizacao_id = (select public.organizacao_id()))`,
-    ),
-    mfaGatePolicy("eventos_contrato_mfa"),
-  ],
+    ),  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -478,12 +527,7 @@ export const documents = pgTable(
       table.type,
       table.version,
     ),
-    organizationAndRegionPolicy(
-      "documentos_organizacao_regiao",
-      table.organizationId,
-      table.regionId,
-    ),
-    mfaGatePolicy("documentos_mfa"),
+    ...regionReadRoleWritePolicies("documentos", table.organizationId, table.regionId),
   ],
 );
 
@@ -515,9 +559,7 @@ export const activityRecords = pgTable(
       "registros_atividade_organizacao_regiao",
       table.organizationId,
       table.regionId,
-    ),
-    mfaGatePolicy("registros_atividade_mfa"),
-  ],
+    ),  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -544,7 +586,6 @@ export const collectionLinks = pgTable(
   },
   (table) => [
     organizationPolicy("links_coleta_organizacao", table.organizationId),
-    mfaGatePolicy("links_coleta_mfa"),
   ],
 );
 
@@ -580,7 +621,6 @@ export const notifications = pgTable(
   },
   (table) => [
     organizationPolicy("notificacoes_organizacao", table.organizationId),
-    mfaGatePolicy("notificacoes_mfa"),
   ],
 );
 
@@ -613,9 +653,7 @@ export const purges = pgTable(
     ...organizationReadInsertPolicies(
       "expurgos_organizacao",
       sql`${table.organizationId} = (select public.organizacao_id())`,
-    ),
-    mfaGatePolicy("expurgos_mfa"),
-  ],
+    ),  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -646,7 +684,5 @@ export const auditLog = pgTable(
     ...organizationReadInsertPolicies(
       "log_auditoria_organizacao",
       sql`${table.organizationId} = (select public.organizacao_id())`,
-    ),
-    mfaGatePolicy("log_auditoria_mfa"),
-  ],
+    ),  ],
 );
