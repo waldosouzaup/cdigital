@@ -28,6 +28,12 @@ import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
 import { substituirMarcadores } from "@/lib/contratos/marcadores";
 import { gerarPdfContrato, htmlParaTexto } from "@/lib/contratos/gerar-pdf";
 import { amountInWords } from "@/lib/contratos/valor-extenso";
+import {
+  calcularHashSha256,
+  extensaoPorMime,
+  validarDimensaoImagem,
+  validarTipoETamanho,
+} from "@/lib/documentos/upload";
 
 export interface ResultadoAcaoDocumento {
   ok: boolean;
@@ -41,11 +47,10 @@ export interface ResultadoAcaoDocumento {
   pessoaNome?: string;
 }
 
-// Trava de papel (migration 0016): aprovar/rejeitar documento é exclusivo de gestor
-// e coord_comite. As policies `documentos_*` já barram os demais; a checagem aqui
-// devolve mensagem clara em vez de erro genérico de RLS.
-const PAPEIS_TRIAGEM = ["gestor", "coord_comite"];
-const RECUSA_PAPEL = "Só gestores ou coordenadores de comitê podem validar documentos.";
+// Trava de papel (migration 0016 / 0023): aprovar/rejeitar/gerenciar documento é exclusivo de gestor,
+// coord_comite e superadmin.
+const PAPEIS_TRIAGEM = ["gestor", "coord_comite", "superadmin"];
+const RECUSA_PAPEL = "Só gestores, coordenadores de comitê ou superadministradores podem validar ou alterar documentos.";
 
 function formatarValorBRL(valor: number): string {
   return `R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -135,113 +140,189 @@ export async function aprovarDocumentoEGerarContrato(
     };
   }
 
-  // 5. Configura vigência, remuneração e token exclusivo
-  const valor =
-    templateEscolhido.valor_padrao && Number(templateEscolhido.valor_padrao) > 0
-      ? Number(templateEscolhido.valor_padrao)
-      : 3553;
-  const valorExtenso = amountInWords(valor);
-  const vigenciaInicio = "2026-09-01";
-  const vigenciaFim = "2026-10-03";
-  const tokenAssinatura = randomBytes(24).toString("hex");
-
-  // 6. Insere o contrato em rascunho com o token_assinatura
-  const { data: contrato, error: erroInsercaoContrato } = await supabase
+  // 5. Verifica se a pessoa já possui um contrato ativo
+  const { data: contratoExistente } = await supabase
     .from("contratos")
-    .insert({
-      organizacao_id: organizationId,
-      pessoa_id: pessoa.id,
-      template_id: templateEscolhido.id,
+    .select("id, status, token_assinatura, assinatura_expira_em, objeto, caminho_pdf, pdf_sha256")
+    .eq("pessoa_id", pessoa.id)
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const expiracao = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  let contratoId = contratoExistente?.id;
+  let tokenAssinatura = contratoExistente?.token_assinatura;
+  let objetoContrato = contratoExistente?.objeto ?? templateEscolhido.objeto;
+
+  if (!contratoExistente || ["rascunho", "emitido"].includes(contratoExistente.status)) {
+    const valor =
+      templateEscolhido.valor_padrao && Number(templateEscolhido.valor_padrao) > 0
+        ? Number(templateEscolhido.valor_padrao)
+        : 3553;
+    const valorExtenso = amountInWords(valor);
+    const vigenciaInicio = "2026-09-01";
+    const vigenciaFim = "2026-10-03";
+    const tokenNovo = randomBytes(24).toString("hex");
+
+    // Renderiza e compila o PDF oficial do contrato
+    const corpoComDados = substituirMarcadores(templateEscolhido.corpo_html, {
+      nome: pessoa.nome_completo,
+      cpf: pessoa.cpf,
+      endereco: pessoa.endereco ?? "não informado",
+      chavePix: pessoa.chave_pix ?? "não informada",
       objeto: templateEscolhido.objeto,
-      valor,
-      valor_extenso: valorExtenso,
-      vigencia_inicio: vigenciaInicio,
-      vigencia_fim: vigenciaFim,
-      token_assinatura: tokenAssinatura,
-      regiao_id: pessoa.regiao_id,
-    })
-    .select("id")
-    .single();
+      valor: formatarValorBRL(valor),
+      valorExtenso,
+      vigenciaInicio: formatarDataBR(vigenciaInicio),
+      vigenciaFim: formatarDataBR(vigenciaFim),
+    });
 
-  if (erroInsercaoContrato || !contrato) {
-    revalidatePath("/documentos");
-    return {
-      ok: true,
-      pessoaFicouApta,
-      pessoaNome: pessoa.nome_completo,
-      mensagem: "Documento aprovado, mas ocorreu um erro ao gerar o registro de contrato.",
-    };
+    const pdfBytes = await gerarPdfContrato({
+      titulo: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS — ${templateEscolhido.objeto.toUpperCase()}`,
+      corpo: htmlParaTexto(corpoComDados),
+    });
+
+    const hashPdf = calcularHashSha256(Buffer.from(pdfBytes));
+
+    if (!contratoExistente) {
+      const { data: contratoNovo, error: erroInsercaoContrato } = await supabase
+        .from("contratos")
+        .insert({
+          organizacao_id: organizationId,
+          pessoa_id: pessoa.id,
+          template_id: templateEscolhido.id,
+          objeto: templateEscolhido.objeto,
+          valor,
+          valor_extenso: valorExtenso,
+          vigencia_inicio: vigenciaInicio,
+          vigencia_fim: vigenciaFim,
+          token_assinatura: tokenNovo,
+          assinatura_expira_em: expiracao,
+          pdf_sha256: hashPdf,
+          regiao_id: pessoa.regiao_id,
+        })
+        .select("id")
+        .single();
+
+      if (erroInsercaoContrato || !contratoNovo) {
+        revalidatePath("/documentos");
+        return {
+          ok: true,
+          pessoaFicouApta,
+          pessoaNome: pessoa.nome_completo,
+          mensagem: "Documento aprovado, mas ocorreu um erro ao gerar o registro de contrato.",
+        };
+      }
+
+      contratoId = contratoNovo.id;
+      tokenAssinatura = tokenNovo;
+      objetoContrato = templateEscolhido.objeto;
+
+      const pdfPath = `${organizationId}/${pessoa.id}/contrato_${contratoId}.pdf`;
+      await supabase.storage
+        .from("contratos")
+        .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true });
+
+      await supabase.from("contratos").update({ caminho_pdf: pdfPath }).eq("id", contratoId);
+
+      await supabase.rpc("gravar_transicao_contrato", {
+        p_contrato_id: contratoId,
+        p_status_anterior: "rascunho",
+        p_status_novo: "emitido",
+        p_observacao: "Emissão automática após aprovação na mesa de conferência documental.",
+      });
+
+      await supabase
+        .from("contratos")
+        .update({
+          canal_envio: "email",
+          enviado_para: pessoa.email ?? "sem-email-cadastrado",
+        })
+        .eq("id", contratoId);
+
+      await supabase.rpc("gravar_transicao_contrato", {
+        p_contrato_id: contratoId,
+        p_status_anterior: "emitido",
+        p_status_novo: "enviado",
+        p_observacao: `Contrato disponibilizado para assinatura pública via link.${pessoa.email ? ` Notificação despachada para ${pessoa.email}.` : ""}`,
+      });
+
+      await registerContractWrite({
+        supabase,
+        organizationId,
+        userId,
+        contractId: contratoId,
+        action: "emissao",
+      });
+    } else {
+      // Contrato em rascunho/emitido: atualiza PDF, hash, token e expiração
+      contratoId = contratoExistente.id;
+      tokenAssinatura = contratoExistente.token_assinatura || tokenNovo;
+      objetoContrato = contratoExistente.objeto;
+
+      const pdfPath = `${organizationId}/${pessoa.id}/contrato_${contratoId}.pdf`;
+      await supabase.storage
+        .from("contratos")
+        .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true });
+
+      await supabase
+        .from("contratos")
+        .update({
+          caminho_pdf: pdfPath,
+          pdf_sha256: hashPdf,
+          token_assinatura: tokenAssinatura,
+          assinatura_expira_em: expiracao,
+        })
+        .eq("id", contratoId);
+
+      if (contratoExistente.status === "rascunho") {
+        await supabase.rpc("gravar_transicao_contrato", {
+          p_contrato_id: contratoId,
+          p_status_anterior: "rascunho",
+          p_status_novo: "emitido",
+          p_observacao: "Emissão após aprovação documental.",
+        });
+      }
+
+      await supabase.rpc("gravar_transicao_contrato", {
+        p_contrato_id: contratoId,
+        p_status_anterior: "emitido",
+        p_status_novo: "enviado",
+        p_observacao: "Contrato enviado para assinatura após aprovação documental.",
+      });
+    }
+  } else if (contratoExistente.status === "enviado") {
+    // Contrato já enviado: renova a expiração se expirado
+    contratoId = contratoExistente.id;
+    tokenAssinatura = contratoExistente.token_assinatura;
+    objetoContrato = contratoExistente.objeto;
+
+    if (
+      !tokenAssinatura ||
+      !contratoExistente.assinatura_expira_em ||
+      new Date(contratoExistente.assinatura_expira_em).getTime() <= Date.now()
+    ) {
+      tokenAssinatura = randomBytes(24).toString("hex");
+      await supabase
+        .from("contratos")
+        .update({
+          token_assinatura: tokenAssinatura,
+          assinatura_expira_em: expiracao,
+        })
+        .eq("id", contratoId);
+    }
   }
 
-  // 7. Renderiza e compila o PDF oficial do contrato
-  const corpoComDados = substituirMarcadores(templateEscolhido.corpo_html, {
-    nome: pessoa.nome_completo,
-    cpf: pessoa.cpf,
-    endereco: pessoa.endereco ?? "não informado",
-    chavePix: pessoa.chave_pix ?? "não informada",
-    objeto: templateEscolhido.objeto,
-    valor: formatarValorBRL(valor),
-    valorExtenso,
-    vigenciaInicio: formatarDataBR(vigenciaInicio),
-    vigenciaFim: formatarDataBR(vigenciaFim),
-  });
-
-  const pdfBytes = await gerarPdfContrato({
-    titulo: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS — ${templateEscolhido.objeto.toUpperCase()}`,
-    corpo: htmlParaTexto(corpoComDados),
-  });
-
-  const pdfPath = `${organizationId}/${pessoa.id}/contrato_${contrato.id}.pdf`;
-  const { error: erroUpload } = await supabase.storage
-    .from("contratos")
-    .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true });
-
-  if (!erroUpload) {
-    await supabase.from("contratos").update({ caminho_pdf: pdfPath }).eq("id", contrato.id);
-  }
-
-  // 8. Transiciona atomicamente: rascunho -> emitido
-  await supabase.rpc("gravar_transicao_contrato", {
-    p_contrato_id: contrato.id,
-    p_status_anterior: "rascunho",
-    p_status_novo: "emitido",
-    p_observacao: "Emissão automática após aprovação na mesa de conferência documental.",
-  });
-
-  // 9. Atualiza canal de envio e transiciona: emitido -> enviado
-  await supabase
-    .from("contratos")
-    .update({
-      canal_envio: "email",
-      enviado_para: pessoa.email ?? "sem-email-cadastrado",
-    })
-    .eq("id", contrato.id);
-
-  await supabase.rpc("gravar_transicao_contrato", {
-    p_contrato_id: contrato.id,
-    p_status_anterior: "emitido",
-    p_status_novo: "enviado",
-    p_observacao: `Contrato disponibilizado para assinatura pública via link.${pessoa.email ? ` Notificação despachada para ${pessoa.email}.` : ""}`,
-  });
-
-  await registerContractWrite({
-    supabase,
-    organizationId,
-    userId,
-    contractId: contrato.id,
-    action: "emissao",
-  });
-
-  // 10. Dispara e-mail com link do contrato para o colaborador
+  // 6. Monta URL e dispara e-mail com link de assinatura para o colaborador
   const baseUrl = process.env.APP_URL || "http://localhost:3000";
   const urlAssinatura = `${baseUrl}/assinar/${tokenAssinatura}`;
   let emailEnviado = false;
 
-  if (pessoa.email) {
+  if (pessoa.email && contratoId && tokenAssinatura) {
     const primeiroNome = pessoa.nome_completo.split(" ")[0];
     const { subject, html, text } = await renderizarEmailContratoEnviado({
       primeiroNome,
-      objeto: templateEscolhido.objeto,
+      objeto: objetoContrato,
       urlAssinatura,
       urlContato: baseUrl,
     });
@@ -253,8 +334,8 @@ export async function aprovarDocumentoEGerarContrato(
       type: "contrato_enviado",
       recipientEmail: pessoa.email,
       entity: "contratos",
-      entityId: contrato.id,
-      idempotencyKey: idempotencyKey("contrato_enviado", contrato.id),
+      entityId: contratoId,
+      idempotencyKey: `${idempotencyKey("contrato_enviado", contratoId)}:${tokenAssinatura.slice(0, 16)}`,
       subject,
       html,
       text,
@@ -270,16 +351,16 @@ export async function aprovarDocumentoEGerarContrato(
   return {
     ok: true,
     pessoaFicouApta,
-    contratoId: contrato.id,
+    contratoId,
     tokenAssinatura,
     urlAssinatura,
     emailEnviado,
     destinatarioEmail: pessoa.email,
     pessoaNome: pessoa.nome_completo,
     mensagem: emailEnviado
-      ? `Documento aprovado! Contrato gerado em PDF e link de assinatura enviado por e-mail para ${pessoa.email}.`
+      ? `Documento aprovado! Contrato emitido e link de assinatura enviado por e-mail para ${pessoa.email}.`
       : pessoa.email
-        ? `Documento aprovado e contrato gerado em PDF! Link de assinatura pronto.`
+        ? `Documento aprovado e contrato gerado em PDF! Link de assinatura pronto para compartilhamento.`
         : `Documento aprovado e contrato gerado em PDF! (Colaborador sem e-mail cadastrado — copie o link de assinatura).`,
   };
 }
@@ -372,6 +453,343 @@ export async function gerarUrlDocumento(
     return { ok: false, mensagem: "Não foi possível gerar o link de acesso." };
   }
 }
+
+/**
+ * Marca um documento de volta para "pendente" (reabre a conferência).
+ * Se o documento estava aprovado, revoga a aptidão do colaborador até nova decisão.
+ */
+export async function marcarDocumentoPendente(
+  documentoId: string,
+): Promise<ResultadoAcaoDocumento> {
+  const supabase = await createClient();
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_TRIAGEM.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL };
+
+  const { data: documento, error } = await supabase
+    .from("documentos")
+    .update({ status: "pendente", motivo_rejeicao: null })
+    .eq("id", documentoId)
+    .select("id, pessoa_id, status")
+    .single();
+
+  if (error || !documento) {
+    return { ok: false, mensagem: "Não foi possível marcar o documento como pendente." };
+  }
+
+  await registerDocumentReview({
+    supabase,
+    organizationId,
+    userId,
+    documentId: documento.id,
+    action: "reabertura",
+  });
+
+  const pessoaFicouApta = await reavaliarAptidao({
+    supabase,
+    organizationId,
+    userId,
+    pessoaId: documento.pessoa_id,
+  });
+
+  revalidatePath("/documentos");
+  revalidatePath("/pessoas");
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    pessoaFicouApta,
+    mensagem: "Documento reaberto e marcado como pendente para conferência.",
+  };
+}
+
+/**
+ * Upload manual de documento realizado pelo gestor ou administrador diretamente pelo painel.
+ */
+export async function adicionarDocumentoManual(
+  formData: FormData,
+): Promise<ResultadoAcaoDocumento> {
+  const supabase = await createClient();
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_TRIAGEM.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL };
+
+  const pessoaId = String(formData.get("pessoaId") ?? "").trim();
+  const tipoParam = String(formData.get("tipo") ?? "").trim();
+  const statusInicial = String(formData.get("statusInicial") ?? "pendente").trim();
+  const arquivo = formData.get("arquivo");
+
+  if (!pessoaId) {
+    return { ok: false, mensagem: "Selecione o colaborador para o envio do documento." };
+  }
+  if (!["documento_identidade", "comprovante_endereco"].includes(tipoParam)) {
+    return { ok: false, mensagem: "Selecione um tipo de documento válido." };
+  }
+  if (!(arquivo instanceof File) || arquivo.size === 0) {
+    return { ok: false, mensagem: "Selecione um arquivo válido para enviar." };
+  }
+
+  const checagemTipo = validarTipoETamanho(arquivo.type, arquivo.size);
+  if (!checagemTipo.ok) {
+    return { ok: false, mensagem: checagemTipo.motivo ?? "Arquivo inválido." };
+  }
+
+  const buffer = Buffer.from(await arquivo.arrayBuffer());
+  const checagemDimensao = await validarDimensaoImagem(buffer, arquivo.type);
+  if (!checagemDimensao.ok) {
+    return { ok: false, mensagem: checagemDimensao.motivo ?? "Resolução de imagem baixa." };
+  }
+
+  const hash = calcularHashSha256(buffer);
+  const ext = extensaoPorMime(arquivo.type);
+  if (!ext) {
+    return { ok: false, mensagem: "Tipo de arquivo não suportado." };
+  }
+
+  // Verifica se o hash já existe na organização
+  const { data: existente } = await supabase
+    .from("documentos")
+    .select("id, criado_em")
+    .eq("hash_sha256", hash)
+    .maybeSingle();
+
+  if (existente) {
+    return {
+      ok: false,
+      mensagem: "Este mesmo arquivo já foi cadastrado anteriormente no sistema.",
+    };
+  }
+
+  // Busca dados da pessoa para obter regiao_id
+  const { data: pessoa } = await supabase
+    .from("pessoas")
+    .select("id, nome_completo, regiao_id")
+    .eq("id", pessoaId)
+    .maybeSingle();
+
+  if (!pessoa) {
+    return { ok: false, mensagem: "Colaborador não encontrado." };
+  }
+
+  // Calcula próxima versão
+  const { data: ultimos } = await supabase
+    .from("documentos")
+    .select("versao")
+    .eq("pessoa_id", pessoaId)
+    .eq("tipo", tipoParam)
+    .order("versao", { ascending: false })
+    .limit(1);
+
+  const versao = (ultimos?.[0]?.versao ?? 0) + 1;
+  const caminhoStorage = `${organizationId}/${pessoaId}/${tipoParam}_v${versao}.${ext}`;
+
+  // Upload para storage
+  const { error: erroUpload } = await supabase.storage
+    .from("documentos")
+    .upload(caminhoStorage, buffer, { contentType: arquivo.type, upsert: true });
+
+  if (erroUpload) {
+    console.error("Erro no upload do documento para storage:", erroUpload);
+    return { ok: false, mensagem: "Não foi possível salvar o arquivo no Storage." };
+  }
+
+  // Insere em documentos
+  const { data: novoDoc, error: erroInsert } = await supabase
+    .from("documentos")
+    .insert({
+      organizacao_id: organizationId,
+      pessoa_id: pessoaId,
+      regiao_id: pessoa.regiao_id,
+      tipo: tipoParam,
+      nome_original: arquivo.name,
+      caminho_storage: caminhoStorage,
+      hash_sha256: hash,
+      largura_px: checagemDimensao.largura ?? null,
+      altura_px: checagemDimensao.altura ?? null,
+      bytes: arquivo.size,
+      status: statusInicial === "aprovado" ? "aprovado" : "pendente",
+      versao,
+    })
+    .select("id")
+    .single();
+
+  if (erroInsert || !novoDoc) {
+    console.error("Erro ao inserir documento:", erroInsert);
+    return { ok: false, mensagem: "Não foi possível registrar o documento." };
+  }
+
+  await registerPersonWrite({
+    supabase,
+    organizationId,
+    userId,
+    personId: pessoaId,
+    action: "edicao",
+  });
+
+  if (statusInicial === "aprovado") {
+    return aprovarDocumentoEGerarContrato(novoDoc.id);
+  }
+
+  revalidatePath("/documentos");
+  revalidatePath("/pessoas");
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    mensagem: `Documento v${versao} de ${pessoa.nome_completo} adicionado com sucesso.`,
+  };
+}
+
+/**
+ * Edição de documento: permite corrigir o tipo (ex: RG para Comprovante), motivo de rejeição
+ * e opcionalmente anexar arquivo substituto.
+ */
+export async function editarDocumento(
+  formData: FormData,
+): Promise<ResultadoAcaoDocumento> {
+  const supabase = await createClient();
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_TRIAGEM.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL };
+
+  const id = String(formData.get("id") ?? "").trim();
+  const novoTipo = String(formData.get("tipo") ?? "").trim();
+  const novoMotivo = String(formData.get("motivoRejeicao") ?? "").trim();
+  const arquivoSubstituto = formData.get("arquivo");
+
+  if (!id) return { ok: false, mensagem: "Documento não informado." };
+
+  const { data: docAtual } = await supabase
+    .from("documentos")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!docAtual) return { ok: false, mensagem: "Documento não encontrado." };
+
+  const updates: Record<string, unknown> = {};
+  if (novoTipo && ["documento_identidade", "comprovante_endereco"].includes(novoTipo)) {
+    updates.tipo = novoTipo;
+  }
+  if (docAtual.status === "rejeitado") {
+    updates.motivo_rejeicao = novoMotivo || docAtual.motivo_rejeicao;
+  }
+
+  // Se houver arquivo substituto anexado
+  if (arquivoSubstituto instanceof File && arquivoSubstituto.size > 0) {
+    const checagemTipo = validarTipoETamanho(arquivoSubstituto.type, arquivoSubstituto.size);
+    if (!checagemTipo.ok) {
+      return { ok: false, mensagem: checagemTipo.motivo ?? "Arquivo inválido." };
+    }
+
+    const buffer = Buffer.from(await arquivoSubstituto.arrayBuffer());
+    const checagemDimensao = await validarDimensaoImagem(buffer, arquivoSubstituto.type);
+    if (!checagemDimensao.ok) {
+      return { ok: false, mensagem: checagemDimensao.motivo ?? "Resolução de imagem baixa." };
+    }
+
+    const hash = calcularHashSha256(buffer);
+    const ext = extensaoPorMime(arquivoSubstituto.type);
+    const novaVersao = docAtual.versao + 1;
+    const tipoFinal = (updates.tipo as string) || docAtual.tipo;
+    const novoCaminho = `${organizationId}/${docAtual.pessoa_id}/${tipoFinal}_v${novaVersao}.${ext}`;
+
+    const { error: erroUpload } = await supabase.storage
+      .from("documentos")
+      .upload(novoCaminho, buffer, { contentType: arquivoSubstituto.type, upsert: true });
+
+    if (erroUpload) {
+      return { ok: false, mensagem: "Não foi possível fazer upload do novo arquivo." };
+    }
+
+    updates.caminho_storage = novoCaminho;
+    updates.nome_original = arquivoSubstituto.name;
+    updates.hash_sha256 = hash;
+    updates.largura_px = checagemDimensao.largura ?? null;
+    updates.altura_px = checagemDimensao.altura ?? null;
+    updates.bytes = arquivoSubstituto.size;
+    updates.versao = novaVersao;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    const { error: erroUpdate } = await supabase
+      .from("documentos")
+      .update(updates)
+      .eq("id", id);
+
+    if (erroUpdate) {
+      return { ok: false, mensagem: "Não foi possível atualizar o documento." };
+    }
+  }
+
+  const pessoaFicouApta = await reavaliarAptidao({
+    supabase,
+    organizationId,
+    userId,
+    pessoaId: docAtual.pessoa_id,
+  });
+
+  revalidatePath("/documentos");
+  revalidatePath("/pessoas");
+  revalidatePath("/dashboard");
+
+  return { ok: true, pessoaFicouApta, mensagem: "Documento atualizado com sucesso." };
+}
+
+/**
+ * Exclui o documento do painel e do Storage, arquivando snapshot de auditoria em DadosExcluidos
+ * e recalculando a aptidão do colaborador.
+ */
+export async function excluirDocumento(
+  documentoId: string,
+  motivo?: string,
+): Promise<ResultadoAcaoDocumento> {
+  const supabase = await createClient();
+  const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_TRIAGEM.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL };
+
+  const { data: resultado, error } = await supabase.rpc("excluir_documento", {
+    p_documento_id: documentoId,
+    p_motivo: motivo?.trim() || null,
+  });
+
+  if (error || !resultado?.ok) {
+    return {
+      ok: false,
+      mensagem: error?.message || "Não foi possível excluir o documento.",
+    };
+  }
+
+  // Remove o arquivo do Storage
+  if (resultado.caminho_storage) {
+    const { error: erroStorage } = await supabase.storage
+      .from("documentos")
+      .remove([resultado.caminho_storage]);
+    if (erroStorage) {
+      console.warn("Documento excluído da base, falha ao remover arquivo no Storage:", erroStorage.message);
+    }
+  }
+
+  // Reavalia aptidão da pessoa (se este era o documento aprovado, revoga aptidão)
+  const pessoaFicouApta = await reavaliarAptidao({
+    supabase,
+    organizationId,
+    userId,
+    pessoaId: resultado.pessoa_id,
+  });
+
+  revalidatePath("/documentos");
+  revalidatePath("/pessoas");
+  revalidatePath("/contratos");
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    pessoaFicouApta,
+    mensagem: `Documento de ${resultado.pessoa_nome ?? "colaborador"} excluído e arquivado em DadosExcluidos com sucesso.`,
+  };
+}
+
 
 // ---------------------------------------------------------------------------
 // Internas

@@ -24,6 +24,8 @@ import {
   montarTextoTermoDistrato,
 } from "@/lib/contratos/distrato";
 import { renderizarEmailContratoEnviado } from "@/emails/contrato-enviado";
+import { renderizarEmailContratoAssinado } from "@/emails/contrato-assinado";
+import { renderizarEmailDistratoEnviado } from "@/emails/distrato-enviado";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
 import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
@@ -450,12 +452,68 @@ export async function enviarContrato(
 }
 
 export async function marcarContratoAssinado(contractId: string): Promise<ResultadoAcaoContrato> {
-  return transicionarContrato({
+  const transicao = await transicionarContrato({
     contractId,
     de: "enviado",
     para: "assinado",
     observacao: "Assinatura registrada manualmente pela coordenação.",
   });
+
+  if (transicao.ok) {
+    try {
+      const supabase = await createClient();
+      const { organizationId } = await obterContextoUsuario(supabase);
+
+      const { data: c } = await supabase
+        .from("contratos")
+        .select("objeto, token_assinatura, pessoas(nome_completo, email)")
+        .eq("id", contractId)
+        .maybeSingle<{
+          objeto: string;
+          token_assinatura: string | null;
+          pessoas: { nome_completo: string; email: string | null } | null;
+        }>();
+
+      if (organizationId && c?.pessoas?.email && c.token_assinatura) {
+        const primeiroNome = c.pessoas.nome_completo.split(" ")[0];
+        const agora = new Date().toLocaleString("pt-BR", {
+          timeZone: "America/Sao_Paulo",
+          dateStyle: "short",
+          timeStyle: "short",
+        });
+        const baseUrl = process.env.APP_URL || "http://localhost:3000";
+        const urlContratoAssinado = `${baseUrl}/assinar/${c.token_assinatura}`;
+        const urlDownloadPdf = `${baseUrl}/api/contratos/publico/${c.token_assinatura}/pdf`;
+
+        const { subject, html, text } = await renderizarEmailContratoAssinado({
+          primeiroNome,
+          objeto: c.objeto,
+          dataAssinatura: agora,
+          urlContratoAssinado,
+          urlDownloadPdf,
+          urlContato: baseUrl,
+        });
+
+        await sendNotification({
+          supabase,
+          transport: transporteEmailPadrao(),
+          organizationId,
+          type: "contrato_assinado",
+          recipientEmail: c.pessoas.email,
+          entity: "contratos",
+          entityId: contractId,
+          idempotencyKey: idempotencyKey("contrato_assinado", contractId),
+          subject,
+          html,
+          text,
+        });
+      }
+    } catch {
+      // Disparo de notificação é secundário
+    }
+  }
+
+  return transicao;
 }
 
 /** Item 13: "Distrato gerando termo, sem apagar o contrato original." Gera um PDF
@@ -480,7 +538,7 @@ export async function distratarContrato(
   const { data: contrato } = await supabase
     .from("contratos")
     .select(
-      "pessoa_id, objeto, valor, valor_extenso, vigencia_inicio, vigencia_fim, pessoas ( nome_completo, cpf, endereco )",
+      "pessoa_id, objeto, valor, valor_extenso, vigencia_inicio, vigencia_fim, pessoas ( nome_completo, cpf, endereco, email )",
     )
     .eq("id", contractId)
     .maybeSingle<{
@@ -490,7 +548,7 @@ export async function distratarContrato(
       valor_extenso: string;
       vigencia_inicio: string;
       vigencia_fim: string;
-      pessoas: { nome_completo: string; cpf: string; endereco: string | null } | null;
+      pessoas: { nome_completo: string; cpf: string; endereco: string | null; email: string | null } | null;
     }>();
 
   if (!contrato) return { ok: false, mensagem: "Contrato não encontrado." };
@@ -540,12 +598,34 @@ export async function distratarContrato(
     .eq("id", contractId);
 
   const valorFormatado = formatarValorBRL(calculo.valorProporcional);
-  return transicionarContrato({
+  const periodoFormatado = `${calculo.vigenciaInicioFormatada} a ${calculo.dataDistratoFormatada} (${calculo.diasTrabalhados}/${calculo.diasTotais} dias)`;
+  const resultadoTransicao = await transicionarContrato({
     contractId,
     de: "assinado",
     para: "distratado",
-    observacao: `Distrato registrado pela coordenação. Período trabalhado: ${calculo.vigenciaInicioFormatada} a ${calculo.dataDistratoFormatada} (${calculo.diasTrabalhados}/${calculo.diasTotais} dias). Valor proporcional: ${valorFormatado}. Motivo: ${motivoLimpo}`,
+    observacao: `Distrato registrado pela coordenação. Período trabalhado: ${periodoFormatado}. Valor proporcional: ${valorFormatado}. Motivo: ${motivoLimpo}`,
   });
+
+  if (resultadoTransicao.ok && contrato.pessoas?.email) {
+    try {
+      await dispararDistratoEnviado({
+        supabase,
+        organizationId,
+        contractId,
+        destinatario: contrato.pessoas.email,
+        primeiroNome: contrato.pessoas.nome_completo.split(" ")[0],
+        objeto: contrato.objeto,
+        dataDistrato: calculo.dataDistratoFormatada,
+        periodoTrabalhado: periodoFormatado,
+        valorProporcional: valorFormatado,
+        motivo: motivoLimpo,
+      });
+    } catch {
+      // Disparo de notificação é secundário e não invalida o registro do distrato
+    }
+  }
+
+  return resultadoTransicao;
 }
 
 /** Fecha a cadeia do distrato (Seção 7: distratado → distrato_assinado) — mesma
@@ -607,6 +687,114 @@ async function dispararContratoEnviado(params: {
     html,
     text,
   });
+}
+
+async function dispararDistratoEnviado(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  organizationId: string;
+  contractId: string;
+  destinatario: string;
+  primeiroNome: string;
+  objeto: string;
+  dataDistrato: string;
+  periodoTrabalhado: string;
+  valorProporcional: string;
+  motivo?: string;
+}) {
+  const { supabase, organizationId, contractId } = params;
+  const baseUrl = process.env.APP_URL || "http://localhost:3000";
+
+  const { subject, html, text } = await renderizarEmailDistratoEnviado({
+    primeiroNome: params.primeiroNome,
+    objeto: params.objeto,
+    dataDistrato: params.dataDistrato,
+    periodoTrabalhado: params.periodoTrabalhado,
+    valorProporcional: params.valorProporcional,
+    motivo: params.motivo,
+    urlContato: baseUrl,
+  });
+
+  return sendNotification({
+    supabase,
+    transport: transporteEmailPadrao(),
+    organizationId,
+    type: "distrato_enviado",
+    recipientEmail: params.destinatario,
+    entity: "contratos",
+    entityId: contractId,
+    idempotencyKey: idempotencyKey("distrato_enviado", contractId),
+    subject,
+    html,
+    text,
+  });
+}
+
+export async function enviarDistratoPorEmail(contractId: string): Promise<ResultadoAcaoContrato> {
+  const supabase = await createClient();
+  const { organizationId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL_CONTRATO };
+
+  const { data: contrato } = await supabase
+    .from("contratos")
+    .select("status, objeto, valor, vigencia_inicio, vigencia_fim, pessoas ( nome_completo, email )")
+    .eq("id", contractId)
+    .maybeSingle<{
+      status: string;
+      objeto: string;
+      valor: string;
+      vigencia_inicio: string;
+      vigencia_fim: string;
+      pessoas: { nome_completo: string; email: string | null } | null;
+    }>();
+
+  if (!contrato || (contrato.status !== "distratado" && contrato.status !== "distrato_assinado")) {
+    return { ok: false, mensagem: "Contrato não encontrado ou não está em estado de distrato." };
+  }
+
+  if (!contrato.pessoas?.email) {
+    return { ok: false, mensagem: "O integrante não possui endereço de e-mail cadastrado." };
+  }
+
+  const { data: eventos } = await supabase
+    .from("eventos_contrato")
+    .select("observacao, criado_em")
+    .eq("contrato_id", contractId)
+    .eq("status_novo", "distratado")
+    .order("criado_em", { ascending: false })
+    .limit(1);
+
+  const observacao = eventos?.[0]?.observacao ?? "";
+  const dataDistrato = eventos?.[0]?.criado_em
+    ? formatarDataBR(eventos[0].criado_em.split("T")[0])
+    : formatarDataBR(new Date().toISOString().split("T")[0]);
+
+  try {
+    const envio = await dispararDistratoEnviado({
+      supabase,
+      organizationId,
+      contractId,
+      destinatario: contrato.pessoas.email,
+      primeiroNome: contrato.pessoas.nome_completo.split(" ")[0],
+      objeto: contrato.objeto,
+      dataDistrato,
+      periodoTrabalhado: "Conforme apurado no termo de rescisão",
+      valorProporcional: "Conforme termo de rescisão",
+      motivo: observacao,
+    });
+
+    return envio?.sent
+      ? { ok: true, mensagem: "Notificação de distrato enviada por e-mail." }
+      : {
+          ok: false,
+          mensagem:
+            envio?.reason === "duplicate"
+              ? "Este envio de distrato já foi registrado anteriormente."
+              : "Falha ao enviar a notificação de distrato por e-mail.",
+        };
+  } catch {
+    return { ok: false, mensagem: "Erro ao disparar e-mail de distrato." };
+  }
 }
 
 export async function gerarUrlPdfContrato(

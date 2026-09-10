@@ -114,3 +114,64 @@ export async function listarCampanhasSuperadmin(): Promise<CampanhaSuperadmin[]>
   });
 }
 
+export interface MetricasComunicacao {
+  apiKeyConfigurada: boolean;
+  remetenteConfigurado: string;
+  appUrl: string;
+  totalEnviadas: number;
+  totalFalhas: number;
+  totalEnfileiradas: number;
+  ultimasNotificacoes: {
+    id: string;
+    tipo: string;
+    destinatarioEmail: string;
+    status: string;
+    erro: string | null;
+    tentativas: number;
+    criadoEm: string;
+  }[];
+}
+
+export async function obterMetricasComunicacao(): Promise<MetricasComunicacao> {
+  const supabase = await createClient();
+
+  const { data: notificacoes } = await supabase
+    .from("notificacoes")
+    .select("id, tipo, destinatario_email, status, erro, tentativas, criado_em")
+    .order("criado_em", { ascending: false })
+    .limit(10);
+
+  const { count: enviadas } = await supabase
+    .from("notificacoes")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "enviada");
+
+  const { count: falhas } = await supabase
+    .from("notificacoes")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "falhou");
+
+  const { count: enfileiradas } = await supabase
+    .from("notificacoes")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "enfileirada");
+
+  return {
+    apiKeyConfigurada: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim()),
+    remetenteConfigurado: process.env.RESEND_FROM || "Não configurado",
+    appUrl: process.env.APP_URL || "http://localhost:3000",
+    totalEnviadas: enviadas ?? 0,
+    totalFalhas: falhas ?? 0,
+    totalEnfileiradas: enfileiradas ?? 0,
+    ultimasNotificacoes: (notificacoes ?? []).map((n) => ({
+      id: n.id,
+      tipo: n.tipo,
+      destinatarioEmail: n.destinatario_email,
+      status: n.status,
+      erro: n.erro,
+      tentativas: n.tentativas,
+      criadoEm: n.criado_em,
+    })),
+  };
+}
+

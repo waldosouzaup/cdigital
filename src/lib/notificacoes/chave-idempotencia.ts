@@ -17,7 +17,10 @@ export type NotificationType =
   | "lembrete_assinatura"
   | "vigencia_a_vencer"
   | "resumo_diario"
-  | "pessoa_apta";
+  | "pessoa_apta"
+  | "distrato_enviado"
+  | "contrato_assinado"
+  | "convite_usuario";
 
 export function idempotencyKey(
   type: NotificationType,

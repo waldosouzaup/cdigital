@@ -18,6 +18,8 @@ import {
   CARENCIA_PADRAO_DIAS,
 } from "@/lib/documentos/elegiveis-expurgo";
 import { validarIdentidadeComite } from "@/lib/organizacao/validacao";
+import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
+import { reprocessarNotificacoesFalhas } from "@/lib/notificacoes/reprocessar";
 import type { EstadoIdentidadeComite, EstadoSalvarTemplate } from "./estado";
 
 function campoTexto(formData: FormData, nome: string): string {
@@ -222,3 +224,98 @@ export async function alternarAtivoTemplate(
   revalidatePath("/configuracoes");
   return { ok: true };
 }
+
+export async function testarTransmissaoEmail(destinatario: string): Promise<{
+  ok: boolean;
+  mensagem: string;
+  resendId?: string;
+  erro?: string;
+}> {
+  const emailLimpo = destinatario.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLimpo)) {
+    return { ok: false, mensagem: "Informe um endereço de e-mail válido." };
+  }
+
+  const supabase = await createClient();
+  const { organizationId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (papel !== "gestor" && papel !== "admin" && papel !== "superadmin") {
+    return { ok: false, mensagem: "Apenas administradores podem testar transmissões de e-mail." };
+  }
+
+  const transporte = transporteEmailPadrao();
+  const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+  const html = `
+    <div style="font-family: sans-serif; background-color: #F8FAF9; padding: 24px;">
+      <div style="max-width: 480px; margin: 0 auto; background-color: #ffffff; padding: 24px; border-radius: 8px; border: 1px solid #E2E8F0;">
+        <h2 style="color: #0A0F0D; margin-top: 0;">Teste de Transmissão Resend</h2>
+        <p style="color: #0A0F0D; line-height: 1.5;">Esta mensagem confirma que a integração via API do Resend no <strong>Comitê Digital</strong> está funcionando com sucesso.</p>
+        <p style="color: #52605B; font-size: 13px;">Data do teste: ${agora}</p>
+        <div style="margin-top: 20px; padding: 12px; background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; color: #166534; font-size: 13px;">
+          ✓ Conexão estável e entrega autorizada.
+        </div>
+      </div>
+    </div>
+  `;
+
+  const resultado = await transporte.send({
+    to: emailLimpo,
+    subject: "Comitê Digital - Teste de Transmissão de E-mail",
+    html,
+    text: `Comitê Digital - Teste de Transmissão Resend efetuado com sucesso em ${agora}.`,
+  });
+
+  if (!resultado.ok) {
+    return {
+      ok: false,
+      mensagem: `A transmissão falhou: ${resultado.error}`,
+      erro: resultado.error,
+    };
+  }
+
+  return {
+    ok: true,
+    mensagem: `E-mail de teste transmitido com sucesso! (ID Resend: ${resultado.id})`,
+    resendId: resultado.id,
+  };
+}
+
+export async function reprocessarFalhasTransmissao(): Promise<{
+  ok: boolean;
+  mensagem: string;
+  processadas?: number;
+  reenviadas?: number;
+  aindaFalhando?: number;
+}> {
+  const supabase = await createClient();
+  const { organizationId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (papel !== "gestor" && papel !== "admin" && papel !== "superadmin") {
+    return { ok: false, mensagem: "Apenas administradores podem reprocessar transmissões." };
+  }
+
+  try {
+    const res = await reprocessarNotificacoesFalhas({
+      supabase,
+      transport: transporteEmailPadrao(),
+      maxTentativas: 3,
+    });
+
+    revalidatePath("/configuracoes");
+
+    return {
+      ok: true,
+      mensagem: `${res.reenviadas} notificação(ões) reenviada(s) com sucesso de ${res.processadas} processada(s).`,
+      processadas: res.processadas,
+      reenviadas: res.reenviadas,
+      aindaFalhando: res.aindaFalhando,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      mensagem: err instanceof Error ? err.message : "Erro ao reprocessar notificações.",
+    };
+  }
+}
+

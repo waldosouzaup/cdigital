@@ -9,3 +9,12 @@ export interface EstadoRegiao {
 }
 
 export const ESTADO_INICIAL_REGIAO: EstadoRegiao = { status: "idle" };
+
+export interface EstadoFuncao {
+  status: "idle" | "sucesso" | "erro";
+  erro?: string;
+  mensagem?: string;
+}
+
+export const ESTADO_INICIAL_FUNCAO: EstadoFuncao = { status: "idle" };
+

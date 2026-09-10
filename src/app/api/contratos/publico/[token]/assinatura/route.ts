@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { sha256 } from "@/lib/contratos/documento";
 import { anexarEvidenciasPdf, validarImagemAssinatura } from "@/lib/contratos/evidencias";
+import { renderizarEmailContratoAssinado } from "@/emails/contrato-assinado";
+import { sendNotification } from "@/lib/notificacoes/enviar";
+import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
+import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
 
 export const runtime = "nodejs";
 const resposta = (mensagem: string, status: number) =>
@@ -32,7 +36,7 @@ export async function POST(
   const { data: contrato } = await admin
     .from("contratos")
     .select(
-      "id,pessoa_id,organizacao_id,status,caminho_pdf,pdf_sha256,assinatura_evidencias,assinado_em,pessoas(nome_completo,cpf)",
+      "id,pessoa_id,organizacao_id,objeto,status,caminho_pdf,pdf_sha256,assinatura_evidencias,assinado_em,pessoas(nome_completo,cpf,email)",
     )
     .eq("id", valido.contrato_id)
     .eq("token_assinatura", token)
@@ -99,7 +103,11 @@ export async function POST(
         "O documento não corresponde à versão apresentada. Contate a coordenação.",
         409,
       );
-    const pessoa = contrato.pessoas as unknown as { nome_completo: string; cpf: string };
+    const pessoa = contrato.pessoas as unknown as {
+      nome_completo: string;
+      cpf: string;
+      email: string | null;
+    };
     const registradoEm = new Date().toISOString();
     const pdf = await anexarEvidenciasPdf({
       original: bytes,
@@ -150,6 +158,50 @@ export async function POST(
         "Não foi possível confirmar o registro. Recarregue a página antes de tentar novamente.",
         503,
       );
+
+    // Dispara notificação por e-mail com o link para a via do contrato assinado em PDF
+    if (pessoa?.email) {
+      try {
+        const primeiroNome = pessoa.nome_completo.split(" ")[0];
+        const dataAssinaturaFormatada = new Date(atual?.assinado_em || registradoEm).toLocaleString(
+          "pt-BR",
+          {
+            timeZone: "America/Sao_Paulo",
+            dateStyle: "short",
+            timeStyle: "short",
+          },
+        );
+
+        const baseUrl = process.env.APP_URL || expectedOrigin || "http://localhost:3000";
+        const urlContratoAssinado = `${baseUrl}/assinar/${token}`;
+        const urlDownloadPdf = `${baseUrl}/api/contratos/publico/${token}/pdf`;
+
+        const { subject, html, text } = await renderizarEmailContratoAssinado({
+          primeiroNome,
+          objeto: contrato.objeto,
+          dataAssinatura: dataAssinaturaFormatada,
+          urlContratoAssinado,
+          urlDownloadPdf,
+          urlContato: baseUrl,
+        });
+
+        await sendNotification({
+          supabase: admin,
+          transport: transporteEmailPadrao(),
+          organizationId: contrato.organizacao_id,
+          type: "contrato_assinado",
+          recipientEmail: pessoa.email,
+          entity: "contratos",
+          entityId: contrato.id,
+          idempotencyKey: idempotencyKey("contrato_assinado", contrato.id),
+          subject,
+          html,
+          text,
+        });
+      } catch {
+        // Falha no envio de notificação não impede a conclusão da assinatura válida
+      }
+    }
     for (const path of [
       "/contratos",
       "/dashboard",

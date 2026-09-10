@@ -1,0 +1,135 @@
+variavel,arquivo,linha,contexto,observacao
+APP_URL,.env.example,14,declaração local,valor não inventariado
+APP_URL,.env.local,13,declaração local,valor não inventariado
+APP_URL,playwright.config.ts,19,CLI/configuração,consumo process.env
+APP_URL,src/app/(painel)/contratos/acoes.ts,420,servidor,consumo process.env
+APP_URL,src/app/(painel)/contratos/acoes.ts,583,servidor,consumo process.env
+APP_URL,src/app/(painel)/documentos/acoes.ts,236,servidor,consumo process.env
+APP_URL,src/app/(painel)/documentos/acoes.ts,456,servidor,consumo process.env
+APP_URL,src/app/(painel)/documentos/acoes.ts,510,servidor,consumo process.env
+APP_URL,src/app/(painel)/pessoas/acoes.ts,160,servidor,consumo process.env
+APP_URL,src/app/api/coleta/[token]/documento/route.ts,168,servidor,consumo process.env
+APP_URL,src/app/api/contratos/publico/[token]/assinatura/route.ts,20,servidor,consumo process.env
+APP_URL,src/lib/cron/rota.ts,28,servidor,consumo process.env
+CRON_SECRET,.env.example,15,declaração local,valor não inventariado
+CRON_SECRET,.env.local,14,declaração local,valor não inventariado
+CRON_SECRET,src/lib/cron/rota.ts,16,servidor,consumo process.env
+CRON_SECRET,tests/integration/gate-fase4-cron.test.ts,174,teste (não executado),consumo process.env
+DATABASE_URL,.env.example,5,declaração local,valor não inventariado
+DATABASE_URL,.env.local,5,declaração local,valor não inventariado
+DATABASE_URL,drizzle.config.ts,10,CLI/configuração,consumo process.env
+DATABASE_URL,scripts/aplicar-sql.mjs,23,CLI/configuração,consumo process.env
+DATABASE_URL,src/db/client.ts,15,CLI/configuração,consumo process.env
+DATABASE_URL,tests/integration/contratos-paginacao-evidencias.test.ts,8,teste (não executado),consumo process.env
+DATABASE_URL,tests/integration/excluir-contrato.test.ts,7,teste (não executado),consumo process.env
+DATABASE_URL,tests/integration/filtro-status-contrato.test.ts,7,teste (não executado),consumo process.env
+DATABASE_URL,tests/integration/gate-fase4-cron.test.ts,187,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,.env.example,3,declaração local,valor não inventariado
+NEXT_PUBLIC_SUPABASE_ANON_KEY,.env.local,3,declaração local,valor não inventariado
+NEXT_PUBLIC_SUPABASE_ANON_KEY,src/lib/supabase/client.ts,16,browser,consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,src/lib/supabase/server.ts,17,servidor,consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,src/middleware.ts,62,middleware,consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/e2e/_sessao.ts,23,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/e2e/_sessao.ts,106,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/e2e/atividade-offline.spec.ts,87,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/assinatura-contrato.test.ts,30,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/autoinscricao-publica.test.ts,21,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/documentos-triagem.test.ts,34,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/emissao-contrato.test.ts,33,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/gate-fase2-e2e-completo.test.ts,41,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/gate-fase3-realtime.test.ts,26,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/gestao-acessos.test.ts,29,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/links-coleta.test.ts,20,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/registro-atividade.test.ts,21,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/rls-isolamento.test.ts,26,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/troca-senha-obrigatoria.test.ts,23,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_ANON_KEY,tests/integration/upload-coleta.test.ts,24,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,.env.example,2,declaração local,valor não inventariado
+NEXT_PUBLIC_SUPABASE_URL,.env.local,2,declaração local,valor não inventariado
+NEXT_PUBLIC_SUPABASE_URL,src/db/provision-user.ts,65,CLI/configuração,consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,src/db/reset-senhas.ts,36,CLI/configuração,consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,src/lib/supabase/admin.ts,26,servidor,consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,src/lib/supabase/client.ts,15,browser,consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,src/lib/supabase/server.ts,16,servidor,consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,src/middleware.ts,61,middleware,consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/e2e/_sessao.ts,12,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/e2e/atividade-offline.spec.ts,12,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/assinatura-contrato.test.ts,23,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/assinatura-contrato.test.ts,29,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/autoinscricao-publica.test.ts,14,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/autoinscricao-publica.test.ts,20,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/documentos-triagem.test.ts,27,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/documentos-triagem.test.ts,33,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/emissao-contrato.test.ts,26,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/emissao-contrato.test.ts,32,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/expurgo-retencao.test.ts,22,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gate-fase2-e2e-completo.test.ts,34,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gate-fase2-e2e-completo.test.ts,40,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gate-fase2-notificacao-contrato.test.ts,18,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gate-fase2-transicao-invalida.test.ts,22,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gate-fase3-realtime.test.ts,19,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gate-fase3-realtime.test.ts,25,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gate-fase4-cron.test.ts,20,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gestao-acessos.test.ts,22,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/gestao-acessos.test.ts,28,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/importar-planilha.test.ts,18,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/links-coleta.test.ts,13,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/links-coleta.test.ts,19,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/pessoas-cpf-duplicado.test.ts,17,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/registro-atividade.test.ts,17,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/registro-atividade.test.ts,21,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/rls-isolamento.test.ts,19,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/rls-isolamento.test.ts,25,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/troca-senha-obrigatoria.test.ts,16,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/troca-senha-obrigatoria.test.ts,22,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/upload-coleta.test.ts,17,teste (não executado),consumo process.env
+NEXT_PUBLIC_SUPABASE_URL,tests/integration/upload-coleta.test.ts,23,teste (não executado),consumo process.env
+OPENAI_API_KEY,supabase/config.toml,100,serviço/CLI Supabase local,referência; habilitação descrita no relatório
+RESEND_API_KEY,.env.example,8,declaração local,valor não inventariado
+RESEND_API_KEY,.env.local,7,declaração local,valor não inventariado
+RESEND_API_KEY,src/app/api/coleta/[token]/documento/route.ts,176,servidor,consumo process.env
+RESEND_API_KEY,src/app/api/webhooks/resend/route.ts,19,servidor,consumo process.env
+RESEND_API_KEY,src/lib/notificacoes/transporte-padrao.ts,10,servidor,consumo process.env
+RESEND_API_KEY,supabase/config.toml,254,serviço/CLI Supabase local,referência; habilitação descrita no relatório
+RESEND_API_KEY,tests/integration/webhook-resend.test.ts,9,teste (não executado),consumo process.env
+RESEND_FROM,.env.example,9,declaração local,valor não inventariado
+RESEND_FROM,.env.local,8,declaração local,valor não inventariado
+RESEND_FROM,src/app/api/coleta/[token]/documento/route.ts,177,servidor,consumo process.env
+RESEND_FROM,src/lib/notificacoes/transporte-padrao.ts,11,servidor,consumo process.env
+RESEND_REPLY_TO,.env.example,10,declaração local,valor não inventariado
+RESEND_REPLY_TO,.env.local,9,declaração local,valor não inventariado
+RESEND_WEBHOOK_SECRET,.env.example,11,declaração local,valor não inventariado
+RESEND_WEBHOOK_SECRET,.env.local,10,declaração local,valor não inventariado
+RESEND_WEBHOOK_SECRET,src/app/api/webhooks/resend/route.ts,24,servidor,consumo process.env
+RESEND_WEBHOOK_SECRET,tests/integration/webhook-resend.test.ts,10,teste (não executado),consumo process.env
+S3_ACCESS_KEY,supabase/config.toml,420,serviço/CLI Supabase local,referência; habilitação descrita no relatório
+S3_HOST,supabase/config.toml,416,serviço/CLI Supabase local,referência; habilitação descrita no relatório
+S3_REGION,supabase/config.toml,418,serviço/CLI Supabase local,referência; habilitação descrita no relatório
+S3_SECRET_KEY,supabase/config.toml,422,serviço/CLI Supabase local,referência; habilitação descrita no relatório
+SUPABASE_AUTH_EXTERNAL_APPLE_SECRET,supabase/config.toml,343,serviço/CLI Supabase local,referência; habilitação descrita no relatório
+SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN,supabase/config.toml,308,serviço/CLI Supabase local,referência; habilitação descrita no relatório
+SUPABASE_SERVICE_ROLE_KEY,.env.example,4,declaração local,valor não inventariado
+SUPABASE_SERVICE_ROLE_KEY,.env.local,4,declaração local,valor não inventariado
+SUPABASE_SERVICE_ROLE_KEY,src/db/provision-user.ts,66,CLI/configuração,consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,src/db/reset-senhas.ts,37,CLI/configuração,consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,src/lib/supabase/admin.ts,27,servidor,consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/e2e/_sessao.ts,16,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/e2e/atividade-offline.spec.ts,17,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/assinatura-contrato.test.ts,24,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/autoinscricao-publica.test.ts,15,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/documentos-triagem.test.ts,28,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/emissao-contrato.test.ts,27,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/expurgo-retencao.test.ts,23,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/gate-fase2-e2e-completo.test.ts,35,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/gate-fase2-notificacao-contrato.test.ts,19,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/gate-fase2-transicao-invalida.test.ts,23,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/gate-fase3-realtime.test.ts,20,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/gate-fase4-cron.test.ts,21,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/gestao-acessos.test.ts,23,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/importar-planilha.test.ts,19,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/links-coleta.test.ts,14,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/pessoas-cpf-duplicado.test.ts,18,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/registro-atividade.test.ts,18,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/rls-isolamento.test.ts,20,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/troca-senha-obrigatoria.test.ts,17,teste (não executado),consumo process.env
+SUPABASE_SERVICE_ROLE_KEY,tests/integration/upload-coleta.test.ts,18,teste (não executado),consumo process.env

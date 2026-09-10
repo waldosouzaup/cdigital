@@ -5,6 +5,12 @@
  */
 import { createClient } from "@/lib/supabase/server";
 
+export interface ColaboradorOpcao {
+  id: string;
+  nomeCompleto: string;
+  cpf: string;
+}
+
 export interface ColaboradorDocumento {
   id: string;
   nomeCompleto: string;
@@ -128,3 +134,20 @@ export async function listarDocumentos(): Promise<DocumentoListado[]> {
     };
   });
 }
+
+export async function listarColaboradoresParaDocumento(): Promise<ColaboradorOpcao[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pessoas")
+    .select("id, nome_completo, cpf")
+    .order("nome_completo");
+
+  if (error) throw new Error("Não foi possível carregar os colaboradores.");
+
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    nomeCompleto: p.nome_completo,
+    cpf: p.cpf,
+  }));
+}
+

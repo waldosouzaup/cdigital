@@ -3,9 +3,14 @@
  * (nome/CNPJ, item 4 do feedback do coordenador) e expurgo de retenção (Fase 4,
  * item 6) são reais. O resto da governança LGPD continua informativo.
  */
-import { buscarIdentidadeComite, listarCampanhasSuperadmin, listarTemplates } from "./dados";
+import {
+  buscarIdentidadeComite,
+  listarCampanhasSuperadmin,
+  listarTemplates,
+  obterMetricasComunicacao,
+} from "./dados";
 import { listarEquipe } from "../equipe/dados";
-import { listarRegioesComContagem } from "../regioes/dados";
+import { listarFuncoesPretendidasComContagem, listarRegioesComContagem } from "../regioes/dados";
 import { listarContextoAtividades } from "../atividades/dados";
 import { ConfiguracoesCliente } from "./configuracoes-cliente";
 import { createClient } from "@/lib/supabase/server";
@@ -15,12 +20,23 @@ export const metadata = { title: "Configurações & Governança — Comitê Digi
 
 export default async function ConfiguracoesPage() {
   const supabase = await createClient();
-  const [templates, identidade, membros, regioes, contextoAtividades, contexto] = await Promise.all([
+  const [
+    templates,
+    identidade,
+    membros,
+    regioes,
+    funcoes,
+    contextoAtividades,
+    metricas,
+    contexto,
+  ] = await Promise.all([
     listarTemplates(),
     buscarIdentidadeComite(),
     listarEquipe(),
     listarRegioesComContagem(),
+    listarFuncoesPretendidasComContagem(),
     listarContextoAtividades(),
+    obterMetricasComunicacao(),
     obterContextoUsuario(supabase),
   ]);
 
@@ -32,9 +48,12 @@ export default async function ConfiguracoesPage() {
       identidadeInicial={identidade}
       membrosIniciais={membros}
       regioesIniciais={regioes}
+      funcoesIniciais={funcoes}
       atividadesContexto={contextoAtividades}
+      metricasComunicacao={metricas}
       campanhasIniciais={campanhas}
       usuarioLogado={{ id: contexto.userId, papel: contexto.papel }}
     />
   );
 }
+

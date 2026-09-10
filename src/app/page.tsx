@@ -290,7 +290,7 @@ export default function Home() {
               </p>
             </div>
             <Link
-              href="/coleta/demonstracao"
+              href="/inscricao/candidado-eleicao-2026"
               className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 text-xs font-semibold rounded-full whitespace-nowrap shadow-sm transition"
             >
               Testar Coleta Pública →
@@ -350,10 +350,16 @@ export default function Home() {
 
         <div className="mx-auto max-w-6xl pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[0.7rem] text-ink-subtle font-mono">
           <span>COMITÊ DIGITAL © 2026 · TODOS OS DIREITOS RESERVADOS.</span>
-          <div className="flex items-center gap-4 text-ink-muted">
-            <span>Resolução TSE nº 23.607</span>
-            <span>•</span>
-            <span className="text-positive-text font-bold">Status: Operacional</span>
+          <div className="flex items-center gap-2 text-ink-muted">
+            <span>Desenvolvido por:</span>
+            <a
+              href="https://waldoeller.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-ink hover:text-primary transition-colors underline decoration-primary/40 underline-offset-4"
+            >
+              Waldo Eller
+            </a>
           </div>
         </div>
       </footer>

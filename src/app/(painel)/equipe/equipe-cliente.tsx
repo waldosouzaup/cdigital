@@ -34,8 +34,12 @@ export function EquipeCliente({
 }) {
   const router = useRouter();
 
-  // Senha temporária devolvida por um convite ou uma redefinição — mostrada UMA vez.
-  const [credencial, setCredencial] = useState<{ email: string; senha: string } | null>(null);
+  // Senha temporária devolvida por convite ou redefinição — exibida UMA única vez
+  const [credencial, setCredencial] = useState<{
+    email: string;
+    senha: string;
+    emailEnviado?: boolean;
+  } | null>(null);
   const [credencialCopiada, setCredencialCopiada] = useState(false);
 
   // ----- Convidar (fetch → /api/equipe/convite; não é Server Action) -----
@@ -68,6 +72,7 @@ export function EquipeCliente({
         erro?: string;
         erros?: Record<string, string>;
         senhaTemporaria?: string;
+        emailEnviado?: boolean;
       };
       if (!resp.ok || !dados.ok) {
         const primeiroErro = dados.erros ? Object.values(dados.erros)[0] : undefined;
@@ -77,7 +82,13 @@ export function EquipeCliente({
       setModalConvite(false);
       form.reset();
       setConvitePapel("coord_comite");
-      if (dados.senhaTemporaria) setCredencial({ email, senha: dados.senhaTemporaria });
+      if (dados.senhaTemporaria) {
+        setCredencial({
+          email,
+          senha: dados.senhaTemporaria,
+          emailEnviado: dados.emailEnviado,
+        });
+      }
       router.refresh();
     });
   }
@@ -92,10 +103,18 @@ export function EquipeCliente({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: membro.id, acao: "redefinir-senha" }),
     });
-    const dados = (await resp.json().catch(() => ({}))) as { ok?: boolean; senhaTemporaria?: string };
+    const dados = (await resp.json().catch(() => ({}))) as {
+      ok?: boolean;
+      senhaTemporaria?: string;
+      emailEnviado?: boolean;
+    };
     setRedefinindoId(null);
     if (resp.ok && dados.ok && dados.senhaTemporaria) {
-      setCredencial({ email: membro.email, senha: dados.senhaTemporaria });
+      setCredencial({
+        email: membro.email,
+        senha: dados.senhaTemporaria,
+        emailEnviado: dados.emailEnviado,
+      });
     }
   }
 
@@ -234,19 +253,30 @@ export function EquipeCliente({
         aberto={credencial !== null}
         aoFechar={() => setCredencial(null)}
         titulo="Senha temporária gerada"
-        descricao="Anote agora — não será exibida de novo. Entregue por um canal seguro; o membro troca no primeiro login."
+        descricao="Anote agora — não será exibida novamente no painel. Uma mensagem com esta senha e as orientações de primeiro acesso também foi enviada para o e-mail cadastrado."
         rotuloPrimario={credencialCopiada ? "Copiado ✓" : "Copiar"}
         acaoPrimaria={copiarCredencial}
       >
         {credencial && (
-          <div className="space-y-2 font-mono text-sm">
-            <div>
-              <span className="text-ink-muted text-xs uppercase">E-mail</span>
-              <div className="select-all text-ink">{credencial.email}</div>
+          <div className="space-y-3 font-mono text-sm">
+            <div className="rounded border border-line bg-surface-sunken p-3">
+              <span className="text-ink-muted text-xs uppercase tracking-wider block font-sans">
+                E-mail
+              </span>
+              <div className="select-all text-ink mt-0.5 font-bold">{credencial.email}</div>
             </div>
-            <div>
-              <span className="text-ink-muted text-xs uppercase">Senha temporária</span>
-              <div className="select-all text-seal font-bold break-all">{credencial.senha}</div>
+            <div className="rounded border border-seal/30 bg-seal/5 p-3">
+              <span className="text-ink-muted text-xs uppercase tracking-wider block font-sans">
+                Senha temporária
+              </span>
+              <div className="select-all text-seal font-bold text-base mt-0.5 break-all">
+                {credencial.senha}
+              </div>
+            </div>
+
+            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 font-sans text-xs text-amber-800 dark:text-amber-200">
+              <span className="font-semibold block mb-0.5">⚠️ Troca obrigatória no primeiro login</span>
+              O colaborador foi notificado por e-mail e deverá alterar esta senha provisória imediatamente no primeiro acesso ao sistema.
             </div>
           </div>
         )}

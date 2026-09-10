@@ -5,14 +5,15 @@
  */
 import Link from "next/link";
 import { Alerta } from "@/components/alerta";
-import { listarDocumentos } from "./dados";
 import { contarAutoinscritosPendentes } from "../pessoas/dados";
+import { listarColaboradoresParaDocumento, listarDocumentos } from "./dados";
 import { DocumentosCliente } from "./documentos-cliente";
 
 export default async function DocumentosPage() {
-  const [documentos, autoinscritosPendentes] = await Promise.all([
+  const [documentos, autoinscritosPendentes, colaboradores] = await Promise.all([
     listarDocumentos(),
     contarAutoinscritosPendentes(),
+    listarColaboradoresParaDocumento(),
   ]);
 
   return (
@@ -31,7 +32,7 @@ export default async function DocumentosPage() {
           liberá-los para a emissão do contrato.
         </Alerta>
       )}
-      <DocumentosCliente documentosIniciais={documentos} />
+      <DocumentosCliente documentosIniciais={documentos} colaboradores={colaboradores} />
     </div>
   );
 }

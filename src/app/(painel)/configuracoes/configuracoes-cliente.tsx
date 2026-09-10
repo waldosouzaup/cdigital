@@ -18,10 +18,11 @@ import { EquipeSecao } from "./equipe-secao";
 import { RegioesSecao } from "./regioes-secao";
 import { AtividadesSecao } from "./atividades-secao";
 import { CampanhasSecao } from "./campanhas-secao";
+import { ComunicacoesSecao } from "./comunicacoes-secao";
 import { MODELO_REFERENCIA_MICHELLE } from "@/lib/contratos/modelo-referencia";
-import type { CampanhaSuperadmin, IdentidadeComite, TemplateContrato } from "./dados";
+import type { CampanhaSuperadmin, IdentidadeComite, MetricasComunicacao, TemplateContrato } from "./dados";
 import type { MembroEquipe } from "../equipe/dados";
-import type { RegiaoListada } from "../regioes/dados";
+import type { FuncaoPretendidaListada, RegiaoListada } from "../regioes/dados";
 import type {
   PessoaOpcao,
   RegiaoOpcao,
@@ -51,7 +52,9 @@ export function ConfiguracoesCliente({
   identidadeInicial,
   membrosIniciais,
   regioesIniciais,
+  funcoesIniciais = [],
   atividadesContexto,
+  metricasComunicacao,
   campanhasIniciais,
   usuarioLogado,
 }: {
@@ -59,14 +62,17 @@ export function ConfiguracoesCliente({
   identidadeInicial: IdentidadeComite;
   membrosIniciais: MembroEquipe[];
   regioesIniciais: RegiaoListada[];
+  funcoesIniciais?: FuncaoPretendidaListada[];
   atividadesContexto: {
     regioes: RegiaoOpcao[];
     pessoas: PessoaOpcao[];
     registros: RegistroAtividadeListado[];
   };
+  metricasComunicacao?: MetricasComunicacao;
   campanhasIniciais?: CampanhaSuperadmin[];
   usuarioLogado?: { id: string | null; papel?: string };
 }) {
+
   const router = useRouter();
 
   // Estado dos modelos de contrato sincronizado com os dados do servidor
@@ -191,6 +197,7 @@ export function ConfiguracoesCliente({
     | "equipe"
     | "regioes"
     | "atividades"
+    | "comunicacoes"
     | "identidade"
     | "modelos"
     | "seguranca"
@@ -209,6 +216,7 @@ export function ConfiguracoesCliente({
       aba === "equipe" ||
       aba === "regioes" ||
       aba === "atividades" ||
+      aba === "comunicacoes" ||
       aba === "campanhas"
     ) {
       setAbaAtiva(aba);
@@ -325,6 +333,24 @@ export function ConfiguracoesCliente({
 
         <button
           type="button"
+          onClick={() => mudarAba("comunicacoes")}
+          className={`flex items-center gap-2 py-2.5 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === "comunicacoes"
+              ? "border-primary text-primary font-semibold bg-primary/5"
+              : "border-transparent text-ink-muted hover:text-ink hover:border-line"
+          }`}
+        >
+          <span>✉️</span>
+          <span>Comunicações &amp; E-mails</span>
+          {Boolean(metricasComunicacao?.totalFalhas && metricasComunicacao.totalFalhas > 0) && (
+            <span className="ml-1 rounded-full bg-red-500/10 border border-red-500/20 px-1.5 py-0.2 font-mono text-[0.65rem] text-red-600 font-semibold">
+              {metricasComunicacao?.totalFalhas}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
           onClick={() => mudarAba("seguranca")}
           className={`flex items-center gap-2 py-2.5 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             abaAtiva === "seguranca"
@@ -366,10 +392,10 @@ export function ConfiguracoesCliente({
         </section>
       )}
 
-      {/* ABA: REGIÕES DE ATUAÇÃO */}
+      {/* ABA: REGIÕES DE ATUAÇÃO & FUNÇÕES */}
       {abaAtiva === "regioes" && (
         <section className="border border-line bg-surface p-6">
-          <RegioesSecao regioesIniciais={regioesIniciais} />
+          <RegioesSecao regioesIniciais={regioesIniciais} funcoesIniciais={funcoesIniciais} />
         </section>
       )}
 
@@ -654,6 +680,13 @@ export function ConfiguracoesCliente({
           </div>
         </div>
       </section>
+      )}
+
+      {/* ABA: COMUNICAÇÕES & E-MAILS */}
+      {abaAtiva === "comunicacoes" && metricasComunicacao && (
+        <section className="border border-line bg-surface p-6">
+          <ComunicacoesSecao metricas={metricasComunicacao} />
+        </section>
       )}
 
       {/* ABA: CAMPANHAS & GESTORES (SUPERADMIN) */}

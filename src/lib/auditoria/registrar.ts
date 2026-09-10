@@ -82,7 +82,7 @@ export async function registerDocumentReview(params: {
   organizationId: string;
   userId: string | null;
   documentId: string;
-  action: "aprovacao" | "rejeicao";
+  action: "aprovacao" | "rejeicao" | "reabertura";
 }): Promise<void> {
   await registrarAuditoria({
     supabase: params.supabase,

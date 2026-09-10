@@ -3,6 +3,7 @@
  * | Aviso de que há contrato a assinar + link." Regra 7: nada de CPF/endereço/valor
  * no corpo — só avisa que existe algo a assinar.
  */
+import * as React from "react";
 import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
 
 interface ContratoEnviadoEmailProps {

@@ -1,13 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, type StatusTipo } from "@/components/badge";
 import { Modal } from "@/components/modal";
 import { Alerta } from "@/components/alerta";
+import { Campo } from "@/components/campo";
+import { Selo } from "@/components/selo";
 import { EstadoVazio } from "@/components/estado-vazio";
-import { aprovarDocumentoEGerarContrato, gerarUrlDocumento, rejeitarDocumento } from "./acoes";
-import type { DocumentoListado } from "./dados";
+import {
+  adicionarDocumentoManual,
+  aprovarDocumentoEGerarContrato,
+  editarDocumento,
+  excluirDocumento,
+  gerarUrlDocumento,
+  marcarDocumentoPendente,
+  rejeitarDocumento,
+} from "./acoes";
+import type { ColaboradorOpcao, DocumentoListado } from "./dados";
 
 const ROTULO_TIPO: Record<string, string> = {
   documento_identidade: "Documento de Identidade (RG/CNH)",
@@ -54,11 +64,18 @@ function montarTextoMotivo(selecionados: string[], textoCustomizado: string): st
 
 export function DocumentosCliente({
   documentosIniciais,
+  colaboradores = [],
 }: {
   documentosIniciais: DocumentoListado[];
+  colaboradores?: ColaboradorOpcao[];
 }) {
   const router = useRouter();
-  const [filtro, setFiltro] = useState<"todos" | "pendente" | "aprovado" | "rejeitado">("todos");
+
+  // Filtros e busca
+  const [filtroStatus, setFiltroStatus] = useState<"todos" | "pendente" | "aprovado" | "rejeitado">("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "documento_identidade" | "comprovante_endereco">("todos");
+  const [busca, setBusca] = useState("");
+
   const [processando, setProcessando] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     tipo: "sucesso" | "erro" | "info";
@@ -68,15 +85,58 @@ export function DocumentosCliente({
   } | null>(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
 
-  // Modais
+  // Modais de Controle
   const [docSelecionado, setDocSelecionado] = useState<DocumentoListado | null>(null);
   const [modalConferenciaAberto, setModalConferenciaAberto] = useState(false);
+  const [carregandoDocUrl, setCarregandoDocUrl] = useState(false);
+
+  // Modal 1: Rejeição
   const [modalRejeicaoAberto, setModalRejeicaoAberto] = useState(false);
   const [motivoRejeicao, setMotivoRejeicao] = useState("");
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
-  const [carregandoDocUrl, setCarregandoDocUrl] = useState(false);
 
-  const docsFiltrados = documentosIniciais.filter((d) => filtro === "todos" || d.status === filtro);
+  // Modal 2: Adicionar Documento Manual
+  const [modalAdicionarAberto, setModalAdicionarAberto] = useState(false);
+  const [salvandoNovoDoc, setSalvandoNovoDoc] = useState(false);
+  const formAdicionarRef = useRef<HTMLFormElement>(null);
+
+  // Modal 3: Editar Documento
+  const [docParaEditar, setDocParaEditar] = useState<DocumentoListado | null>(null);
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const formEditarRef = useRef<HTMLFormElement>(null);
+
+  // Modal 4: Excluir Documento
+  const [docParaExcluir, setDocParaExcluir] = useState<DocumentoListado | null>(null);
+  const [motivoExclusao, setMotivoExclusao] = useState("");
+  const [excluindoDoc, setExcluindoDoc] = useState(false);
+  const [erroExcluir, setErroExcluir] = useState<string | null>(null);
+
+  // Contadores por status
+  const contadores = useMemo(() => {
+    return {
+      todos: documentosIniciais.length,
+      pendente: documentosIniciais.filter((d) => d.status === "pendente").length,
+      aprovado: documentosIniciais.filter((d) => d.status === "aprovado").length,
+      rejeitado: documentosIniciais.filter((d) => d.status === "rejeitado").length,
+    };
+  }, [documentosIniciais]);
+
+  // Lista filtrada
+  const docsFiltrados = useMemo(() => {
+    return documentosIniciais.filter((d) => {
+      if (filtroStatus !== "todos" && d.status !== filtroStatus) return false;
+      if (filtroTipo !== "todos" && d.tipo !== filtroTipo) return false;
+      if (busca.trim()) {
+        const termo = busca.toLowerCase().trim();
+        const nomeMatch = d.pessoaNome.toLowerCase().includes(termo);
+        const cpfMatch = d.pessoaCpf.replace(/\D/g, "").includes(termo.replace(/\D/g, ""));
+        const arqMatch = d.nomeOriginal.toLowerCase().includes(termo);
+        const storageMatch = d.caminhoStorage.toLowerCase().includes(termo);
+        if (!nomeMatch && !cpfMatch && !arqMatch && !storageMatch) return false;
+      }
+      return true;
+    });
+  }, [documentosIniciais, filtroStatus, filtroTipo, busca]);
 
   function mostrarFeedback(
     titulo: string,
@@ -85,10 +145,11 @@ export function DocumentosCliente({
     urlAssinatura?: string,
   ) {
     setFeedback({ titulo, mensagem, tipo, urlAssinatura });
-    // Mantém feedback com link visível por mais tempo
     const timeout = urlAssinatura ? 15000 : 6000;
     setTimeout(() => setFeedback(null), timeout);
   }
+
+  // --- Handlers de Ações de Triagem ---
 
   async function handleAprovar(doc: DocumentoListado) {
     setProcessando(doc.id);
@@ -115,9 +176,26 @@ export function DocumentosCliente({
     router.refresh();
   }
 
-  function abrirModalConferencia(doc: DocumentoListado) {
-    setDocSelecionado(doc);
-    setModalConferenciaAberto(true);
+  async function handleMarcarPendente(doc: DocumentoListado) {
+    setProcessando(doc.id);
+    const resultado = await marcarDocumentoPendente(doc.id);
+    setProcessando(null);
+
+    if (!resultado.ok) {
+      mostrarFeedback(
+        "Erro na Reabertura",
+        resultado.mensagem ?? "Não foi possível marcar como pendente.",
+        "erro",
+      );
+      return;
+    }
+
+    mostrarFeedback(
+      "Documento Reaberto",
+      resultado.mensagem ?? "O documento voltou para o estado pendente de conferência.",
+      "info",
+    );
+    router.refresh();
   }
 
   function abrirModalRejeicao(doc: DocumentoListado) {
@@ -194,6 +272,77 @@ export function DocumentosCliente({
     window.open(resultado.url, "_blank", "noopener,noreferrer");
   }
 
+  // --- Handlers de CRUD Completo ---
+
+  async function handleSubmeterNovoDocumento(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    setSalvandoNovoDoc(true);
+    const res = await adicionarDocumentoManual(formData);
+    setSalvandoNovoDoc(false);
+
+    if (!res.ok) {
+      mostrarFeedback("Erro ao Adicionar", res.mensagem ?? "Falha no envio do documento.", "erro");
+      return;
+    }
+
+    setModalAdicionarAberto(false);
+    form.reset();
+    mostrarFeedback(
+      "Documento Adicionado",
+      res.mensagem ?? "Documento cadastrado com sucesso no sistema.",
+      "sucesso",
+      res.urlAssinatura,
+    );
+    router.refresh();
+  }
+
+  async function handleSubmeterEdicaoDocumento(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    setSalvandoEdicao(true);
+    const res = await editarDocumento(formData);
+    setSalvandoEdicao(false);
+
+    if (!res.ok) {
+      mostrarFeedback("Erro ao Atualizar", res.mensagem ?? "Falha na atualização.", "erro");
+      return;
+    }
+
+    setDocParaEditar(null);
+    form.reset();
+    mostrarFeedback("Documento Atualizado", res.mensagem ?? "Documento atualizado com sucesso.", "sucesso");
+    router.refresh();
+  }
+
+  async function handleConfirmarExclusao() {
+    if (!docParaExcluir) return;
+
+    setExcluindoDoc(true);
+    setErroExcluir(null);
+
+    const res = await excluirDocumento(docParaExcluir.id, motivoExclusao);
+    setExcluindoDoc(false);
+
+    if (!res.ok) {
+      setErroExcluir(res.mensagem ?? "Não foi possível excluir o documento.");
+      return;
+    }
+
+    setDocParaExcluir(null);
+    setMotivoExclusao("");
+    mostrarFeedback(
+      "Documento Excluído",
+      res.mensagem ?? "Documento removido e arquivado em auditoria.",
+      "sucesso",
+    );
+    router.refresh();
+  }
+
   function copiarLinkAssinatura(url: string) {
     navigator.clipboard.writeText(url);
     setLinkCopiado(true);
@@ -202,22 +351,31 @@ export function DocumentosCliente({
 
   return (
     <div className="space-y-8 max-w-6xl">
-      {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 border-b border-line pb-4">
+      {/* Cabeçalho com Botão de Adicionar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-4">
         <div>
           <span className="font-mono text-xs uppercase tracking-wider text-seal">
             Mesa de Conferência & Triagem
           </span>
           <h1 className="text-h1 font-semibold text-ink">Conferência de Documentos</h1>
           <p className="mt-1 text-small text-ink-muted">
-            Inspeção de qualidade técnica, dados informados pelo colaborador, integridade SHA-256 e
-            emissão contratual.
+            Inspeção de qualidade técnica, dados informados pelo colaborador, integridade SHA-256 e emissão contratual.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-ink-muted">Storage:</span>
-          <Badge status="aprovado" rotuloPersonalizado="Buckets Privados (15 min)" />
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden md:flex items-center gap-2">
+            <span className="text-xs text-ink-muted">Storage:</span>
+            <Badge status="aprovado" rotuloPersonalizado="Buckets Privados (15 min)" />
+          </div>
+          <Selo
+            voz="selo"
+            type="button"
+            onClick={() => setModalAdicionarAberto(true)}
+            className="text-xs py-2 shadow-sm"
+          >
+            + Adicionar Documento
+          </Selo>
         </div>
       </div>
 
@@ -243,12 +401,12 @@ export function DocumentosCliente({
                   type="text"
                   readOnly
                   value={feedback.urlAssinatura}
-                  className="font-mono text-xs bg-surface border border-line px-2.5 py-1.5 flex-1 select-all text-ink focus:outline-none"
+                  className="font-mono text-xs bg-surface border border-line px-2.5 py-1.5 flex-1 select-all text-ink focus:outline-none rounded"
                 />
                 <button
                   type="button"
                   onClick={() => copiarLinkAssinatura(feedback.urlAssinatura!)}
-                  className="px-3 py-1.5 text-xs bg-seal text-paper hover:opacity-90 font-medium cursor-pointer transition-opacity whitespace-nowrap"
+                  className="px-3 py-1.5 text-xs bg-seal text-paper hover:opacity-90 font-medium cursor-pointer transition-opacity whitespace-nowrap rounded"
                 >
                   {linkCopiado ? "Link Copiado! ✓" : "Copiar Link"}
                 </button>
@@ -258,27 +416,81 @@ export function DocumentosCliente({
         </Alerta>
       )}
 
-      {/* Filtros por Situação */}
-      <div className="flex border-b border-line gap-4 sm:gap-6">
-        {(["todos", "pendente", "aprovado", "rejeitado"] as const).map((sit) => (
+      {/* Abas com Contadores */}
+      <div className="flex flex-wrap border-b border-line gap-2 sm:gap-6">
+        {(
+          [
+            { id: "todos", label: "Todos os Documentos", count: contadores.todos },
+            { id: "pendente", label: "Pendente", count: contadores.pendente },
+            { id: "aprovado", label: "Aprovado", count: contadores.aprovado },
+            { id: "rejeitado", label: "Rejeitado", count: contadores.rejeitado },
+          ] as const
+        ).map((aba) => (
           <button
-            key={sit}
+            key={aba.id}
             type="button"
-            onClick={() => setFiltro(sit)}
-            className={`pb-3 text-small font-medium border-b-2 cursor-pointer capitalize transition-colors ${
-              filtro === sit
+            onClick={() => setFiltroStatus(aba.id)}
+            className={`pb-3 text-small font-medium border-b-2 cursor-pointer transition-colors flex items-center gap-2 ${
+              filtroStatus === aba.id
                 ? "border-seal text-ink"
                 : "border-transparent text-ink-muted hover:text-ink"
             }`}
           >
-            {sit === "todos" ? "Todos os Documentos" : sit}
+            <span>{aba.label}</span>
+            <span
+              className={`text-[11px] font-mono px-1.5 py-0.2 rounded ${
+                filtroStatus === aba.id
+                  ? "bg-seal/15 text-seal font-semibold"
+                  : "bg-surface-sunken text-ink-muted border border-line"
+              }`}
+            >
+              {aba.count}
+            </span>
           </button>
         ))}
       </div>
 
+      {/* Barra de Filtros Rápidos (Busca por Colaborador e Tipo) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-surface p-3 border border-line rounded-md">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="🔍 Buscar por nome do colaborador, CPF ou nome do arquivo…"
+            className="w-full text-small border border-line bg-surface-sunken/40 px-3 py-2 text-ink placeholder:text-ink-muted/70 focus:outline-none focus:border-primary rounded"
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => setBusca("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-ink-muted hover:text-ink"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <div className="sm:w-64">
+          <select
+            value={filtroTipo}
+            onChange={(e) =>
+              setFiltroTipo(
+                e.target.value as "todos" | "documento_identidade" | "comprovante_endereco",
+              )
+            }
+            className="w-full text-small border border-line bg-surface-sunken/40 px-3 py-2 text-ink focus:outline-none focus:border-primary rounded cursor-pointer"
+          >
+            <option value="todos">Todos os Tipos de Documento</option>
+            <option value="documento_identidade">Documento de Identidade (RG/CNH)</option>
+            <option value="comprovante_endereco">Comprovante de Residência</option>
+          </select>
+        </div>
+      </div>
+
       {/* Lista de Documentos */}
       {docsFiltrados.length > 0 ? (
-        <div className="overflow-x-auto border border-line bg-surface">
+        <div className="overflow-x-auto border border-line bg-surface rounded-md shadow-xs">
           <table className="w-full border-collapse text-left text-small">
             <thead>
               <tr className="border-b border-line bg-paper/60 font-mono text-xs text-ink-muted">
@@ -286,7 +498,7 @@ export function DocumentosCliente({
                 <th className="p-3.5">Metadados Técnicos</th>
                 <th className="p-3.5">Nome no Storage</th>
                 <th className="p-3.5 text-center">Situação</th>
-                <th className="p-3.5 text-right">Ação de Conferência</th>
+                <th className="p-3.5 text-right">Ações & Conferência</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -299,21 +511,23 @@ export function DocumentosCliente({
 
                 return (
                   <tr key={doc.id} className="hover:bg-paper/40 transition-colors">
+                    {/* Colaborador & Tipo */}
                     <td className="p-3.5">
                       <span className="font-medium text-ink block">{doc.pessoaNome}</span>
-                      <span className="text-xs text-seal block">
+                      <span className="text-xs text-seal block font-medium">
                         {ROTULO_TIPO[doc.tipo] ?? doc.tipo} · v{doc.versao}
                       </span>
                       <span className="font-mono text-[0.7rem] text-ink-muted">{doc.pessoaCpf}</span>
                     </td>
 
+                    {/* Metadados Técnicos */}
                     <td className="p-3.5 text-xs font-mono">
                       <div className="flex items-center gap-1.5">
                         <span className={baixaResolucao ? "text-alert font-bold" : "text-ink"}>
                           {doc.larguraPx ?? "—"} × {doc.alturaPx ?? "—"} px
                         </span>
                         {baixaResolucao && (
-                          <span className="text-[0.65rem] bg-alert/10 text-alert px-1 font-bold">
+                          <span className="text-[0.65rem] bg-alert/10 text-alert px-1 font-bold rounded">
                             BAIXA RESOLUÇÃO
                           </span>
                         )}
@@ -324,23 +538,25 @@ export function DocumentosCliente({
                       </span>
                     </td>
 
+                    {/* Storage */}
                     <td className="p-3.5 font-mono text-xs text-ink-muted">
                       <span
-                        className="block text-ink truncate max-w-[220px]"
+                        className="block text-ink truncate max-w-[200px]"
                         title={doc.caminhoStorage}
                       >
                         {doc.caminhoStorage}
                       </span>
-                      <span className="text-[0.7rem] text-ink-muted/80 block">
+                      <span className="text-[0.7rem] text-ink-muted/80 block truncate max-w-[200px]">
                         Original: {doc.nomeOriginal}
                       </span>
                     </td>
 
+                    {/* Situação */}
                     <td className="p-3.5 text-center">
                       <Badge status={doc.status as StatusTipo} />
                       {doc.motivoRejeicao && (
                         <span
-                          className="block text-[0.7rem] text-alert mt-1 max-w-[180px] truncate"
+                          className="block text-[0.7rem] text-alert mt-1 max-w-[180px] truncate mx-auto"
                           title={doc.motivoRejeicao}
                         >
                           {doc.motivoRejeicao}
@@ -348,37 +564,86 @@ export function DocumentosCliente({
                       )}
                     </td>
 
+                    {/* Ações */}
                     <td className="p-3.5 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        {/* Ação 1: Aprovar (quando pendente ou rejeitado) */}
                         {doc.status !== "aprovado" && (
                           <button
                             type="button"
                             disabled={ocupado}
                             onClick={() => handleAprovar(doc)}
-                            className="px-2.5 py-1 text-xs border border-success text-success hover:bg-success/10 cursor-pointer font-medium disabled:opacity-50 transition-colors"
+                            className="px-2.5 py-1 text-xs border border-success text-success hover:bg-success/10 cursor-pointer font-medium disabled:opacity-50 transition-colors rounded"
+                            title="Aprovar documento e emitir contrato"
                           >
                             {ocupado ? "Processando…" : "Aprovar"}
                           </button>
                         )}
 
+                        {/* Ação 2: Reabrir / Marcar Pendente (quando aprovado ou rejeitado) */}
+                        {doc.status !== "pendente" && (
+                          <button
+                            type="button"
+                            disabled={ocupado}
+                            onClick={() => handleMarcarPendente(doc)}
+                            className="px-2.5 py-1 text-xs border border-line hover:border-ink/60 text-ink-muted hover:text-ink cursor-pointer font-medium disabled:opacity-50 transition-colors rounded"
+                            title="Voltar status para pendente para nova conferência"
+                          >
+                            Pendente
+                          </button>
+                        )}
+
+                        {/* Ação 3: Rejeitar (quando pendente ou aprovado) */}
                         {doc.status !== "rejeitado" && (
                           <button
                             type="button"
                             disabled={ocupado}
                             onClick={() => abrirModalRejeicao(doc)}
-                            className="px-2.5 py-1 text-xs border border-alert text-alert hover:bg-alert/10 cursor-pointer font-medium disabled:opacity-50 transition-colors"
+                            className="px-2.5 py-1 text-xs border border-alert text-alert hover:bg-alert/10 cursor-pointer font-medium disabled:opacity-50 transition-colors rounded"
+                            title="Reprovar documento com motivo"
                           >
                             Rejeitar
                           </button>
                         )}
 
+                        {/* Ação 4: Abrir / Detalhes */}
                         <button
                           type="button"
                           disabled={ocupado}
-                          onClick={() => abrirModalConferencia(doc)}
-                          className="px-2.5 py-1 text-xs bg-paper border border-line text-ink hover:border-seal font-medium cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
+                          onClick={() => {
+                            setDocSelecionado(doc);
+                            setModalConferenciaAberto(true);
+                          }}
+                          className="px-2.5 py-1 text-xs bg-paper border border-line text-ink hover:border-seal font-medium cursor-pointer disabled:opacity-50 transition-colors shadow-xs rounded"
+                          title="Inspecionar dados do colaborador e visualizar arquivo"
                         >
                           Abrir
+                        </button>
+
+                        {/* Ação 5: Editar */}
+                        <button
+                          type="button"
+                          disabled={ocupado}
+                          onClick={() => setDocParaEditar(doc)}
+                          className="px-2 py-1 text-xs text-primary hover:underline font-medium cursor-pointer"
+                          title="Editar tipo de documento, motivo ou substituir arquivo"
+                        >
+                          Editar
+                        </button>
+
+                        {/* Ação 6: Excluir */}
+                        <button
+                          type="button"
+                          disabled={ocupado}
+                          onClick={() => {
+                            setDocParaExcluir(doc);
+                            setErroExcluir(null);
+                            setMotivoExclusao("");
+                          }}
+                          className="px-2 py-1 text-xs text-danger hover:underline font-medium cursor-pointer"
+                          title="Excluir documento do painel e do Storage"
+                        >
+                          Excluir
                         </button>
                       </div>
                     </td>
@@ -390,18 +655,20 @@ export function DocumentosCliente({
         </div>
       ) : (
         <EstadoVazio
-          titulo="Nenhum documento aguardando nesta fila"
-          descricao="Todos os documentos desta categoria foram auditados ou nenhum envio recente foi registrado."
+          titulo="Nenhum documento encontrado"
+          descricao="Não há documentos correspondentes aos filtros e termo de busca informados."
         />
       )}
 
-      {/* MODAL 1: CONFERÊNCIA COMPLETA DE DADOS DO COLABORADOR */}
+      {/* =====================================================================
+          MODAL 1: CONFERÊNCIA COMPLETA DE DADOS DO COLABORADOR
+          ===================================================================== */}
       {docSelecionado && (
         <Modal
           aberto={modalConferenciaAberto}
           aoFechar={() => setModalConferenciaAberto(false)}
           titulo="Conferência de Documento & Cadastro"
-          descricao="Inspecione os dados completos informados pelo colaborador no link de coleta e verifique o arquivo comprobatório antes de aprovar a emissão do contrato."
+          descricao="Inspecione os dados completos informados pelo colaborador e verifique o arquivo comprobatório antes de aprovar a emissão do contrato."
           larguraMaxima="max-w-3xl"
           ocultarRodapePadrao={true}
         >
@@ -412,7 +679,7 @@ export function DocumentosCliente({
                 <span className="text-xs font-mono uppercase tracking-wider text-seal block font-semibold">
                   1. Identificação Pessoal
                 </span>
-                <div className="bg-surface/80 p-3 border border-line space-y-1.5">
+                <div className="bg-surface/80 p-3 border border-line space-y-1.5 rounded">
                   <div>
                     <span className="text-xs text-ink-muted block">Nome Completo:</span>
                     <strong className="text-ink font-semibold">
@@ -446,7 +713,7 @@ export function DocumentosCliente({
                 <span className="text-xs font-mono uppercase tracking-wider text-seal block font-semibold">
                   2. Contato & Comunicação
                 </span>
-                <div className="bg-surface/80 p-3 border border-line space-y-1.5">
+                <div className="bg-surface/80 p-3 border border-line space-y-1.5 rounded">
                   <div>
                     <span className="text-xs text-ink-muted block">WhatsApp / Telefone:</span>
                     <span className="font-mono text-xs font-medium text-ink">
@@ -476,7 +743,7 @@ export function DocumentosCliente({
                 <span className="text-xs font-mono uppercase tracking-wider text-seal block font-semibold">
                   3. Endereço Residencial
                 </span>
-                <div className="bg-surface/80 p-3 border border-line space-y-1">
+                <div className="bg-surface/80 p-3 border border-line space-y-1 rounded">
                   <div>
                     <span className="text-xs text-ink-muted block">Logradouro:</span>
                     <span className="text-xs text-ink leading-relaxed">
@@ -496,7 +763,7 @@ export function DocumentosCliente({
                 <span className="text-xs font-mono uppercase tracking-wider text-seal block font-semibold">
                   4. Dados de Pagamento (PIX / Banco)
                 </span>
-                <div className="bg-surface/80 p-3 border border-line space-y-1.5">
+                <div className="bg-surface/80 p-3 border border-line space-y-1.5 rounded">
                   <div>
                     <span className="text-xs text-ink-muted block">Chave PIX:</span>
                     {docSelecionado.colaborador.chavePix ? (
@@ -519,7 +786,7 @@ export function DocumentosCliente({
             </div>
 
             {/* Bloco 3: Inspeção do Arquivo & Botão Visualizar */}
-            <div className="space-y-3 bg-paper p-4 border border-line">
+            <div className="space-y-3 bg-paper p-4 border border-line rounded">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <span className="text-xs font-mono uppercase tracking-wider text-seal block font-semibold">
@@ -541,7 +808,7 @@ export function DocumentosCliente({
                   type="button"
                   disabled={carregandoDocUrl}
                   onClick={() => handleVisualizarDocumento(docSelecionado.id)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-surface border-2 border-seal text-ink hover:bg-seal/10 font-medium text-xs cursor-pointer transition-colors shadow-sm whitespace-nowrap disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-surface border-2 border-seal text-ink hover:bg-seal/10 font-medium text-xs cursor-pointer transition-colors shadow-xs whitespace-nowrap disabled:opacity-50 rounded"
                 >
                   <span>{carregandoDocUrl ? "Carregando…" : "📄 Visualizar Documento"}</span>
                   <span className="text-seal font-mono text-xs">↗</span>
@@ -551,14 +818,29 @@ export function DocumentosCliente({
 
             {/* Ações de Decisão no Rodapé do Modal */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-line">
-              <button
-                type="button"
-                onClick={() => abrirModalRejeicao(docSelecionado)}
-                disabled={processando === docSelecionado.id}
-                className="w-full sm:w-auto px-4 py-2 text-xs border border-alert text-alert hover:bg-alert/10 cursor-pointer font-medium disabled:opacity-50 transition-colors"
-              >
-                Rejeitar Documento…
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => abrirModalRejeicao(docSelecionado)}
+                  disabled={processando === docSelecionado.id}
+                  className="w-full sm:w-auto px-4 py-2 text-xs border border-alert text-alert hover:bg-alert/10 cursor-pointer font-medium disabled:opacity-50 transition-colors rounded"
+                >
+                  Rejeitar Documento…
+                </button>
+                {docSelecionado.status !== "pendente" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalConferenciaAberto(false);
+                      handleMarcarPendente(docSelecionado);
+                    }}
+                    disabled={processando === docSelecionado.id}
+                    className="w-full sm:w-auto px-3 py-2 text-xs border border-line text-ink-muted hover:text-ink cursor-pointer font-medium disabled:opacity-50 transition-colors rounded"
+                  >
+                    Marcar Pendente
+                  </button>
+                )}
+              </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <button
@@ -574,7 +856,7 @@ export function DocumentosCliente({
                     type="button"
                     disabled={processando === docSelecionado.id}
                     onClick={() => handleAprovar(docSelecionado)}
-                    className="w-full sm:w-auto px-5 py-2 text-xs bg-seal text-paper hover:opacity-90 font-semibold cursor-pointer disabled:opacity-50 transition-opacity shadow-sm flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto px-5 py-2 text-xs bg-seal text-paper hover:opacity-90 font-semibold cursor-pointer disabled:opacity-50 transition-opacity shadow-sm flex items-center justify-center gap-2 rounded"
                   >
                     {processando === docSelecionado.id ? (
                       <>
@@ -592,7 +874,260 @@ export function DocumentosCliente({
         </Modal>
       )}
 
-      {/* MODAL 2: MOTIVO DE REJEIÇÃO DO DOCUMENTO */}
+      {/* =====================================================================
+          MODAL 2: ADICIONAR DOCUMENTO MANUAL (UPLOAD PELO GESTOR)
+          ===================================================================== */}
+      <Modal
+        aberto={modalAdicionarAberto}
+        aoFechar={() => setModalAdicionarAberto(false)}
+        titulo="Adicionar Novo Documento"
+        descricao="Faça o upload de documentos comprobatórios diretamente para qualquer colaborador cadastrado."
+        larguraMaxima="max-w-lg"
+        ocultarRodapePadrao
+      >
+        <form ref={formAdicionarRef} onSubmit={handleSubmeterNovoDocumento} className="space-y-4">
+          {/* Seletor de Colaborador */}
+          <div>
+            <label htmlFor="novo-doc-pessoa" className="block text-small font-medium text-ink mb-1">
+              Colaborador *
+            </label>
+            <select
+              id="novo-doc-pessoa"
+              name="pessoaId"
+              required
+              className="w-full border border-line bg-surface p-2.5 text-small text-ink rounded focus:border-primary focus:outline-none"
+            >
+              <option value="">Selecione o colaborador…</option>
+              {colaboradores.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nomeCompleto} ({c.cpf})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tipo de Documento */}
+          <div>
+            <label htmlFor="novo-doc-tipo" className="block text-small font-medium text-ink mb-1">
+              Tipo do Documento *
+            </label>
+            <select
+              id="novo-doc-tipo"
+              name="tipo"
+              required
+              className="w-full border border-line bg-surface p-2.5 text-small text-ink rounded focus:border-primary focus:outline-none"
+            >
+              <option value="documento_identidade">Documento de Identidade (RG/CNH)</option>
+              <option value="comprovante_endereco">Comprovante de Residência</option>
+            </select>
+          </div>
+
+          {/* Situação Inicial */}
+          <div>
+            <label htmlFor="novo-doc-status" className="block text-small font-medium text-ink mb-1">
+              Situação Inicial *
+            </label>
+            <select
+              id="novo-doc-status"
+              name="statusInicial"
+              className="w-full border border-line bg-surface p-2.5 text-small text-ink rounded focus:border-primary focus:outline-none"
+            >
+              <option value="pendente">Pendente (conferir na mesa depois)</option>
+              <option value="aprovado">Aprovado (já liberar emissão de contrato)</option>
+            </select>
+          </div>
+
+          {/* Arquivo */}
+          <div>
+            <label htmlFor="novo-doc-arquivo" className="block text-small font-medium text-ink mb-1">
+              Arquivo Comprobatório (JPG, PNG ou PDF até 20MB) *
+            </label>
+            <input
+              id="novo-doc-arquivo"
+              name="arquivo"
+              type="file"
+              required
+              accept="image/jpeg,image/png,application/pdf"
+              className="w-full border border-line bg-surface p-2 text-small text-ink rounded file:mr-3 file:py-1 file:px-3 file:border-0 file:text-xs file:font-semibold file:bg-seal file:text-paper file:rounded hover:file:opacity-90 cursor-pointer"
+            />
+            <span className="text-[11px] text-ink-muted block mt-1">
+              Para imagens, recomenda-se resolução nítida de pelo menos 800px no lado menor.
+            </span>
+          </div>
+
+          <div className="pt-4 border-t border-line flex justify-end gap-2">
+            <Selo
+              voz="linha"
+              type="button"
+              onClick={() => setModalAdicionarAberto(false)}
+              disabled={salvandoNovoDoc}
+              className="text-xs"
+            >
+              Cancelar
+            </Selo>
+            <Selo
+              voz="selo"
+              type="submit"
+              carregando={salvandoNovoDoc}
+              textoCarregando="Enviando…"
+              className="text-xs"
+            >
+              Adicionar Documento
+            </Selo>
+          </div>
+        </form>
+      </Modal>
+
+      {/* =====================================================================
+          MODAL 3: EDITAR DOCUMENTO (TIPO, MOTIVO, SUBSTITUIR ARQUIVO)
+          ===================================================================== */}
+      <Modal
+        aberto={Boolean(docParaEditar)}
+        aoFechar={() => setDocParaEditar(null)}
+        titulo={`Editar Documento: ${docParaEditar?.pessoaNome ?? ""}`}
+        descricao="Ajuste a classificação do documento ou anexe uma nova versão do arquivo."
+        larguraMaxima="max-w-lg"
+        ocultarRodapePadrao
+      >
+        {docParaEditar && (
+          <form ref={formEditarRef} onSubmit={handleSubmeterEdicaoDocumento} className="space-y-4">
+            <input type="hidden" name="id" value={docParaEditar.id} />
+
+            <div>
+              <label htmlFor="editar-doc-tipo" className="block text-small font-medium text-ink mb-1">
+                Classificação / Tipo do Documento
+              </label>
+              <select
+                id="editar-doc-tipo"
+                name="tipo"
+                defaultValue={docParaEditar.tipo}
+                className="w-full border border-line bg-surface p-2.5 text-small text-ink rounded focus:border-primary focus:outline-none"
+              >
+                <option value="documento_identidade">Documento de Identidade (RG/CNH)</option>
+                <option value="comprovante_endereco">Comprovante de Residência</option>
+              </select>
+              <span className="text-[11px] text-ink-muted block mt-1">
+                Útil quando o colaborador enviou o comprovante no campo do RG por engano.
+              </span>
+            </div>
+
+            {docParaEditar.status === "rejeitado" && (
+              <div>
+                <label htmlFor="editar-doc-motivo" className="block text-small font-medium text-ink mb-1">
+                  Motivo da Rejeição
+                </label>
+                <textarea
+                  id="editar-doc-motivo"
+                  name="motivoRejeicao"
+                  rows={3}
+                  defaultValue={docParaEditar.motivoRejeicao ?? ""}
+                  placeholder="Explique o motivo para o colaborador…"
+                  className="w-full border border-line bg-surface p-2.5 text-small text-ink rounded focus:border-primary focus:outline-none resize-none"
+                />
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-line">
+              <label htmlFor="editar-doc-substituto" className="block text-small font-medium text-ink mb-1">
+                Substituir Arquivo Atual (Opcional)
+              </label>
+              <input
+                id="editar-doc-substituto"
+                name="arquivo"
+                type="file"
+                accept="image/jpeg,image/png,application/pdf"
+                className="w-full border border-line bg-surface p-2 text-small text-ink rounded file:mr-3 file:py-1 file:px-3 file:border-0 file:text-xs file:font-semibold file:bg-seal file:text-paper file:rounded hover:file:opacity-90 cursor-pointer"
+              />
+              <span className="text-[11px] text-ink-muted block mt-1">
+                Arquivo atual: {docParaEditar.nomeOriginal} (v{docParaEditar.versao}). O envio incrementará a versão.
+              </span>
+            </div>
+
+            <div className="pt-4 border-t border-line flex justify-end gap-2">
+              <Selo
+                voz="linha"
+                type="button"
+                onClick={() => setDocParaEditar(null)}
+                disabled={salvandoEdicao}
+                className="text-xs"
+              >
+                Cancelar
+              </Selo>
+              <Selo
+                voz="selo"
+                type="submit"
+                carregando={salvandoEdicao}
+                textoCarregando="Salvando…"
+                className="text-xs"
+              >
+                Salvar Alterações
+              </Selo>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* =====================================================================
+          MODAL 4: EXCLUIR DOCUMENTO (AUDITORIA EM DADOS EXCLUIDOS)
+          ===================================================================== */}
+      <Modal
+        aberto={Boolean(docParaExcluir)}
+        aoFechar={() => setDocParaExcluir(null)}
+        titulo={`Excluir Documento de ${docParaExcluir?.pessoaNome ?? ""}`}
+        larguraMaxima="max-w-md"
+        ocultarRodapePadrao
+      >
+        {docParaExcluir && (
+          <div className="space-y-4">
+            <p className="text-small text-ink-muted leading-relaxed">
+              Tem certeza que deseja excluir este documento (
+              <strong>{ROTULO_TIPO[docParaExcluir.tipo] ?? docParaExcluir.tipo}</strong>)?
+              O arquivo será removido do Storage e um snapshot de integridade será arquivado em Dados Excluídos.
+            </p>
+
+            {docParaExcluir.status === "aprovado" && (
+              <Alerta tom="atencao">
+                Este documento está <strong>Aprovado</strong>. Ao excluí-lo, a aptidão cadastral do colaborador será
+                automaticamente reavaliada e revogada se não houver outro documento válido.
+              </Alerta>
+            )}
+
+            <Campo
+              id="motivo-exclusao-doc"
+              rotulo="Motivo da exclusão (para auditoria)"
+              value={motivoExclusao}
+              onChange={(e) => setMotivoExclusao(e.target.value)}
+              placeholder="Ex.: Documento duplicado ou ilegível a pedido do gestor"
+            />
+
+            {erroExcluir && <Alerta tom="critico">{erroExcluir}</Alerta>}
+
+            <div className="pt-3 border-t border-line flex justify-end gap-2">
+              <Selo
+                voz="linha"
+                onClick={() => setDocParaExcluir(null)}
+                disabled={excluindoDoc}
+                className="text-xs"
+              >
+                Cancelar
+              </Selo>
+              <Selo
+                voz="perigo"
+                onClick={handleConfirmarExclusao}
+                carregando={excluindoDoc}
+                textoCarregando="Excluindo…"
+                className="text-xs"
+              >
+                Confirmar Exclusão
+              </Selo>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* =====================================================================
+          MODAL 5: MOTIVO DE REJEIÇÃO DO DOCUMENTO
+          ===================================================================== */}
       <Modal
         aberto={modalRejeicaoAberto}
         aoFechar={() => setModalRejeicaoAberto(false)}

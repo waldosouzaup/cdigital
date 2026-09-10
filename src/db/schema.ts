@@ -81,6 +81,9 @@ export const notificationTypeEnum = pgEnum("tipo_notificacao", [
   "vigencia_a_vencer",
   "resumo_diario",
   "pessoa_apta",
+  "distrato_enviado",
+  "contrato_assinado",
+  "convite_usuario",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -270,9 +273,66 @@ export const regions = pgTable(
       as: "permissive",
       for: "update",
       to: authenticatedRole,
-      using: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
-      withCheck: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
-    }),  ],
+      using: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+      withCheck: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+    }),
+    pgPolicy("regioes_delete_gestor", {
+      as: "permissive",
+      for: "delete",
+      to: authenticatedRole,
+      using: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+    }),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// funcoes_pretendidas — Catálogo de atividades/funções pretendidas para candidatura
+// ---------------------------------------------------------------------------
+
+export const intendedRoles = pgTable(
+  "funcoes_pretendidas",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organizacao_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("nome").notNull(),
+    description: text("descricao"),
+    active: boolean("ativa").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("funcoes_pretendidas_org_nome_idx").on(
+      table.organizationId,
+      sql`lower(trim(${table.name}))`,
+    ),
+    index("funcoes_pretendidas_org_ativa_idx").on(table.organizationId, table.active),
+    pgPolicy("funcoes_select", {
+      as: "permissive",
+      for: "select",
+      to: authenticatedRole,
+      using: sql`${table.organizationId} = (select public.organizacao_id()) OR (select public.papel()) = 'superadmin'`,
+    }),
+    pgPolicy("funcoes_insert_gestor", {
+      as: "permissive",
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+    }),
+    pgPolicy("funcoes_update_gestor", {
+      as: "permissive",
+      for: "update",
+      to: authenticatedRole,
+      using: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+      withCheck: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+    }),
+    pgPolicy("funcoes_delete_gestor", {
+      as: "permissive",
+      for: "delete",
+      to: authenticatedRole,
+      using: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+    }),
+  ],
 );
 
 // ---------------------------------------------------------------------------

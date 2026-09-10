@@ -17,6 +17,10 @@ import { createClient } from "@/lib/supabase/server";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { validarEntradaUsuario } from "@/lib/equipe/validacao";
 import { gerarSenhaTemporaria } from "@/lib/auth/senha-temporaria";
+import { sendNotification } from "@/lib/notificacoes/enviar";
+import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
+import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
+import { renderizarEmailConviteUsuario } from "@/emails/convite-usuario";
 
 // Espelha o enum `papel_usuario` do schema
 const PAPEIS_BASE = ["gestor", "coord_comite", "coord_regiao", "contratado", "auditor"] as const;
@@ -151,7 +155,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return Response.json({ ok: true, senhaTemporaria });
+  // Dispara e-mail personalizado com credenciais e aviso de troca obrigatória imediata
+  let emailEnviado = false;
+  try {
+    const baseUrl = process.env.APP_URL || "http://localhost:3000";
+    const { subject, html, text } = await renderizarEmailConviteUsuario({
+      nome,
+      email,
+      papel: papelNovo,
+      senhaTemporaria,
+      urlLogin: `${baseUrl}/login`,
+    });
+
+    const resultadoEnvio = await sendNotification({
+      supabase: admin,
+      transport: transporteEmailPadrao(),
+      organizationId,
+      type: "convite_usuario",
+      recipientEmail: email,
+      entity: "usuarios",
+      entityId: userId,
+      idempotencyKey: idempotencyKey("convite_usuario", userId, Date.now().toString()),
+      subject,
+      html,
+      text,
+    });
+
+    emailEnviado = resultadoEnvio.sent;
+  } catch (errEnvio) {
+    console.warn("Não foi possível despachar e-mail de convite para o usuário:", errEnvio);
+  }
+
+  return Response.json({ ok: true, senhaTemporaria, emailEnviado });
 }
 
 export async function PUT(request: NextRequest) {
@@ -375,7 +410,7 @@ export async function PATCH(request: NextRequest) {
 
   const { data: membro } = await admin
     .from("usuarios")
-    .select("id")
+    .select("id, nome, email, papel")
     .eq("id", corpo.id)
     .eq("organizacao_id", organizationId)
     .maybeSingle();
@@ -393,7 +428,38 @@ export async function PATCH(request: NextRequest) {
     if (error) {
       return Response.json({ ok: false, erro: "Não foi possível redefinir a senha." }, { status: 500 });
     }
-    return Response.json({ ok: true, senhaTemporaria });
+
+    let emailEnviado = false;
+    try {
+      const baseUrl = process.env.APP_URL || "http://localhost:3000";
+      const { subject, html, text } = await renderizarEmailConviteUsuario({
+        nome: membro.nome,
+        email: membro.email,
+        papel: membro.papel,
+        senhaTemporaria,
+        urlLogin: `${baseUrl}/login`,
+      });
+
+      const resultadoEnvio = await sendNotification({
+        supabase: admin,
+        transport: transporteEmailPadrao(),
+        organizationId,
+        type: "convite_usuario",
+        recipientEmail: membro.email,
+        entity: "usuarios",
+        entityId: membro.id,
+        idempotencyKey: idempotencyKey("convite_usuario", membro.id, Date.now().toString()),
+        subject,
+        html,
+        text,
+      });
+
+      emailEnviado = resultadoEnvio.sent;
+    } catch (errEnvio) {
+      console.warn("Não foi possível despachar e-mail de redefinição de senha:", errEnvio);
+    }
+
+    return Response.json({ ok: true, senhaTemporaria, emailEnviado });
   }
 
   // --- (Des)ativar acesso ---
