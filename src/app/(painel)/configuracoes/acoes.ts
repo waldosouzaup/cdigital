@@ -54,6 +54,7 @@ export async function salvarTemplate(
     objeto,
     corpo_html: corpoHtml,
     valor_padrao: valorPadrao,
+    ...(id ? {} : { ativo: true }),
   };
 
   const { error } = id
@@ -65,6 +66,7 @@ export async function salvarTemplate(
   }
 
   revalidatePath("/configuracoes");
+  revalidatePath("/contratos");
   return { status: "sucesso", mensagem: id ? "Modelo atualizado." : "Modelo criado." };
 }
 

@@ -1,6 +1,6 @@
 # Comitê Digital
 
-> **Plataforma SaaS Multi-organização para Gestão de Equipes Temporárias, Governança Contratual e Prestação de Contas em Tempo Real.**
+> **Plataforma SaaS Multi-organização para Gestão de Equipes Temporárias, Governança Contratual, Prestação de Contas em Tempo Real e Administração Centralizada de Campanhas.**
 
 ---
 
@@ -10,11 +10,11 @@
 2. [Panorama Geral da Solução](#2-panorama-geral-da-solução)
 3. [Aplicabilidade e Cenários](#3-aplicabilidade-e-cenários)
 4. [A Estrutura da Solução](#4-a-estrutura-da-solução)
-5. [Abordagem Estratégica Adotada](#5-abordagem-estratégica-adotada)
+5. [Abordagem Estratégica e Governança](#5-abordagem-estratégica-e-governança)
 6. [Impacto e Resultados Esperados](#6-impacto-e-resultados-esperados)
-7. [Evolução e Próximas Etapas](#7-evolução-e-próximas-etapas)
+7. [Evolução e Roadmap Entregue](#7-evolução-e-roadmap-entregue)
 8. [Pilares Tecnológicos e Conceituais](#8-pilares-tecnológicos-e-conceituais)
-9. [Considerações Finais e Guia Rápido](#9-considerações-finais)
+9. [Guia Rápido de Instalação e Execução](#9-guia-rápido-de-instalação-e-execução)
 
 ---
 
@@ -34,10 +34,11 @@ Esse arranjo improvisado gera um conjunto crítico de falhas operacionais, finan
 | **Documentos dispersos nomeados aleatoriamente por UUIDs ou nomes crípticos** | Upload direto e desestruturado, sem catalogação padronizada por tipo de documento, pessoa e versão. |
 | **Proliferação de duplicatas não detectadas (`Rg.pdf`, `Rg(1).pdf`)** | Falta de controle de integridade por soma criptográfica (hash SHA-256) na recepção de arquivos. |
 | **Documentos pessoais ilegíveis (fotos com resolução de 72×72 pixels)** | Inexistência de inspeção e validação síncrona de dimensões e qualidade mínima no momento do upload. |
-| **Erros tipográficos e financeiros em contratos (ex.: `R$ R$ 3.553,00,00` ou divergências no valor por extenso)** | Elaboração artesanal de contratos em editores de texto sem automação de templates ou tradução algorítmica de numerais monetários para texto por extenso. |
-| **Vazamento e exposição de dados sensíveis (CPF, RG, CNH e dados bancários) sem controle** | Armazenamento em diretórios públicos ou compartilhados sem segregação de privilégios, sem criptografia de acesso e sem registro de acessos (não conformidade com a LGPD). |
-| **Quebra de automações e scripts por caracteres inválidos ou espaços no fim de nomes de pastas** | Falta de padronização na taxonomia do armazenamento; dependência de caminhos físicos arbitrários. |
-| **Descumprimento de prazos e descontrole de vigências** | Ausência de agendadores de tarefas em segundo plano e disparadores de notificações automatizadas de vencimento e cobrança. |
+| **Erros tipográficos e financeiros em contratos (ex.: `R$ 3.553,00,00` ou divergências no valor por extenso)** | Elaboração artesanal de contratos em editores de texto sem automação de templates ou tradução algorítmica de numerais monetários para texto por extenso. |
+| **Cálculo impreciso e litigioso em rescisões antecipadas (distratos)** | Falta de cálculo proporcional automático de dias trabalhados e ausência de emissão de termo de rescisão padronizado. |
+| **Perda de histórico ao remover colaboradores ou contratos cancelados** | Exclusões destrutivas no banco sem snapshot de auditoria (`DadosExcluidos`), gerando insegurança contábil e jurídica. |
+| **Vazamento e exposição de dados sensíveis (CPF, RG, CNH, Chave PIX) sem controle** | Armazenamento em diretórios públicos ou compartilhados sem segregação de privilégios, sem criptografia de acesso e sem registro de acessos (não conformidade com a LGPD). |
+| **Descontrole na criação e inicialização de comitês eleitorais e projetos** | Falta de um perfil de governança de topo (**SuperAdmin**) capaz de instanciar campanhas e provisionar comitês e seus primeiros gestores de forma segura. |
 
 Em suma, **a localização física ou lógica de um arquivo nunca deve representar o estado de um negócio**. A dependência de conferência visual humana sobre coleções desordenadas de arquivos torna auditorias impraticáveis e impõe riscos severos de glosas eleitorais, autuações trabalhistas e prejuízos financeiros.
 
@@ -45,20 +46,20 @@ Em suma, **a localização física ou lógica de um arquivo nunca deve represent
 
 ## 2. Panorama Geral da Solução
 
-O **Comitê Digital** é uma plataforma SaaS (*Software as a Service*) multi-organização projetada para centralizar, automatizar e blindar a gestão de equipes temporárias, a emissão e coleta de contratos por período determinado e a prestação de contas operacional. 
+O **Comitê Digital** é uma plataforma SaaS (*Software as a Service*) multi-organização projetada para centralizar, automatizar e blindar a gestão de equipes temporárias, a emissão e coleta de contratos por período determinado, a formalização de distratos com cálculo proporcional e a prestação de contas operacional em tempo real.
 
-O sistema substitui pastas estáticas por uma arquitetura viva orientada a eventos, estruturando todo o fluxo desde a captação de dados em campo até a visualização executiva consolidada em tempo real.
+O sistema substitui pastas estáticas por uma arquitetura viva orientada a eventos, estruturando todo o fluxo desde a captação de dados em campo até a visualização executiva consolidada:
 
 ```
-┌─────────────────┐       ┌────────────────────────┐       ┌─────────────────┐
-│  Link Público   │ ────► │  Motor de Validação &  │ ────► │ Painel Gestor   │
-│   de Coleta     │       │   Máquina de Estados   │       │ em Tempo Real   │
-│ (Sem login/PWA) │       │ (Hash, OCR, Extenso)   │       │ (Auditoria/RLS) │
-└─────────────────┘       └────────────────────────┘       └─────────────────┘
-         │                            │                             │
-         ▼                            ▼                             ▼
-  Coleta Rápida             Integridade Garantida         Conformidade Plena
- (360px / Celular)       (Storage Privado / Eventos)       (TSE / MTE / LGPD)
+┌──────────────────┐       ┌────────────────────────┐       ┌──────────────────┐
+│ Inscrição/Coleta │ ────► │  Motor de Validação &  │ ────► │  Painel Gestor   │
+│   Pública PWA    │       │   Máquina de Estados   │       │   & SuperAdmin   │
+│ (Sem login/Token)│       │ (Hash, OCR, Extenso)   │       │ (Auditoria/RLS)  │
+└──────────────────┘       └────────────────────────┘       └──────────────────┘
+         │                            │                              │
+         ▼                            ▼                              ▼
+  Coleta Rápida             Integridade Garantida          Conformidade Plena
+ (360px / Celular)       (Storage Privado / Eventos)        (TSE / MTE / LGPD)
 ```
 
 ### O Princípio Central da Arquitetura
@@ -70,19 +71,19 @@ O Comitê Digital fundamenta-se em um axioma técnico que elimina as falhas conv
 
 ### Proposta de Valor Integrada
 
-1. **Alimentação Descentralizada e sem Fricção:** O contratado submete seus documentos por meio de links de coleta públicos e seguros (`/coleta/[token]`), sem necessidade de criar contas ou memorizar senhas.
-2. **Triagem Técnica e Qualificação Automática:** Cada anexo recebido passa por validação imediata de dimensões de imagem, formato MIME e unicidade de hash criptográfico antes de ser aceito.
-3. **Formalização Automatizada:** Templates contratuais inteligentes são mesclados com dados cadastrais e valores por extenso gerados algorítmicamente, eliminando discrepâncias financeiras.
-4. **Visibilidade e Acompanhamento Ativo:** O gestor acompanha a evolução dos quadros em painel em tempo real atualizado via WebSockets (com fallback para polling inteligente), permitindo detalhamento progressivo até a cópia do documento com dois cliques.
-5. **Automação de Alertas e Ciclo de Vida:** O sistema antecipa ações críticas — envia lembretes de assinatura, notifica sobre contratos próximos ao vencimento e expede resumos diários para as lideranças operacionais.
+1. **Alimentação Descentralizada e sem Fricção:** O contratado submete seus documentos e assina termos através de links seguros (`/coleta/[token]`, `/inscricao/[slug]` e `/assinar/[token]`), com suporte a PWA e formulários responsivos.
+2. **Triagem Técnica e Qualificação Automática:** Cada anexo recebido passa por validação imediata de dimensões de imagem, formato MIME e cálculo instantâneo de **hash SHA-256** para bloquear duplicatas.
+3. **Formalização Automatizada & Modelos Dinâmicos:** Criação e edição de minutas contratuais personalizáveis com interpolação de marcadores dinâmicos (`{{nome}}`, `{{cpf}}`, `{{valor}}`, etc.) e geração de valores por extenso algorítmica.
+4. **Rescisões e Distratos com Cálculo Proporcional:** Ao distratar, o gestor define o período de vigência efetivo; o sistema calcula os dias trabalhados, divide o valor do contrato proporcionalmente e gera o PDF de distrato oficial.
+5. **Governança de Exclusão com DadosExcluidos:** Exclusões de contratos e membros limpam a visão operacional do painel, mas gravam automaticamente um snapshot integral imutável na tabela `DadosExcluidos` (`dados_excluidos`), preservando o nome e login do executor.
+6. **Visibilidade Executiva Térmica e Drill-down:** Dashboard com escala térmica contextual em "Conclusão por Região" (cores de calor dinâmicas baseadas na porcentagem de conclusão), funil de conversão vibrante e detalhamento nominal direto ao clicar em qualquer "Objeto Contratual".
+7. **Gestão de Acessos & Função SuperAdmin:** CRUD completo de membros de equipe com salvaguardas (bloqueio de autoexclusão e trava de único gestor) e perfil **SuperAdmin** para criação centralizada de campanhas, definição de slugs e provisionamento de gestores.
 
 ---
 
 ## 3. Aplicabilidade e Cenários
 
-Embora concebido a partir das dores agudas verificadas em **comitês de campanha eleitoral**, o modelo de domínio do Comitê Digital é agnóstico e extensível a qualquer operação intensiva que envolva trabalho temporário por período determinado:
-
-### Cenários Típicos de Aplicação
+Embora concebido com base nas dores operacionais de **comitês de campanha eleitoral**, o modelo de domínio do Comitê Digital é agnóstico e extensível a qualquer operação intensiva com trabalho temporário por período determinado:
 
 * **Comitês de Campanha Eleitoral:**
   * Gestão de centenas ou milhares de militantes, cabos eleitorais, coordenadores de comitê e equipes itinerantes.
@@ -95,8 +96,8 @@ Embora concebido a partir das dores agudas verificadas em **comitês de campanha
   * Formalização ágil de prestadores de serviços pontuais e subcontratados em projetos com prazo definido.
   * Manutenção de acervo comprobatório de conformidade trabalhista e previdenciária, mitigando riscos de solidariedade passiva.
 * **Ações de Trade Marketing e Varejo Sazonal:**
-  * Contratação de promotores temporários para campanhas de datas sazonais (Black Friday, Natal, ações de verão).
-  * Registro geo-referenciado e fotográfico de atividades de campo com operação offline em terminais móveis.
+  * Contratação de promotores temporários para campanhas sazonais (Black Friday, Natal, campanhas de verão).
+  * Registro de presença, atividades de campo e gestão de pagamentos via Chave PIX.
 
 ---
 
@@ -107,218 +108,207 @@ A solução organiza-se em camadas funcionais coerentes, implementadas sobre uma
 ```
 src/
 ├── app/
-│   ├── (auth)/             # Fluxos de entrada (Login sem senha, Verificação, MFA TOTP)
+│   ├── (auth)/             # Fluxos de entrada (Login e-mail/senha, Redefinição de senha temporária, MFA)
 │   ├── (painel)/           # Aplicação corporativa segura protegida por RLS
-│   │   ├── dashboard/      # Matriz categoria × status, funil de conversão e pendências
-│   │   ├── pessoas/        # Gestão cadastral de contratados e conferência documental
-│   │   ├── contratos/      # Ciclo de vida contratual, emissão e assinatura
+│   │   ├── dashboard/      # Matriz categoria × status, escala térmica por região e funil de conversão
+│   │   │   └── contratos/  # Listagem nominal detalhada por Objeto Contratual (Drill-down)
+│   │   ├── pessoas/        # Gestão cadastral, condição documental, Chave PIX e relatório demográfico (idade)
+│   │   ├── contratos/      # Ciclo de vida contratual, filtro por status, emissão, exclusão auditada e distrato
 │   │   ├── documentos/     # Repositório de arquivos auditado e visualização protegida
-│   │   ├── atividades/     # Registro operacional de campo (3 toques)
-│   │   └── configuracoes/  # Gestão de templates, regiões e parâmetros da organização
+│   │   └── configuracoes/  # Central unificada: Equipe (CRUD), Regiões, Atividades, Minutas, Identidade e SuperAdmin
 │   ├── coleta/[token]/     # Interface pública de onboarding responsivo
+│   ├── inscricao/[slug]/   # Página pública de autoinscrição por campanha/organização
+│   ├── assinar/[token]/    # Interface pública de assinatura de contrato com evidências
 │   └── api/
-│       ├── cron/           # Endpoints agendados protegidos por CRON_SECRET
+│       ├── equipe/convite  # Rota com isolamento de privilégios para CRUD e credenciais da equipe
+│       ├── superadmin/     # Rota administrativa para criação de campanhas e provisionamento de 1º gestor
+│       ├── cron/           # Endpoints agendados protegidos por CRON_SECRET (vigência, lembrete, resumo)
 │       └── webhooks/       # Receptor assinado de eventos de e-mail (Resend)
 ├── db/                     # Camada de persistência Drizzle ORM, schemas e migrations
 ├── emails/                 # Componentes tipados de e-mail transacional (React Email)
 └── lib/                    # Regras de negócio puras, clientes de infraestrutura e serviços
-    ├── atividades/         # Sincronização offline e fila de atividades
+    ├── atividades/         # Sincronização offline e fila de atividades de rua
     ├── auditoria/          # Registrador central de trilha e acessos
-    ├── contratos/          # Máquina de estados, gerador de PDF e extenso pt-BR
+    ├── contratos/          # Máquina de estados, distrato proporcional, gerador de PDF e extenso pt-BR
     ├── cron/               # Rotinas de tarefas periódicas e agendamento
-    ├── dashboard/          # Motores de agregação estatística e relatórios
+    ├── dashboard/          # Motores de agregação estatística, escalas térmicas e exportações
     ├── documentos/         # Validação de upload, hash SHA-256 e inspeção Sharp
+    ├── equipe/             # Validações de entrada de membros e regras de privilégios
     ├── notificacoes/       # Disparador idempotente e tratamento de retentativas
     ├── realtime/           # Gerenciador de assinaturas Postgres Changes
     └── supabase/           # Clientes tipados isolados (client, server, admin)
 ```
 
+---
+
 ### Componentes Principais
 
 #### 1. Autenticação, Perfis e Controle de Acesso (RBAC)
-* **Login sem senha (*Magic Links*):** Autenticação segura sem atrito de credenciais estáticas.
-* **MFA Obrigatório via TOTP:** Exigência incondicional de segundo fator de autenticação (`aal2`) para perfis administrativos (`gestor` e `coord_comite`).
-* **Segregação Estrita por Região:** Coordenadores regionais (`coord_regiao`) têm seu escopo de visibilidade limitado exclusivamente aos contratados de sua respectiva base geográfica, garantido diretamente na camada de banco de dados via PostgreSQL Row Level Security (RLS).
 
-| Papel | Dashboard Consolidado | Cadastrar Pessoas | Emitir Contratos | Assinar / Distratar | Ver Log de Auditoria |
-|---|:---:|:---:|:---:|:---:|:---:|
-| **gestor** | Global | Global | Sim | Sim | Sim |
-| **coord_comite** | Global | Global | Sim | Sim | Não |
-| **coord_regiao** | Apenas sua região | Apenas sua região | Não | Não | Não |
-| **auditor** | Global (Leitura) | Não | Não | Não | Sim |
-| **contratado** | Não | Não | Não | Próprio Contrato | Não |
+O sistema opera sob isolamento estrito via PostgreSQL Row Level Security (RLS) e claims injetadas no JWT:
 
-#### 2. Módulo de Triagem e Documentação Digital
-* **Link de Coleta Público (`/coleta/[token]`):** Token criptográfico de uso controlado e prazo de expiração configurável, permitindo ao contratado enviar documentos do próprio smartphone.
-* **Validação Síncrona Rigorosa:**
-  * Rejeição automática de imagens com resolução inferior a **800 px** na menor dimensão (evitando uploads de thumbnails ou fotos ilegíveis).
-  * Cálculo instantâneo de **hash SHA-256** para bloquear envios duplicados do mesmo arquivo dentro da organização.
-  * Nomenclatura gerada deterministicamente pelo sistema: `{organizacao_id}/{tipo}_{pessoa_id}_v{versao}.{ext}`, preservando o nome original apenas como metadado para auditoria.
+* **SuperAdmin (Governança Global):** Perfil de topo responsável pela configuração de novas campanhas eleitorais/organizações, gestão de slugs públicos e provisionamento dos primeiros gestores de cada comitê. Possui visibilidade cross-organizacional.
+* **Gestor:** Administra integralmente a organização vinculada, coordena os acessos da equipe (CRUD completo), emite e cancela contratos, aprova documentação e configura modelos de minuta.
+* **Coordenador de Comitê (`coord_comite`):** Visão ampla da organização para triagem documental, emissão de contratos e fiscalização.
+* **Coordenador Regional (`coord_regiao`):** Escopo estritamente limitado à sua região administrativa de atuação via RLS.
+* **Auditor:** Acesso em modo leitura aos dados consolidados e trilha de auditoria para prestação de contas.
+* **Contratado:** Acesso pontual restrito ao seu próprio contrato e links públicos de coleta e assinatura.
 
-#### 3. Motor de Contratos e Máquina de Estados
-A tramitação de contratos segue um fluxo de estados rigorosamente definido:
-
-```
-[ rascunho ] ──► [ emitido ] ──► [ enviado ] ──► [ assinado ] ──► [ encerrado ]
-      │               │               │               │
-      │               │               │               └──► [ distratado ] ──► [ distrato_assinado ]
-      │               │               │
-      └───────► [ cancelado ] ◄───────┘
-```
-
-* **Transições Atômicas:** Toda mudança de estado registra um registro imutável em `eventos_contrato` dentro da mesma transação de banco de dados.
-* **Integridade Numérica:** O texto por extenso dos valores é computado por algoritmo gramatical oficial (`extenso`), eliminando contradições de digitação entre o numeral e o texto legal.
-* **Emissão em Lote e PDF Institucional:** Compilação automatizada de documentos com `pdf-lib`, gerando termos formatados para impressão ou assinatura digital.
-
-#### 4. Dashboard Executivo e Inteligência Operacional
-* **Matriz Categoria × Status:** Quadro matricial consolidando contratados por função e fase de tramitação, separando expressamente o quadro ativo dos distratos.
-* **Propagação Instantânea via Realtime:** Alterações efetuadas por operadores de campo refletem no painel do gestor em menos de 3 segundos através de WebSockets integrados ao Postgres Changes.
-* **Detalhamento Progressivo (*Drill-down* em 2 Cliques):** Qualquer métrica numérica na tela é clicável, abrindo a listagem nominal correspondente e, a partir dela, o documento ou contrato original.
-* **Exportação Multiformato:** Extração instantânea de relatórios analíticos em PDF formal e planilhas estruturadas em XLSX auditáveis (geradas via `exceljs`).
-
-#### 5. Coleta de Campo e Capacidade Offline (PWA)
-* **Interface Otimizada para Celular:** Desenvolvida sob viewport de 360 px, operável confortavelmente com apenas uma das mãos.
-* **Registro em 3 Toques:** Fluxo minimalista para registro de presença, tarefas e mobilização.
-* **Resiliência de Rede:** Armazenamento local temporário em IndexedDB com sincronização automática assim que a conectividade for restabelecida.
-
-#### 6. Automação e Mensageria
-* **Disparo Transacional via Resend:** Comunicação integrada por e-mail com layout responsivo construído em React Email.
-* **Garantia de Idempotência:** Chaves determinísticas únicas vinculadas a cada tipo de notificação impedem duplicidade de envios, mesmo em caso de retentativas.
-* **Agendamento com `pg_cron`:** Jobs periódicos que monitoram vencimento de vigências (alertas a 7 e 3 dias), cobrança de assinaturas pendentes (após 3 dias) e consolidação do resumo matinal diário às 8h (horário de Brasília).
+| Papel | Escopo de Visão | Criar Campanhas | Gerenciar Equipe | Emitir Contratos | Distratar / Excluir | Trilha de Auditoria |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **superadmin** | Cross-Campanhas | Sim | Global / Gestores | Sim | Sim | Sim |
+| **gestor** | Sua Organização | Não | Sim (CRUD) | Sim | Sim | Sim |
+| **coord_comite** | Sua Organização | Não | Não | Sim | Sim | Não |
+| **coord_regiao** | Apenas sua Região | Não | Não | Não | Não | Não |
+| **auditor** | Sua Organização (Leitura) | Não | Não | Não | Não | Sim |
+| **contratado** | Apenas o seu Contrato | Não | Não | Não | Não | Não |
 
 ---
 
-## 5. Abordagem Estratégica Adotada
+#### 2. Central Unificada de Configurações (`/configuracoes`)
 
-A concepção do Comitê Digital priorizou confiabilidade e segurança através de princípios de engenharia de software defensiva:
+A página de configurações unifica a governança da campanha em abas funcionais:
+
+1. **🔑 Equipe & Acessos (`?aba=equipe`):**
+   * **Visualizar (Read):** Modal com histórico, data de cadastro formatada, papel, e-mail, região e ID do usuário com botão de cópia.
+   * **Editar (Update):** Edição de nome, e-mail (sincronizado automaticamente com Supabase Auth), papel e região.
+   * **Excluir (Delete):** Remoção de acesso com **bloqueio de autoexclusão**, **bloqueio de exclusão do único gestor ativo** e snapshot integral arquivado na tabela `DadosExcluidos` com identificação de quem realizou a exclusão.
+   * **Convidar (Create):** Criação de acessos com geração de **senha temporária única**, que deve ser alterada obrigatoriamente no primeiro login.
+   * **Ações Ágeis:** Botões diretos para redefinição de senha e suspensão/reativação imediata de acesso.
+2. **🗺 Regiões de Atuação (`?aba=regioes`):** Cadastro e parametrização das bases geográficas e zonas de atuação.
+3. **📋 Atividades da Equipe (`?aba=atividades`):** Gestão e acompanhamento das atividades de mobilização de rua, centralizadas dentro de configurações.
+4. **🏛 Identidade da Campanha (`?aba=identidade`):** Definição do Nome do Comitê, CNPJ e **Slug público** (`/inscricao/<slug>`) para autoinscrição de equipes.
+5. **📄 Modelos de Minuta (`?aba=modelos`):** Criação e customização de minutas contratuais com suporte a variáveis dinâmicas (`{{nome}}`, `{{cpf}}`, `{{objeto}}`, `{{valor}}`, `{{vigencia_inicio}}`, `{{vigencia_fim}}`, etc.) e visualização prévia.
+6. **🛡 Proteção & LGPD (`?aba=seguranca`):** Controle de retenção com expurgo auditado pós-campanha e verificação em duas etapas (2FA).
+7. **👑 Campanhas & Gestores (`?aba=campanhas` — Exclusivo SuperAdmin):** Painel para criação de novas campanhas, visualização de comitês ativos e provisionamento do 1º gestor responsável com entrega de credenciais seguras.
+
+---
+
+#### 3. Gestão de Contratos, Distratos e Exclusão Segura (`/contratos`)
+
+* **Máquina de Estados Rigorosa:**
+  ```
+  [ rascunho ] ──► [ emitido ] ──► [ enviado ] ──► [ assinado ] ──► [ encerrado ]
+        │               │               │               │
+        │               │               │               └──► [ distratado ] ──► [ distrato_assinado ]
+        │               │               │
+        └───────► [ cancelado ] ◄───────┘
+  ```
+* **Filtro por Estado do Contrato:** Filtro completo no formulário de busca e pílulas rápidas (*filter chips*) para alternar entre `Todos`, `✓ Assinado`, `➤ Enviado`, `▸ Emitido`, `○ Rascunho`, `✕ Cancelado` e `✓✓ Encerrado`.
+* **Fluxo de Distrato com Período e Valor Proporcional:**
+  * O administrador clica em **Distrato** e um modal solicita o período de atuação (data de início e data final de rescisão).
+  * O sistema calcula os dias efetivamente trabalhados, divide o valor do contrato pelo período total e determina o valor proporcional exato a ser pago.
+  * É gerado o **Termo de Distrato Contratual em PDF** com base no modelo oficial de rescisão, contendo os dados das partes, período e valores discriminados.
+* **Exclusão de Contratado com Arquivamento em `DadosExcluidos`:**
+  * Permite ao gestor apagar o registro do painel ativo para despoluir a visualização.
+  * O contrato, a pessoa e todo o histórico de eventos são preservados de forma imutável na tabela `DadosExcluidos` (`dados_excluidos`), salvando o nome e login do executor e o motivo da exclusão.
+
+---
+
+#### 4. Dashboard Executivo e Visualização Térmica (`/dashboard`)
+
+* **Drill-down Nominal na Matriz por Objeto Contratual:** Ao clicar em qualquer função/objeto (ex.: *"Administrativo e Montagem de Material"*), o sistema redireciona para a listagem nominal detalhada de todos os colaboradores contratados para aquela função (`/dashboard/contratos?objeto=...`).
+* **Conclusão por Região com Escala Térmica:** Os cards de progresso regional utilizam uma escala térmica dinâmica — cores frias para baixos percentuais evoluindo gradualmente para tons quentes e destacados à medida que a taxa de conclusão se aproxima de 100%.
+* **Funil de Conversão Profissional:** Cores temáticas bem contrastadas para cada etapa da jornada (cadastros, documentação apta, contratos emitidos e contratos assinados).
+* **Propagação Instantânea via Realtime:** Alterações refletem em menos de 3 segundos via WebSockets Postgres Changes com fallback para polling inteligente.
+* **Exportação Analítica:** Relatórios em PDF institucional e planilhas em XLSX geradas via `exceljs`.
+
+---
+
+#### 5. Módulo de Pessoas e Análise Demográfica (`/pessoas`)
+
+* **Relatório Demográfico por Função e Região:** Filtro inteligente que calcula e apresenta a média de idade dos trabalhadores contratados, segmentada por função e localidade, auxiliando o planejamento de campo e conformidade legal.
+* **Gestão de Chave PIX e Dados Bancários:** Registro estruturado de chave PIX (CPF, e-mail, telefone ou chave aleatória), banco, agência e conta para liquidação financeira.
+* **Condição Documental:** Indicadores visuais claros de documentação apta ou pendente, com temas de alto contraste adaptados para modo claro e escuro.
+
+---
+
+#### 6. Assinatura Eletrônica e Evidências (`/assinar/[token]`)
+
+* **Link Público de Assinatura:** Contratados assinam termos contratuais diretamente pelo navegador (desktop ou smartphone).
+* **Captura de Evidências:** Registro de assinatura manuscrita (canvas), endereço IP, data/hora exata, *user agent* e geolocalização.
+* **Anexação no PDF Original:** A tecnologia `pdf-lib` adiciona uma página de evidências ao contrato final, consolidando a validade jurídica do ato.
+
+---
+
+## 5. Abordagem Estratégica e Governança
 
 ### Prevenção por Design (*The Pit of Success*)
-O sistema foi concebido para que o caminho correto seja o mais natural, tornando a falha operacional estruturalmente impossível:
-* Não há telas para criação manual de pastas ou definição de nomes de arquivo pelo usuário.
-* Uploads que não atendam a requisitos de legibilidade são recusados na porta de entrada com explicações claras.
-* Contratos só avançam para emissão caso a documentação pessoal obrigatória esteja aprovada.
+* Nomenclatura determinística e imutável de arquivos gerada pelo sistema: `{organizacao_id}/{tipo}_{pessoa_id}_v{versao}.{ext}`.
+* Imagens de documentos inspecionadas via `sharp` para rejeitar resoluções inferiores a 800 px.
+* Unicidade de arquivo garantida via hash criptográfico SHA-256.
 
-### Defesa em Profundidade
-A segurança da informação não depende de uma única barreira, articulando-se em quatro níveis concêntricos:
+### Defesa em Profundidade e Segregação da `service_role`
+* Toda operação ordinária utiliza o token JWT do usuário sob políticas de RLS.
+* A chave `SUPABASE_SERVICE_ROLE_KEY` é estritamente confinada em rotas de API seguras (`/api/equipe/convite`, `/api/superadmin/campanhas`) e rotinas cron, sendo terminantemente proibida na camada de apresentação por regras de linter (`no-restricted-imports`).
 
-```
- Camada 1: Interface (Validações de formulário, máscaras e feedback de UI)
-   Camada 2: Servidor (Server Actions, esquemas Zod, verificação de sessão)
-     Camada 3: Banco de Dados (PostgreSQL RLS, constraints CHECK, Foreign Keys)
-       Camada 4: Armazenamento (Buckets privados, URLs assinadas com TTL de 15 min)
-```
-
-### Segregação e Enclausuramento da `service_role`
-A chave administrativa `SUPABASE_SERVICE_ROLE_KEY` bypassa todas as políticas de segurança de linha (RLS) do banco de dados. Para mitigar o risco de vazamento entre organizações:
-* Toda requisição de usuário opera obrigatoriamente através da chave pública anônima munida do JWT do usuário autenticado.
-* A chave `service_role` é restrita a scripts de migração, rotinas do agendador e webhooks, ficando isolada em `src/lib/supabase/admin.ts`.
-* Uma regra de linter estrita (`no-restricted-imports`) bloqueia sumariamente a compilação caso qualquer módulo da área autenticada tente importar a chave administrativa.
-
-### Governança e Adequação à LGPD
-* **Minimização de Dados em Trânsito:** E-mails transacionais jamais contêm dados sensíveis (CPF, RG, valores de contrato ou dados bancários) no corpo da mensagem — funcionam estritamente como notificação de encaminhamento ao ambiente seguro.
-* **Rastreabilidade de Acesso:** Toda geração de link assinado para visualização de documentos pessoais é registrada no `log_auditoria`, com identificação do usuário, IP e timestamp.
-* **Isolamento Criptográfico e Temporal:** Documentos repousam em buckets fechados, e links temporários expiram automaticamente após 15 minutos.
+### Governança LGPD e Trilha de Auditoria
+* **Tabela `DadosExcluidos` (`dados_excluidos`):** Garante que exclusões no painel não representem perda irrecuperável de histórico contábil e jurídico.
+* **Minimização de Dados em Notificações:** E-mails transacionais não exibem dados sensíveis (CPF, RG, valores bancários) no corpo da mensagem.
+* **Expurgo Seguro de Retenção:** Rotina de expurgo definitivo pós-campanha para cumprimento do direito ao esquecimento e normas da LGPD.
 
 ---
 
 ## 6. Impacto e Resultados Esperados
 
-A implementação do Comitê Digital transforma a eficiência operacional da organização:
-
 | Indicador | Modelo Tradicional (Pastas / Planilhas) | Com o Comitê Digital |
 |---|---|---|
-| **Tempo de Consolidação de Relatórios** | De 4 a 8 horas abrindo arquivos dispersos | **Instantâneo (< 2 segundos)** no painel |
-| **Taxa de Erros em Valores Contratuais** | Frequente (erros de digitação e divergências por extenso) | **Zero** (valores formatados por algoritmo matemático) |
-| **Detecção de Arquivos Duplicados / Corrompidos** | Apenas em conferência visual manual posterior | **Imediata no upload** (bloqueio por hash e dimensão) |
-| **Risco de Acesso Indevido a Dados Pessoais** | Crítico (pastas acessíveis a toda a equipe) | **Mitigado** (RLS por organização, região e log contínuo) |
-| **Atrasos no Recolhimento de Assinaturas** | Frequente (dependente de cobrança humana manual) | **Automatizado** (notificações ativas com 3 dias de envio) |
-| **Prestação de Contas e Auditoria** | Morosa, sujeita a extravio de vias e impugnações | **Rastreável** (histórico completo de eventos e exportações) |
+| **Consolidação de Relatórios** | De 4 a 8 horas abrindo arquivos dispersos | **Instantâneo (< 2 segundos)** no painel |
+| **Erros em Valores e Extenso** | Frequente (erros de digitação manual) | **Zero** (algoritmo gramatical automatizado) |
+| **Cálculo de Distrato** | Manual, sujeito a contestações | **Automático por período de dias trabalhados** |
+| **Risco de Perda por Exclusão** | Irreversível (registro apagado) | **Protegido** (snapshot em DadosExcluidos) |
+| **Controle de Campanhas** | Múltiplas planilhas e contas separadas | **Centralizado via SuperAdmin** |
+| **Conferência Demográfica de Equipe** | Lenta, exigindo cruzamento de dados | **Relatório instantâneo de média de idade** |
+| **Arquivos Duplicados / Ilegíveis** | Detectados apenas em auditoria posterior | **Bloqueio síncrono no upload** |
 
 ---
 
-## 7. Evolução e Próximas Etapas
+## 7. Evolução e Roadmap Entregue
 
-O projeto foi estruturado em fases incrementais com gates de saída verificados de ponta a ponta:
-
-* [x] **Fase 1 — Fundação e Arquitetura de Segurança:** Modelagem relacional completa, isolamento multi-tenant via RLS, Custom Access Token Hook com injeção de claims no JWT, autenticação sem senha, MFA TOTP obrigatório e pipeline de testes unitários e de integração.
-* [x] **Fase 2 — Pessoas, Documentos e Contratos:** Gestão cadastral com validação de CPF, link público de coleta de documentos, upload síncrono com checagem de integridade SHA-256 e resolução mínima, versionamento de anexos, máquina de estados contratual e motor de compilação PDF.
-* [x] **Fase 3 — Dashboard em Tempo Real e Relatórios:** Agregações analíticas, canal WebSocket com Supabase Realtime (e fallback para polling), detalhamento progressivo em dois cliques, métricas de cobertura regional e exportação formal em PDF e XLSX.
-* [x] **Fase 4 — Campo, Mobilidade e Automações:** Interface mobile com registro em 3 toques, suporte a operação offline com fila local IndexedDB, automações de vigência, cobrança de assinatura e resumo matinal gerenciadas via `pg_cron` e rotas seguras.
-
-### Roadmap Estratégico de Evolução
-
-```
-[ Atual: Fases 1–4 Concluídas ]
-             │
-             ├──► 1. Assinatura Eletrônica Homologada (ICP-Brasil / Gov.br / Assinadores Externos)
-             ├──► 2. Pipeline de OCR Inteligente para pré-preenchimento assistido de RG/CNH
-             ├──► 3. Integração Direta com Layouts de Exportação do SPCE (Justiça Eleitoral)
-             ├──► 4. Módulo de Liquidação Financeira e Pagamentos em Lote via PIX
-             └──► 5. Painéis Preditivos de Acompanhamento e Produtividade em Campo
-```
-
-1. **Assinatura Eletrônica Qualificada e Avançada:** Integração com serviços de assinatura digital com validade jurídica ampliada (Gov.br, ICP-Brasil, ClickSign ou DocuSign).
-2. **OCR Multimodal Assistido:** Extração automática de dados biográficos a partir de documentos de identidade, com tela de conferência assistida obrigatória antes da persistência.
-3. **Módulo de Prestação de Contas Eleitorais (SPCE):** Geração parametrizada de arquivos e recibos eleitorais nos padrões exigidos pelos tribunais eleitorais.
-4. **Liquidação e Pagamentos via PIX:** Módulo de autorização de pagamentos das equipes com conciliação automática após a confirmação de cumprimento de vigência e atividades.
+* [x] **Fase 1 — Fundação e Segurança:** Modelagem relacional multi-tenant, RLS, injeção de claims no JWT, autenticação e testes unitários.
+* [x] **Fase 2 — Pessoas, Documentos e Contratos:** Gestão cadastral, validação de CPF, links públicos de coleta, verificação SHA-256 e motor de compilação PDF.
+* [x] **Fase 3 — Dashboard em Tempo Real e Relatórios:** Agregações analíticas, WebSockets Realtime, exportação em PDF e XLSX.
+* [x] **Fase 4 — Campo, Mobilidade e Automações:** Interface mobile 360 px, operação offline com IndexedDB, agendamento via `pg_cron` e Resend.
+* [x] **Fase 5 — Governança Avançada, Distratos e SuperAdmin:**
+  * [x] Perfil e migração de **SuperAdmin** com gestão centralizada de campanhas e provisionamento do 1º gestor.
+  * [x] CRUD completo de membros de equipe em `/configuracoes?aba=equipe` com travas de segurança.
+  * [x] Arquivamento permanente em `DadosExcluidos` (`dados_excluidos`) para contratos e membros.
+  * [x] Fluxo de distrato com inserção de período, cálculo proporcional de dias e emissão de PDF rescisório.
+  * [x] Filtro por status do contrato e navegação rápida via pílulas (*chips*).
+  * [x] Assinatura pública com coleta de evidências e anexação no PDF.
+  * [x] Drill-down nominal por Objeto Contratual no Dashboard.
+  * [x] Escala térmica contextual em Conclusão por Região.
+  * [x] Relatório demográfico de média de idade por Função e Região.
+  * [x] Centralização da gestão de atividades de rua dentro de configurações.
+  * [x] Criação e edição de modelos de minuta contratual com marcadores dinâmicos.
 
 ---
 
 ## 8. Pilares Tecnológicos e Conceituais
 
-A stack tecnológica foi selecionada com foco em produtividade, segurança de dados em repouso e em trânsito, e suporte nativo a execuções assíncronas:
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        CAMADA DE APRESENTAÇÃO                          │
-│        Next.js 15 (App Router)  ·  React 19  ·  Tailwind CSS v4        │
-│          PWA / IndexedDB  ·  Server Actions  ·  Route Handlers         │
-└────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                     NÚCLEO DE SERVIÇOS & DOMÍNIO                       │
-│    Máquina de Estados Contratual  ·  Motor de Validação de Mídia       │
-│  Notificações Idempotentes (Resend)  ·  Compilação PDF (pdf-lib)       │
-└────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                       PERSISTÊNCIA & SEGURANÇA                         │
-│   Supabase (PostgreSQL 15+)  ·  Drizzle ORM  ·  PostgreSQL RLS         │
-│   Auth Hooks (JWT Claims)  ·  Storage Privado  ·  pg_cron Jobs         │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-* **Frontend & Runtime:** [Next.js 15](https://nextjs.org/) (App Router, Server Actions para redução de superfície de API), [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/) em modo estrito, [Tailwind CSS v4](https://tailwindcss.com/) e suporte a PWA com [idb](https://github.com/jakearchibald/idb) (IndexedDB).
-* **Banco de Dados & BaaS:** [Supabase](https://supabase.com/) sobre [PostgreSQL 15+](https://www.postgresql.org/), com [Drizzle ORM](https://orm.drizzle.team/) para versionamento tipado de esquemas e controle de migrações.
-* **Segurança de Linha & Identidade:** Row Level Security (RLS) mandatório, Custom Access Token Hook para injeção direta de metadados (`organizacao_id`, `papel`, `regiao_id`) no JWT e autenticação multi-fator (MFA TOTP).
-* **Processamento de Mídia & Documentação:** [Sharp](https://sharp.pixelplumbing.com/) para inspeção e validação síncrona de dimensões de imagens; [pdf-lib](https://pdf-lib.js.org/) para renderização determinística de contratos; [exceljs](https://github.com/exceljs/exceljs) para geração segura de relatórios tabulares.
-* **Mensageria Transacional & Agendamento:** [Resend](https://resend.com/) associado ao [React Email](https://react.email/) com tratamento de chaves determinísticas de idempotência e retentativas exponenciais; agendamentos de segundo plano orquestrados pelo `pg_cron`.
-* **Qualidade de Software:** Cobertura de testes unitários com [Vitest](https://vitest.dev/) e testes de ponta a ponta e integração com [Playwright](https://playwright.dev/).
+* **Frontend & Runtime:** [Next.js 15](https://nextjs.org/) (App Router, Server Actions), [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/) estrito, [Tailwind CSS v4](https://tailwindcss.com/) e PWA com [idb](https://github.com/jakearchibald/idb).
+* **Banco de Dados & BaaS:** [Supabase](https://supabase.com/) sobre [PostgreSQL 15+](https://www.postgresql.org/), com [Drizzle ORM](https://orm.drizzle.team/) para versionamento tipado de esquemas e migrações SQL declarativas.
+* **Segurança de Linha & Identidade:** Row Level Security (RLS) estrito, Custom Access Token Hook para injeção de claims (`organizacao_id`, `papel`, `regiao_id`), permissões RBAC e proteção contra autoexclusão.
+* **Processamento de Mídia & Documentos:** [Sharp](https://sharp.pixelplumbing.com/) para validação síncrona de dimensões de imagens; [pdf-lib](https://pdf-lib.js.org/) para renderização determinística de contratos e distratos; [exceljs](https://github.com/exceljs/exceljs) para geração de planilhas de prestação de contas.
+* **Mensageria & Automação:** [Resend](https://resend.com/) e [React Email](https://react.email/) com chaves de idempotência; jobs agendados via `pg_cron`.
+* **Qualidade de Software:** 43 suítes com **286 testes unitários aprovados** em [Vitest](https://vitest.dev/), além de validação estrita de tipos (`npx tsc --noEmit`) e ESLint sem erros.
 
 ---
 
-## 9. Considerações Finais
+## 9. Guia Rápido de Instalação e Execução
 
-O **Comitê Digital** transcende a função de um simples repositório de documentos: consolida-se como uma infraestrutura de governança, conformidade e agilidade operacional projetada para organizações que operam sob prazos exíguos e fiscalização rigorosa. Ao alinhar uma experiência de uso simplificada para a ponta operacional em campo com controles estritos e auditáveis para a gestão central, a plataforma elimina o erro humano na raiz e assegura integridade em todas as etapas do ciclo de vida de contratos temporários.
-
----
-
-### Guia Rápido de Instalação e Execução
-
-#### 1. Pré-requisitos
+### 1. Pré-requisitos
 * **Node.js:** versão 20 ou superior (recomendado Node.js 22 LTS).
 * Instância do **Supabase** configurada com as migrações aplicadas.
 
-#### 2. Configuração de Variáveis de Ambiente
+### 2. Configuração de Variáveis de Ambiente
 Crie o arquivo `.env.local` na raiz do projeto com base no modelo `.env.example`:
 
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL="https://seu-projeto.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="sua-anon-key"
-SUPABASE_SERVICE_ROLE_KEY="sua-service-role-key" # Uso exclusivo de scripts/admin
+SUPABASE_SERVICE_ROLE_KEY="sua-service-role-key" # Uso exclusivo de rotas de admin/scripts
 DATABASE_URL="postgresql://postgres:senha@db.seu-projeto.supabase.co:5432/postgres"
 
 # Resend
@@ -331,7 +321,7 @@ APP_URL="http://localhost:3000"
 CRON_SECRET="chave-secreta-para-rotinas-agendadas"
 ```
 
-#### 3. Instalação e Execução Local
+### 3. Instalação e Execução Local
 
 ```bash
 # Instalação das dependências
@@ -347,22 +337,22 @@ npm run dev
 
 Acesse **http://localhost:3000** no navegador para utilizar a aplicação.
 
-#### 4. Suíte de Testes e Validação de Qualidade
+### 4. Suíte de Testes e Validação de Qualidade
 
 ```bash
-# Execução dos testes unitários
+# Execução dos 286 testes unitários
 npm run test:unit
 
-# Execução dos testes de integração (contra a base de dados)
-npm run test:integration
-
-# Verificação estática de tipos e análise de código
+# Verificação estática de tipos (TypeScript)
 npx tsc --noEmit
+
+# Análise de linting (ESLint)
 npm run lint
 
-# Build de produção
+# Build otimizado de produção
 npm run build
 ```
 
 ---
-*Comitê Digital — Tecnologia a serviço da conformidade, transparência e eficiência operacional.*
+
+*Comitê Digital — Tecnologia a serviço da governança, transparência e eficiência operacional.*

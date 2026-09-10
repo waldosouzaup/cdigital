@@ -255,7 +255,7 @@ describe("Gate Fase 2 — cadeia completa: pessoa → link → documento → con
 
     const { data: pessoa } = await admin
       .from("pessoas")
-      .select("nome_completo, cpf, endereco")
+      .select("nome_completo, cpf, endereco, chave_pix")
       .eq("id", pessoaId)
       .single();
 
@@ -284,6 +284,7 @@ describe("Gate Fase 2 — cadeia completa: pessoa → link → documento → con
       nome: pessoa!.nome_completo,
       cpf: pessoa!.cpf,
       endereco: pessoa!.endereco ?? "não informado",
+      chavePix: pessoa!.chave_pix ?? "não informada",
       objeto: "Militância e Mobilização de Rua",
       valor: `R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
       valorExtenso,

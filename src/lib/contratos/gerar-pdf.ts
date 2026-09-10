@@ -31,7 +31,12 @@ export function htmlParaTexto(html: string): string {
     .trim();
 }
 
-function quebrarLinha(texto: string, larguraMaxima: number, fonte: PDFFont, tamanho: number): string[] {
+function quebrarLinha(
+  texto: string,
+  larguraMaxima: number,
+  fonte: PDFFont,
+  tamanho: number,
+): string[] {
   if (!texto) return [""];
 
   const palavras = texto.split(" ");
@@ -60,8 +65,14 @@ const TAMANHO_FONTE = 11;
 const ALTURA_LINHA = 16;
 const TAMANHO_TITULO = 14;
 
-export async function gerarPdfContrato(params: { titulo: string; corpo: string }): Promise<Uint8Array> {
+export async function gerarPdfContrato(params: {
+  titulo: string;
+  corpo: string;
+}): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
+  // A leitura acessível vem dos mesmos bytes arquivados, sem regenerar o contrato.
+  pdfDoc.setTitle(params.titulo);
+  pdfDoc.setSubject(params.corpo);
   const fonteRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fonteNegrito = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   computarFunil,
   computarMatrizObjetoStatus,
+  computarResumoRegional,
   type Funil,
   type MatrizObjetoStatus,
 } from "@/lib/dashboard/agregacoes";
@@ -19,11 +20,11 @@ export interface VisaoRegional {
   nome: string;
   totalPessoas: number;
   pessoasAptas: number;
-  contratosAtivos: number;
-  contratosAssinados: number;
-  /** 0–100, ou null se a região não tem nenhuma pessoa (não é 0% — é "sem dado",
-   * mesmo cuidado da Seção 11 com Taguatinga: ausência não é zero). */
-  coberturaDocumentalPct: number | null;
+  pessoasComContratoAtivo: number;
+  pessoasComContratoAssinado: number;
+  /** % de pessoas com contrato assinado (conclusão). `null` se a região não tem
+   * ninguém — ausência não é zero (Seção 11, caso Taguatinga). */
+  conclusaoPct: number | null;
 }
 
 export interface PendenciaAgregada {
@@ -50,6 +51,8 @@ export interface PessoaResumo {
   apta: boolean;
   statusContrato: ContractStatus | null;
   objeto: string | null;
+  objetos?: string[];
+  valor: string | null;
   documentoId: string | null;
   contratoId: string | null;
 }
@@ -115,6 +118,16 @@ export async function buscarDadosDashboard(): Promise<DadosDashboard> {
     )[0];
     const documentoMaisRecente = [...(p.documentos ?? [])].sort((a, b) => b.versao - a.versao)[0];
 
+    const todosObjetos = Array.from(
+      new Set(
+        [
+          ...(p.contratos ?? []).map((c) => c.objeto),
+          p.funcao,
+          contratoMaisRecente?.objeto,
+        ].filter((o): o is string => Boolean(o && o.trim()))
+      )
+    );
+
     return {
       id: p.id,
       nomeCompleto: p.nome_completo,
@@ -123,7 +136,9 @@ export async function buscarDadosDashboard(): Promise<DadosDashboard> {
       regiaoNome: p.regioes?.nome ?? null,
       apta: p.apta,
       statusContrato: contratoMaisRecente?.status ?? null,
-      objeto: contratoMaisRecente?.objeto ?? null,
+      objeto: contratoMaisRecente?.objeto ?? p.funcao ?? null,
+      objetos: todosObjetos,
+      valor: contratoMaisRecente?.valor ?? null,
       documentoId: documentoMaisRecente?.id ?? null,
       contratoId: contratoMaisRecente?.id ?? null,
     };
@@ -136,22 +151,14 @@ export async function buscarDadosDashboard(): Promise<DadosDashboard> {
 
   const funil = computarFunil(pessoas.map((p) => ({ apta: p.apta, statusContrato: p.statusContrato })));
 
-  // Visão regional — cobertura documental = % de pessoas apta na região.
+  // Visão regional — conta PESSOAS distintas (pelo contrato mais recente de cada
+  // uma), não linhas de contrato. Regra pura e testada em agregacoes.ts.
   const regioes: VisaoRegional[] = (regioesBrutas ?? []).map((r) => {
-    const pessoasDaRegiao = (pessoasBrutas ?? []).filter((p) => p.regioes?.nome === r.nome);
-    const total = pessoasDaRegiao.length;
-    const aptas = pessoasDaRegiao.filter((p) => p.apta).length;
-    const contratosDaRegiao = pessoasDaRegiao.flatMap((p) => p.contratos ?? []);
-
-    return {
-      regiaoId: r.id,
-      nome: r.nome,
-      totalPessoas: total,
-      pessoasAptas: aptas,
-      contratosAtivos: contratosDaRegiao.filter((c) => ["emitido", "enviado", "assinado"].includes(c.status)).length,
-      contratosAssinados: contratosDaRegiao.filter((c) => c.status === "assinado").length,
-      coberturaDocumentalPct: total === 0 ? null : Math.round((aptas / total) * 100),
-    };
+    const pessoasDaRegiao = pessoas.filter((p) => p.regiaoNome === r.nome);
+    const resumo = computarResumoRegional(
+      pessoasDaRegiao.map((p) => ({ apta: p.apta, statusContrato: p.statusContrato })),
+    );
+    return { regiaoId: r.id, nome: r.nome, ...resumo };
   });
 
   // Central de pendências — agrega por código (mesmo código = mesma causa em

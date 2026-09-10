@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
-import { Archivo, IBM_Plex_Mono } from "next/font/google";
+import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-// Tipografia definida na Tarefa 8 (telas de auth), processo da skill front-end-design
-// — ver o comentário no topo de globals.css e o registro em CONSULTAS.md.
-const archivo = Archivo({
-  variable: "--font-archivo",
+// Tipografia oficial do projeto: Família Inter (fonte variável cobrindo pesos 100 a 900)
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  display: "swap",
 });
 
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -22,18 +22,37 @@ export const metadata: Metadata = {
     "Gestão de equipe temporária, contratos por período determinado e prestação de contas.",
 };
 
+const temaScript = `(function() {
+  try {
+    var salvo = localStorage.getItem('cd-theme');
+    if (salvo === 'dark') {
+      document.documentElement.dataset.theme = 'dark';
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.dataset.theme = 'light';
+      document.documentElement.classList.remove('dark');
+    }
+  } catch (e) {}
+})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // data-theme="dark" fixo: toda a aplicação (landing, auth, painel, coleta)
-  // renderiza no tema escuro. Sem isso, num navegador em modo claro os tokens de
-  // cor ficavam nos valores claros (texto escuro) sobre as cascas de fundo escuro
-  // fixo do painel/auth — texto invisível.
   return (
-    <html lang="pt-BR" data-theme="dark">
-      <body className={`${archivo.variable} ${plexMono.variable} antialiased`}>{children}</body>
+    <html
+      lang="pt-BR"
+      className={`${inter.variable} ${plexMono.variable} ${inter.className}`}
+      data-theme="light"
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: temaScript }} />
+      </head>
+      <body className={`${inter.className} antialiased bg-canvas text-ink`}>
+        {children}
+      </body>
     </html>
   );
 }

@@ -36,7 +36,7 @@ export function GraficoOrcamento({
     <div className={`space-y-6 border border-line bg-surface p-6 ${className}`}>
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-line pb-4">
         <div>
-          <span className="font-mono text-xs uppercase tracking-wider text-seal">
+          <span className="font-mono text-xs uppercase tracking-wider text-primary font-semibold">
             Finanças de Campanha · Prestação de Contas
           </span>
           <h3 className="text-h2 font-semibold text-ink">Comprometimento da Folha Temporária</h3>
@@ -51,17 +51,17 @@ export function GraficoOrcamento({
 
       {/* Cards de Resumo Financeiro */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 border border-line bg-paper">
+        <div className="p-4 border border-line bg-surface-sunken rounded-lg">
           <span className="text-xs text-ink-muted block">Total Comprometido em Contratos</span>
           <span className="font-mono text-2xl font-semibold text-ink">
             R$ {totalComprometido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
           </span>
-          <span className="text-[0.7rem] text-seal font-medium block mt-1">
+          <span className="text-[0.7rem] text-primary font-medium block mt-1">
             {percentualComprometido}% do teto alocado
           </span>
         </div>
 
-        <div className="p-4 border border-line bg-paper">
+        <div className="p-4 border border-line bg-surface-sunken rounded-lg">
           <span className="text-xs text-ink-muted block">Saldo Disponível para Contratações</span>
           <span className="font-mono text-2xl font-semibold text-success">
             R$ {saldoDisponivel.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
@@ -71,7 +71,7 @@ export function GraficoOrcamento({
           </span>
         </div>
 
-        <div className="p-4 border border-line bg-paper">
+        <div className="p-4 border border-line bg-surface-sunken rounded-lg">
           <span className="text-xs text-ink-muted block">Custo Médio por Colaborador</span>
           <span className="font-mono text-2xl font-semibold text-ink">
             R${" "}

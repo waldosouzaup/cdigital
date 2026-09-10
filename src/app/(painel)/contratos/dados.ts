@@ -3,13 +3,15 @@
  * templates ativos) para a tela de emissão — Fase 2, itens 8/10/11.
  */
 import { createClient } from "@/lib/supabase/server";
-import { ACTIVE_BOARD_STATUSES, type ContractStatus } from "@/lib/contratos/maquina-estados";
+import { type ContractStatus } from "@/lib/contratos/maquina-estados";
 
 export interface ContratoListado {
   id: string;
   pessoaId: string;
   pessoaNome: string;
   pessoaCpf: string;
+  pessoaEmail: string | null;
+  pessoaTelefone: string | null;
   objeto: string;
   valor: string;
   valorExtenso: string;
@@ -38,30 +40,50 @@ interface LinhaContrato {
   caminho_pdf: string | null;
   caminho_pdf_assinado: string | null;
   caminho_termo_distrato: string | null;
-  pessoas: { nome_completo: string; cpf: string } | null;
+  pessoas: {
+    nome_completo: string;
+    cpf: string;
+    email: string | null;
+    telefone: string | null;
+  } | null;
   regioes: { nome: string } | null;
 }
 
-const SELECAO_CONTRATO =
-  "id, pessoa_id, objeto, valor, valor_extenso, vigencia_inicio, vigencia_fim, status, canal_envio, enviado_para, caminho_pdf, caminho_pdf_assinado, caminho_termo_distrato, pessoas ( nome_completo, cpf ), regioes ( nome )";
+export interface FiltrosContratos {
+  busca: string;
+  status?: string;
+  aba: "ativos" | "distratos";
+  pagina: number;
+  porPagina: number;
+}
 
-export async function listarContratos(): Promise<ContratoListado[]> {
+export interface PaginaContratos extends FiltrosContratos {
+  contratos: ContratoListado[];
+  totalAtivos: number;
+  totalDistratos: number;
+  total: number;
+}
+
+export async function listarContratos(filtros: FiltrosContratos): Promise<PaginaContratos> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("contratos")
-    .select(SELECAO_CONTRATO)
-    .order("criado_em", { ascending: false })
-    .returns<LinhaContrato[]>();
-
+  const { data: resultado, error } = await supabase.rpc("buscar_contratos_paginados", {
+    p_busca: filtros.busca,
+    p_aba: filtros.aba,
+    p_pagina: filtros.pagina,
+    p_limite: filtros.porPagina,
+    p_status: filtros.status || "",
+  });
   if (error) throw new Error("Não foi possível carregar os contratos.");
-
-  return (data ?? []).map((linha) => ({
+  const data = resultado.itens as LinhaContrato[];
+  const contratos = (data ?? []).map((linha) => ({
     id: linha.id,
     pessoaId: linha.pessoa_id,
     pessoaNome: linha.pessoas?.nome_completo ?? "—",
     pessoaCpf: linha.pessoas?.cpf ?? "—",
+    pessoaEmail: linha.pessoas?.email ?? null,
+    pessoaTelefone: linha.pessoas?.telefone ?? null,
     objeto: linha.objeto,
-    valor: linha.valor,
+    valor: String(linha.valor),
     valorExtenso: linha.valor_extenso,
     vigenciaInicio: linha.vigencia_inicio,
     vigenciaFim: linha.vigencia_fim,
@@ -73,6 +95,14 @@ export async function listarContratos(): Promise<ContratoListado[]> {
     signedPdfPath: linha.caminho_pdf_assinado,
     distratoTermPath: linha.caminho_termo_distrato,
   }));
+  return {
+    ...filtros,
+    contratos,
+    pagina: resultado.pagina,
+    total: resultado.total,
+    totalAtivos: resultado.ativos,
+    totalDistratos: resultado.distratos,
+  };
 }
 
 export interface TemplateParaEmissao {
@@ -110,46 +140,10 @@ export interface PessoaParaEmissao {
   regiaoNome: string | null;
 }
 
-/**
- * Pessoas aptas que ainda não têm nenhum contrato "vivo" (qualquer estado que não
- * seja um encerramento — distrato/cancelado/encerrado não impede um novo contrato).
- * PostgREST não faz anti-join direto por aqui, então filtra em memória — volume
- * esperado (centenas, não milhões) não justifica RPC só para isto.
- */
+/** Anti-join no banco; consultado somente ao abrir a emissão. */
 export async function listarPessoasAptasSemContratoAtivo(): Promise<PessoaParaEmissao[]> {
   const supabase = await createClient();
-
-  const [pessoasResp, contratosResp] = await Promise.all([
-    supabase
-      .from("pessoas")
-      .select("id, nome_completo, cpf, endereco, regioes ( nome )")
-      .eq("apta", true)
-      .returns<
-        { id: string; nome_completo: string; cpf: string; endereco: string | null; regioes: { nome: string } | null }[]
-      >(),
-    supabase
-      .from("contratos")
-      .select("pessoa_id, status")
-      .returns<{ pessoa_id: string; status: ContractStatus }[]>(),
-  ]);
-
-  if (pessoasResp.error) throw new Error("Não foi possível carregar as pessoas aptas.");
-  if (contratosResp.error) throw new Error("Não foi possível carregar os contratos existentes.");
-
-  const statusQueBloqueiam = new Set<ContractStatus>(["rascunho", ...ACTIVE_BOARD_STATUSES]);
-  const pessoasComContratoAtivo = new Set(
-    (contratosResp.data ?? [])
-      .filter((c) => statusQueBloqueiam.has(c.status))
-      .map((c) => c.pessoa_id),
-  );
-
-  return (pessoasResp.data ?? [])
-    .filter((p) => !pessoasComContratoAtivo.has(p.id))
-    .map((p) => ({
-      id: p.id,
-      nomeCompleto: p.nome_completo,
-      cpf: p.cpf,
-      endereco: p.endereco,
-      regiaoNome: p.regioes?.nome ?? null,
-    }));
+  const { data, error } = await supabase.rpc("pessoas_aptas_para_contrato");
+  if (error) throw new Error("Não foi possível carregar as pessoas aptas.");
+  return data as PessoaParaEmissao[];
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/badge";
@@ -8,7 +9,6 @@ import { Alerta } from "@/components/alerta";
 import { EstadoVazio } from "@/components/estado-vazio";
 import { Modal } from "@/components/modal";
 import { Selo } from "@/components/selo";
-import { posicaoAlcancada } from "@/lib/dashboard/agregacoes";
 import type { ContractStatus } from "@/lib/contratos/maquina-estados";
 import {
   exportarBaseNominalXlsx,
@@ -16,6 +16,10 @@ import {
   gerarUrlParaDrillDown,
 } from "./acoes";
 import type { DadosDashboard, PessoaResumo } from "./dados";
+import {
+  ETAPAS_FUNIL_CONFIG,
+  obterEscalaTermica,
+} from "@/lib/dashboard/escala-termica";
 
 type StatusConexao = "conectando" | "ao_vivo" | "degradado";
 const INTERVALO_POLLING_MS = 5000;
@@ -146,7 +150,7 @@ export function DashboardCliente({ dadosIniciais }: { dadosIniciais: DadosDashbo
       {/* Cabeçalho + status de conexão em tempo real */}
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 border-b border-line pb-4">
         <div>
-          <span className="font-mono text-xs uppercase tracking-wider text-seal">
+          <span className="font-mono text-xs uppercase tracking-wider text-primary font-semibold">
             Painel do Gestor
           </span>
           <h1 className="text-h1 font-semibold text-ink">Painel Consolidado</h1>
@@ -188,39 +192,82 @@ export function DashboardCliente({ dadosIniciais }: { dadosIniciais: DadosDashbo
 
       {/* Funil — item 5 */}
       <section className="space-y-3">
-        <h2 className="text-h2 font-semibold text-ink">Funil de Conversão</h2>
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+          <div>
+            <h2 className="text-h2 font-semibold text-ink">Funil de Conversão</h2>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Etapas progressivas de mobilização e conformidade contratual.
+            </p>
+          </div>
+          <span className="text-xs text-ink-muted">
+            Clique em um card para abrir a relação completa de contratos
+          </span>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {(
-            [
-              { rotulo: "Cadastrados", valor: funil.cadastrado, minimo: -1 },
-              { rotulo: "Aptos", valor: funil.apto, minimo: -1, exigeApta: true },
-              { rotulo: "Emitido", valor: funil.emitido, minimo: 1 },
-              { rotulo: "Enviado", valor: funil.enviado, minimo: 2 },
-              { rotulo: "Assinado", valor: funil.assinado, minimo: 3 },
-            ] as const
-          ).map((etapa) => (
-            <button
-              key={etapa.rotulo}
-              type="button"
-              onClick={() =>
-                setDrillDown({
-                  titulo: etapa.rotulo,
-                  predicado: (p) =>
-                    "exigeApta" in etapa && etapa.exigeApta
-                      ? p.apta
-                      : etapa.minimo === -1
-                        ? true
-                        : posicaoAlcancada(p.statusContrato) >= etapa.minimo,
-                })
-              }
-              className="border border-line bg-surface p-4 text-left hover:border-seal transition-colors cursor-pointer"
-            >
-              <div className="font-mono text-2xl font-bold text-ink tabular-nums">
-                {etapa.valor}
-              </div>
-              <div className="text-xs text-ink-muted mt-1">{etapa.rotulo}</div>
-            </button>
-          ))}
+          {ETAPAS_FUNIL_CONFIG.map((cfg) => {
+            const valor =
+              cfg.chave === "cadastrados"
+                ? funil.cadastrado
+                : cfg.chave === "aptos"
+                  ? funil.apto
+                  : funil[cfg.chave];
+
+            const pctBase =
+              funil.cadastrado > 0
+                ? ((valor / funil.cadastrado) * 100).toFixed(cfg.chave === "cadastrados" ? 0 : 1)
+                : "0";
+
+            return (
+              <Link
+                key={cfg.rotulo}
+                href={`/dashboard/contratos?etapa=${cfg.chave}`}
+                className={`group relative overflow-hidden border p-4 text-left transition-all cursor-pointer block rounded-lg shadow-xs ${cfg.corCard}`}
+              >
+                {/* Linha superior colorida da etapa */}
+                <div className={`absolute top-0 left-0 right-0 h-1 ${cfg.corTopo}`} />
+
+                {/* Header com indicador de etapa e taxa sobre a base */}
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span
+                    className={`inline-flex items-center text-[0.68rem] font-mono font-medium px-1.5 py-0.5 rounded border ${cfg.corBadge}`}
+                  >
+                    {cfg.fase}
+                  </span>
+                  <span
+                    className="font-mono text-[0.7rem] text-ink-muted tabular-nums"
+                    title={`Representa ${pctBase}% dos colaboradores cadastrados`}
+                  >
+                    {pctBase}%
+                  </span>
+                </div>
+
+                {/* Valor numérico */}
+                <div
+                  className={`font-mono text-2xl font-bold text-ink tabular-nums transition-colors ${cfg.corNumero}`}
+                >
+                  {valor}
+                </div>
+
+                {/* Micro barra de progresso em relação à base */}
+                <div className="mt-2.5 w-full bg-line/60 dark:bg-surface-sunken h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${cfg.corBarra}`}
+                    style={{
+                      width: `${funil.cadastrado > 0 ? Math.min(100, Math.max(0, Math.round((valor / funil.cadastrado) * 100))) : 0}%`,
+                    }}
+                  />
+                </div>
+
+                {/* Rótulo da etapa e link hover */}
+                <div className="text-xs text-ink-muted mt-2.5 flex items-center justify-between">
+                  <span className="font-medium text-ink/90">{cfg.rotulo}</span>
+                  <span className="text-[0.7rem] opacity-0 group-hover:opacity-100 transition-opacity font-medium text-primary flex items-center gap-0.5">
+                    Ver relação ↗
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
@@ -228,10 +275,10 @@ export function DashboardCliente({ dadosIniciais }: { dadosIniciais: DadosDashbo
       <section className="space-y-3">
         <h2 className="text-h2 font-semibold text-ink">Matriz por Objeto Contratual</h2>
         {matriz.linhas.length > 0 ? (
-          <div className="overflow-x-auto border border-line bg-surface">
+          <div className="overflow-x-auto border border-line bg-surface rounded-lg shadow-xs">
             <table className="w-full border-collapse text-left text-small">
               <thead>
-                <tr className="border-b border-line bg-paper/60 font-mono text-xs text-ink-muted">
+                <tr className="border-b border-line bg-surface-sunken font-mono text-xs text-ink-muted">
                   <th className="p-3">Objeto</th>
                   <th className="p-3 text-center">Emitido</th>
                   <th className="p-3 text-center">Enviado</th>
@@ -242,8 +289,19 @@ export function DashboardCliente({ dadosIniciais }: { dadosIniciais: DadosDashbo
               </thead>
               <tbody className="divide-y divide-line">
                 {matriz.linhas.map((linha) => (
-                  <tr key={linha.objeto}>
-                    <td className="p-3 font-medium text-ink">{linha.objeto}</td>
+                  <tr key={linha.objeto} className="hover:bg-surface-sunken/40 transition-colors">
+                    <td className="p-3 font-medium">
+                      <Link
+                        href={`/dashboard/contratos?objeto=${encodeURIComponent(linha.objeto)}`}
+                        className="text-ink hover:text-primary hover:underline cursor-pointer inline-flex items-center gap-1.5 group/link"
+                        title={`Ver relação de colaboradores em ${linha.objeto}`}
+                      >
+                        <span>{linha.objeto}</span>
+                        <span className="text-xs text-primary opacity-0 group-hover/link:opacity-100 transition-opacity font-mono">
+                          ↗
+                        </span>
+                      </Link>
+                    </td>
                     {(["emitido", "enviado", "assinado"] as ContractStatus[]).map((status) => (
                       <td key={status} className="p-3 text-center">
                         <button
@@ -251,28 +309,48 @@ export function DashboardCliente({ dadosIniciais }: { dadosIniciais: DadosDashbo
                           onClick={() =>
                             setDrillDown({
                               titulo: `${linha.objeto} — ${status}`,
-                              predicado: (p) => p.objeto === linha.objeto && p.statusContrato === status,
+                              predicado: (p) =>
+                                (p.objeto === linha.objeto ||
+                                  p.funcao === linha.objeto ||
+                                  Boolean(p.objetos?.includes(linha.objeto))) &&
+                                p.statusContrato === status,
                             })
                           }
-                          className="font-mono tabular-nums text-ink hover:text-seal hover:underline cursor-pointer disabled:text-ink-muted disabled:no-underline disabled:cursor-default"
+                          className="font-mono tabular-nums text-ink hover:text-primary hover:underline cursor-pointer disabled:text-ink-muted disabled:no-underline disabled:cursor-default"
                           disabled={!linha.porStatus[status]}
                         >
                           {linha.porStatus[status] ?? 0}
                         </button>
                       </td>
                     ))}
-                    <td className="p-3 text-center font-mono font-semibold text-ink">{linha.total}</td>
+                    <td className="p-3 text-center font-mono font-semibold">
+                      <Link
+                        href={`/dashboard/contratos?objeto=${encodeURIComponent(linha.objeto)}`}
+                        className="text-ink hover:text-primary hover:underline cursor-pointer"
+                        title={`Ver ${linha.total} colaboradores em ${linha.objeto}`}
+                      >
+                        {linha.total}
+                      </Link>
+                    </td>
                     <td className="p-3 text-right font-mono text-ink-muted">
                       {formatarValor(linha.valorTotal)}
                     </td>
                   </tr>
                 ))}
-                <tr className="bg-paper/60 font-semibold">
+                <tr className="bg-surface-sunken font-semibold">
                   <td className="p-3 text-ink">Total geral</td>
                   <td className="p-3 text-center font-mono">{matriz.totalPorStatus.emitido ?? 0}</td>
                   <td className="p-3 text-center font-mono">{matriz.totalPorStatus.enviado ?? 0}</td>
                   <td className="p-3 text-center font-mono">{matriz.totalPorStatus.assinado ?? 0}</td>
-                  <td className="p-3 text-center font-mono">{matriz.totalGeral}</td>
+                  <td className="p-3 text-center font-mono">
+                    <Link
+                      href="/dashboard/contratos?etapa=cadastrados"
+                      className="text-ink hover:text-primary hover:underline cursor-pointer"
+                      title="Ver todos os colaboradores cadastrados"
+                    >
+                      {matriz.totalGeral}
+                    </Link>
+                  </td>
                   <td className="p-3 text-right font-mono">{formatarValor(matriz.valorTotalGeral)}</td>
                 </tr>
               </tbody>
@@ -285,31 +363,94 @@ export function DashboardCliente({ dadosIniciais }: { dadosIniciais: DadosDashbo
 
       {/* Visão por região — item 4 */}
       <section className="space-y-3">
-        <h2 className="text-h2 font-semibold text-ink">Cobertura por Região</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-h2 font-semibold text-ink">Conclusão por Região</h2>
+            <p className="text-xs text-ink-muted">
+              % de pessoas da região com contrato assinado.
+            </p>
+          </div>
+
+          {/* Legenda Térmica Dinâmica */}
+          <div className="flex items-center gap-1.5 flex-wrap text-[0.7rem] font-mono text-ink-muted bg-surface-sunken/80 border border-line p-1.5 rounded-md">
+            <span className="text-[0.68rem] uppercase font-semibold text-ink-subtle px-1">
+              Escala Térmica:
+            </span>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-400/25 dark:border-sky-500/25">
+              🧊 0–25% Frio
+            </span>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-400/25 dark:border-amber-500/25">
+              ⛅ 26–50% Morno
+            </span>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-400/25 dark:border-orange-500/25">
+              ☀️ 51–75% Quente
+            </span>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-400/35 dark:border-rose-500/35 font-semibold">
+              🔥 76–100% Muito Quente
+            </span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {regioes.map((r) => (
-            <button
-              key={r.regiaoId}
-              type="button"
-              onClick={() =>
-                setDrillDown({ titulo: r.nome, predicado: (p) => p.regiaoNome === r.nome })
-              }
-              className="border border-line bg-surface p-4 text-left hover:border-seal transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
-              disabled={r.totalPessoas === 0}
-            >
-              <div className="flex items-baseline justify-between">
-                <span className="font-medium text-ink text-small">{r.nome}</span>
-                <span className="font-mono text-xs text-ink-muted">{r.totalPessoas} pessoas</span>
-              </div>
-              <div className="mt-2 font-mono text-xl font-bold text-ink tabular-nums">
-                {/* "não informado" nunca vira 0 (Seção 11) */}
-                {r.coberturaDocumentalPct === null ? "não informado" : `${r.coberturaDocumentalPct}%`}
-              </div>
-              <span className="text-xs text-ink-muted">
-                {r.pessoasAptas} aptas · {r.contratosAssinados} assinados
-              </span>
-            </button>
-          ))}
+          {regioes.map((r) => {
+            const escala = obterEscalaTermica(r.conclusaoPct);
+
+            return (
+              <button
+                key={r.regiaoId}
+                type="button"
+                onClick={() =>
+                  setDrillDown({ titulo: r.nome, predicado: (p) => p.regiaoNome === r.nome })
+                }
+                className={`relative overflow-hidden border p-4 text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-default rounded-lg shadow-xs group ${escala.cardClasse} ${escala.glowClasse}`}
+                disabled={r.totalPessoas === 0}
+              >
+                {/* Cabeçalho do Card: Nome da Região e Quantidade de Pessoas */}
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-medium text-ink text-small truncate group-hover:underline">
+                    {r.nome}
+                  </span>
+                  <span className="font-mono text-xs text-ink-muted shrink-0">
+                    {r.totalPessoas} pessoas
+                  </span>
+                </div>
+
+                {/* % de Conclusão e Tag Térmica */}
+                <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                  <div className={`font-mono text-2xl font-bold tabular-nums ${escala.textoClasse}`}>
+                    {/* "não informado" nunca vira 0 (Seção 11) */}
+                    {r.conclusaoPct === null ? "não informado" : `${r.conclusaoPct}%`}
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[0.7rem] px-2 py-0.5 rounded-full border font-mono ${escala.badgeClasse}`}
+                  >
+                    <span>{escala.icone}</span>
+                    <span>{escala.rotuloCurto}</span>
+                  </span>
+                </div>
+
+                {/* Barra de Progresso com Gradiente Térmico */}
+                <div className="mt-3 w-full bg-line/60 dark:bg-surface-sunken h-2 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${escala.barraClasse}`}
+                    style={{
+                      width: `${Math.min(100, Math.max(0, r.conclusaoPct ?? 0))}%`,
+                    }}
+                  />
+                </div>
+
+                {/* Resumo de Assinaturas e Aptidão */}
+                <div className="mt-2.5 text-xs text-ink-muted flex items-center justify-between">
+                  <span>
+                    {r.pessoasComContratoAssinado} de {r.totalPessoas} assinados
+                  </span>
+                  <span className="font-mono text-[0.7rem] text-ink-muted/80">
+                    {r.pessoasAptas} aptas
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -330,7 +471,7 @@ export function DashboardCliente({ dadosIniciais }: { dadosIniciais: DadosDashbo
                     predicado: (pessoa) => predicadoDaPendencia(p.codigo, pessoa),
                   })
                 }
-                className="w-full flex items-center justify-between border border-line bg-surface p-3 text-left hover:border-seal transition-colors cursor-pointer"
+                className="w-full flex items-center justify-between border border-line bg-surface p-3 text-left hover:border-primary transition-colors cursor-pointer rounded-lg shadow-xs"
               >
                 <span className="flex items-center gap-2 text-small text-ink">
                   <span
@@ -365,24 +506,38 @@ export function DashboardCliente({ dadosIniciais }: { dadosIniciais: DadosDashbo
         descricao={`${pessoasNaLista.length} pessoa(s) — clique em uma para abrir o documento ou contrato.`}
       >
         {pessoasNaLista.length > 0 ? (
-          <div className="max-h-80 overflow-y-auto divide-y divide-line border border-line">
-            {pessoasNaLista.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => abrirDocumentoOuContrato(p)}
-                disabled={processandoPessoa === p.id}
-                className="w-full flex items-center justify-between p-3 text-left hover:bg-paper/40 cursor-pointer disabled:opacity-50"
-              >
-                <div>
-                  <div className="text-small font-medium text-ink">{p.nomeCompleto}</div>
-                  <div className="text-xs text-ink-muted">{p.regiaoNome ?? "sem região"}</div>
-                </div>
-                <span className="text-xs text-seal">
-                  {processandoPessoa === p.id ? "Abrindo…" : "Abrir →"}
-                </span>
-              </button>
-            ))}
+          <div className="space-y-3">
+            <div className="max-h-80 overflow-y-auto divide-y divide-line border border-line">
+              {pessoasNaLista.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => abrirDocumentoOuContrato(p)}
+                  disabled={processandoPessoa === p.id}
+                  className="w-full flex items-center justify-between p-3 text-left hover:bg-surface-sunken cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  <div>
+                    <div className="text-small font-medium text-ink">{p.nomeCompleto}</div>
+                    <div className="text-xs text-ink-muted">
+                      {p.objeto ?? p.funcao ?? "sem função"} · {p.regiaoNome ?? "sem região"}
+                    </div>
+                  </div>
+                  <span className="text-xs text-primary font-medium">
+                    {processandoPessoa === p.id ? "Abrindo…" : "Abrir →"}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {drillDown?.titulo && (
+              <div className="pt-2 border-t border-line flex justify-end">
+                <Link
+                  href={`/dashboard/contratos?objeto=${encodeURIComponent(drillDown.titulo.split(" — ")[0])}`}
+                  className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
+                >
+                  Ver relação analítica completa →
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-small text-ink-muted">Ninguém nesta lista.</p>

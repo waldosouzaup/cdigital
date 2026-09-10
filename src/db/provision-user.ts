@@ -22,7 +22,7 @@ import { eq } from "drizzle-orm";
 import { gerarSenhaTemporaria } from "@/lib/auth/senha-temporaria";
 
 type Papel = (typeof userRoleEnum.enumValues)[number];
-const PAPEIS_VALIDOS: Papel[] = ["gestor", "coord_comite", "coord_regiao", "contratado", "auditor"];
+const PAPEIS_VALIDOS: Papel[] = ["superadmin", "gestor", "coord_comite", "coord_regiao", "contratado", "auditor"];
 
 async function main() {
   const [email, papel, nome, nomeRegiao] = process.argv.slice(2);

@@ -41,20 +41,20 @@ export default function DefinirSenhaPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-[#0d1728] p-8 sm:p-10 shadow-2xl">
+    <div className="rounded-2xl border border-line bg-surface p-8 sm:p-10 shadow-card">
       <div className="mb-8 text-center">
         <div className="inline-flex justify-center mb-5">
           <Marca subtitulo="" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Definir uma nova senha</h1>
-        <p className="mt-2 text-sm text-slate-400">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Definir uma nova senha</h1>
+        <p className="mt-2 text-sm text-ink-muted">
           Você entrou com uma senha temporária. Escolha uma senha sua para continuar.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="senha" className="block text-xs font-medium text-slate-300 mb-1.5">
+          <label htmlFor="senha" className="block text-xs font-medium text-ink mb-1.5">
             Nova senha (mín. {SENHA_MIN} caracteres)
           </label>
           <input
@@ -66,11 +66,11 @@ export default function DefinirSenhaPage() {
             minLength={SENHA_MIN}
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow"
+            className="w-full rounded-md border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-primary focus:ring-1 focus:ring-focus font-medium"
           />
         </div>
         <div>
-          <label htmlFor="confirmacao" className="block text-xs font-medium text-slate-300 mb-1.5">
+          <label htmlFor="confirmacao" className="block text-xs font-medium text-ink mb-1.5">
             Repita a nova senha
           </label>
           <input
@@ -81,7 +81,7 @@ export default function DefinirSenhaPage() {
             minLength={SENHA_MIN}
             value={confirmacao}
             onChange={(e) => setConfirmacao(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow"
+            className="w-full rounded-md border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-primary focus:ring-1 focus:ring-focus font-medium"
           />
         </div>
 
@@ -94,7 +94,7 @@ export default function DefinirSenhaPage() {
         <button
           type="submit"
           disabled={salvando || senha.length < SENHA_MIN || confirmacao.length < SENHA_MIN}
-          className="btn-gold w-full py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+          className="w-full py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 cursor-pointer transition bg-primary text-white hover:bg-primary-hover shadow-xs disabled:opacity-50"
         >
           {salvando ? "Salvando…" : "Salvar e continuar"}
         </button>

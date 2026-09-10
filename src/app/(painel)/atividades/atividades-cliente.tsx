@@ -31,6 +31,7 @@ const QUANTIAS_RAPIDAS = [50, 100, 500];
 
 const LS_PESSOA = "atividade:ultimaPessoa";
 const LS_TIPO = "atividade:ultimoTipo";
+const LS_TIPOS_PERSONALIZADOS = "atividade:tiposPersonalizados";
 
 function lerLocal(chave: string): string | null {
   try {
@@ -63,6 +64,11 @@ export function AtividadesCliente({
   const [pessoaId, setPessoaId] = useState("");
   const [tipoBase, setTipoBase] = useState<string>("");
   const [tipoOutra, setTipoOutra] = useState("");
+  const [tiposPersonalizados, setTiposPersonalizados] = useState<string[]>([]);
+  const [adicionandoAcao, setAdicionandoAcao] = useState(false);
+  const [nomeNovaAcao, setNomeNovaAcao] = useState("");
+  const [erroNovaAcao, setErroNovaAcao] = useState<string | null>(null);
+
   const [quantidade, setQuantidade] = useState(100);
   const [observacao, setObservacao] = useState("");
   const [mostrarObs, setMostrarObs] = useState(false);
@@ -136,24 +142,117 @@ export function AtividadesCliente({
     return () => window.removeEventListener("online", aoVoltarRede);
   }, [sincronizar]);
 
-  // Recupera a última pessoa/tipo. Sem pessoa lembrada, já abre o seletor.
+  // Recupera a última pessoa/tipo e carrega ações personalizadas salvas.
   useEffect(() => {
+    const salvosRaw = lerLocal(LS_TIPOS_PERSONALIZADOS);
+    let salvos: string[] = [];
+    if (salvosRaw) {
+      try {
+        const parsed = JSON.parse(salvosRaw);
+        if (Array.isArray(parsed)) {
+          salvos = parsed.filter(
+            (item): item is string => typeof item === "string" && item.trim().length > 0,
+          );
+        }
+      } catch {
+        // Formato anterior corrompido, ignora
+      }
+    }
+
+    // Carrega também ações presentes nos registros recentes deste comitê
+    const tiposHistorico = registros
+      .map((r) => r.tipo?.trim())
+      .filter(
+        (t): t is string =>
+          Boolean(t) && !(TIPOS_ACAO as readonly string[]).includes(t as (typeof TIPOS_ACAO)[number]),
+      );
+
+    const combinados = Array.from(new Set([...salvos, ...tiposHistorico]));
+    setTiposPersonalizados(combinados);
+
     const ultimaPessoa = lerLocal(LS_PESSOA);
     if (ultimaPessoa && pessoas.some((p) => p.id === ultimaPessoa)) {
       setPessoaId(ultimaPessoa);
     } else {
       setTrocarPessoa(true);
     }
+
     const ultimoTipo = lerLocal(LS_TIPO);
     if (ultimoTipo) {
-      if ((TIPOS_ACAO as readonly string[]).includes(ultimoTipo)) {
+      if (
+        (TIPOS_ACAO as readonly string[]).includes(ultimoTipo) ||
+        combinados.includes(ultimoTipo)
+      ) {
         setTipoBase(ultimoTipo);
       } else {
         setTipoBase("__outra__");
         setTipoOutra(ultimoTipo);
       }
     }
-  }, [pessoas]);
+  }, [pessoas, registros]);
+
+  const todasAsAcoes = useMemo(() => {
+    return [...TIPOS_ACAO, ...tiposPersonalizados, "Outra"];
+  }, [tiposPersonalizados]);
+
+  function salvarNovaAcao() {
+    const nomeLimpo = nomeNovaAcao.trim();
+    if (!nomeLimpo) {
+      setErroNovaAcao("Digite o nome da ação.");
+      return;
+    }
+    if (nomeLimpo.length > 80) {
+      setErroNovaAcao("O nome deve ter no máximo 80 caracteres.");
+      return;
+    }
+    if (
+      (TIPOS_ACAO as readonly string[]).some(
+        (a) => a.toLowerCase() === nomeLimpo.toLowerCase(),
+      ) ||
+      tiposPersonalizados.some((a) => a.toLowerCase() === nomeLimpo.toLowerCase())
+    ) {
+      setErroNovaAcao("Esta ação já existe na lista.");
+      return;
+    }
+
+    const atualizados = [...tiposPersonalizados, nomeLimpo];
+    setTiposPersonalizados(atualizados);
+    gravarLocal(LS_TIPOS_PERSONALIZADOS, JSON.stringify(atualizados));
+    setTipoBase(nomeLimpo);
+    setTipoOutra("");
+    setNomeNovaAcao("");
+    setAdicionandoAcao(false);
+    setErroNovaAcao(null);
+  }
+
+  function removerAcaoPersonalizada(acao: string) {
+    const atualizados = tiposPersonalizados.filter((t) => t !== acao);
+    setTiposPersonalizados(atualizados);
+    gravarLocal(LS_TIPOS_PERSONALIZADOS, JSON.stringify(atualizados));
+    if (tipoBase === acao) {
+      setTipoBase("");
+    }
+  }
+
+  function salvarComoAtalho(nome: string) {
+    const nomeLimpo = nome.trim();
+    if (!nomeLimpo) return;
+    if (
+      (TIPOS_ACAO as readonly string[]).some(
+        (a) => a.toLowerCase() === nomeLimpo.toLowerCase(),
+      ) ||
+      tiposPersonalizados.some((a) => a.toLowerCase() === nomeLimpo.toLowerCase())
+    ) {
+      setTipoBase(nomeLimpo);
+      setTipoOutra("");
+      return;
+    }
+    const atualizados = [...tiposPersonalizados, nomeLimpo];
+    setTiposPersonalizados(atualizados);
+    gravarLocal(LS_TIPOS_PERSONALIZADOS, JSON.stringify(atualizados));
+    setTipoBase(nomeLimpo);
+    setTipoOutra("");
+  }
 
   const pessoa = useMemo(() => pessoas.find((p) => p.id === pessoaId) ?? null, [pessoas, pessoaId]);
   const regiaoNome = useMemo(
@@ -277,30 +376,136 @@ export function AtividadesCliente({
 
       {/* TOQUE 1 — tipo de ação */}
       <section className="mt-6">
-        <span className="text-small font-medium text-ink">1 · Tipo de ação</span>
+        <div className="flex items-center justify-between">
+          <span className="text-small font-medium text-ink">1 · Tipo de ação</span>
+          {!adicionandoAcao && (
+            <button
+              type="button"
+              onClick={() => {
+                setAdicionandoAcao(true);
+                setErroNovaAcao(null);
+              }}
+              className="text-xs font-medium text-seal hover:underline decoration-seal/40 underline-offset-4 flex items-center gap-1"
+            >
+              + Adicionar ação
+            </button>
+          )}
+        </div>
+
+        {/* Adicionar nova ação manualmente */}
+        {adicionandoAcao && (
+          <div className="mt-2.5 rounded-lg border border-line bg-surface/90 p-3.5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <label htmlFor="nova-acao-nome" className="text-xs font-semibold text-ink">
+                Nova ação personalizada
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdicionandoAcao(false);
+                  setErroNovaAcao(null);
+                  setNomeNovaAcao("");
+                }}
+                className="text-xs text-ink-muted hover:text-ink transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input
+                id="nova-acao-nome"
+                type="text"
+                value={nomeNovaAcao}
+                onChange={(e) => {
+                  setNomeNovaAcao(e.target.value);
+                  setErroNovaAcao(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    salvarNovaAcao();
+                  } else if (e.key === "Escape") {
+                    setAdicionandoAcao(false);
+                  }
+                }}
+                placeholder="Ex.: Carreata, Adesivaço, Comício…"
+                maxLength={80}
+                className="min-w-0 flex-1 rounded border border-line bg-surface px-3 py-2 text-small text-ink placeholder:text-ink-muted/50 outline-none focus:border-seal focus:ring-1 focus:ring-seal"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={salvarNovaAcao}
+                disabled={!nomeNovaAcao.trim()}
+                className="rounded bg-seal px-3.5 py-2 text-xs font-semibold text-canvas transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                Salvar ação
+              </button>
+            </div>
+            {erroNovaAcao ? (
+              <p role="alert" className="text-xs text-alert font-medium">
+                {erroNovaAcao}
+              </p>
+            ) : (
+              <p className="text-[0.7rem] text-ink-muted">
+                A ação ficará salva como botão para registros rápidos futuros.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="mt-2 grid grid-cols-2 gap-2">
-          {[...TIPOS_ACAO, "Outra"].map((t) => {
+          {todasAsAcoes.map((t) => {
             const valor = t === "Outra" ? "__outra__" : t;
             const ativo = tipoBase === valor;
+            const isPersonalizada = tiposPersonalizados.includes(t);
+
             return (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={ativo}
-                onClick={() => setTipoBase(valor)}
-                className={`min-h-14 rounded border px-3 py-2 text-left text-small transition-colors ${
-                  ativo
-                    ? "border-seal bg-seal/15 font-semibold text-ink"
-                    : "border-line bg-surface/60 text-ink-muted hover:border-ink/25"
-                }`}
-              >
-                {t}
-              </button>
+              <div key={t} className="relative group">
+                <button
+                  type="button"
+                  aria-pressed={ativo}
+                  onClick={() => setTipoBase(valor)}
+                  className={`w-full min-h-14 rounded border px-3 py-2 text-left text-small transition-colors flex items-center justify-between ${
+                    ativo
+                      ? "border-seal bg-seal/15 font-semibold text-ink"
+                      : "border-line bg-surface/60 text-ink-muted hover:border-ink/25"
+                  } ${isPersonalizada ? "pr-8" : ""}`}
+                >
+                  <span className="line-clamp-2">{t}</span>
+                </button>
+                {isPersonalizada && (
+                  <button
+                    type="button"
+                    aria-label={`Remover ação ${t}`}
+                    title="Remover este botão"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removerAcaoPersonalizada(t);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted/50 hover:text-alert transition-colors rounded hover:bg-surface"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>
+
         {tipoBase === "__outra__" && (
-          <div className="mt-3">
+          <div className="mt-3 space-y-2">
             <Campo
               id="tipo-outra"
               rotulo="Descreva a ação"
@@ -310,6 +515,16 @@ export function AtividadesCliente({
               onChange={(e) => setTipoOutra(e.target.value)}
               placeholder="Ex.: adesivagem de veículos"
             />
+            {tipoOutra.trim().length >= 3 &&
+              !todasAsAcoes.some((a) => a.toLowerCase() === tipoOutra.trim().toLowerCase()) && (
+                <button
+                  type="button"
+                  onClick={() => salvarComoAtalho(tipoOutra.trim())}
+                  className="text-xs text-seal hover:underline decoration-seal/40 underline-offset-4 flex items-center gap-1 font-medium"
+                >
+                  + Salvar &quot;{tipoOutra.trim()}&quot; como botão para os próximos registros
+                </button>
+              )}
           </div>
         )}
         {erros.tipo && tipoBase !== "__outra__" && (

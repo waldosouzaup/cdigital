@@ -7,6 +7,8 @@ import { Campo } from "@/components/campo";
 import { Selo } from "@/components/selo";
 import { Alerta } from "@/components/alerta";
 import { Badge } from "@/components/badge";
+import { SeletorTema } from "@/components/seletor-tema";
+import { formatarCep, limparCep, buscarEnderecoPorCep } from "@/lib/cep/viacep";
 import { enviarDadosColeta } from "./acoes";
 import { ESTADO_INICIAL_ENVIAR_DADOS } from "./estado";
 
@@ -30,11 +32,27 @@ export function ColetaCliente({
   const [consentimento, setConsentimento] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Etapa 2 — documento
-  const [enviandoDocumento, setEnviandoDocumento] = useState(false);
-  const [erroDocumento, setErroDocumento] = useState<string | null>(null);
-  const [documentoEnviado, setDocumentoEnviado] = useState(false);
-  const [nomeArquivoEnviado, setNomeArquivoEnviado] = useState<string | null>(null);
+  // Etapa 1 — Endereço e CEP (autocompletar via ViaCEP)
+  const [cep, setCep] = useState("");
+  const [endereco, setEndereco] = useState("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [feedbackCep, setFeedbackCep] = useState<{
+    tipo: "sucesso" | "erro";
+    texto: string;
+  } | null>(null);
+  const enderecoInputRef = useRef<HTMLInputElement>(null);
+
+  // Etapa 2 — Documento de Identidade
+  const [enviandoIdentidade, setEnviandoIdentidade] = useState(false);
+  const [erroIdentidade, setErroIdentidade] = useState<string | null>(null);
+  const [identidadeEnviada, setIdentidadeEnviada] = useState(false);
+  const [nomeArquivoIdentidade, setNomeArquivoIdentidade] = useState<string | null>(null);
+
+  // Etapa 2 — Comprovante de Residência
+  const [enviandoEndereco, setEnviandoEndereco] = useState(false);
+  const [erroEndereco, setErroEndereco] = useState<string | null>(null);
+  const [enderecoEnviado, setEnderecoEnviado] = useState(false);
+  const [nomeArquivoEndereco, setNomeArquivoEndereco] = useState<string | null>(null);
 
   const enviarComToken = enviarDadosColeta.bind(null, token);
   const [estado, formAction, pendente] = useActionState(
@@ -48,22 +66,35 @@ export function ColetaCliente({
         primeiroNome={primeiroNome}
         organizacaoNome={organizacaoNome}
         token={token}
-        documentoEnviado={documentoEnviado}
+        identidadeEnviada={identidadeEnviada}
+        enderecoEnviado={enderecoEnviado}
       />
     );
   }
 
-  async function handleArquivoSelecionado(evento: ChangeEvent<HTMLInputElement>) {
+  async function handleEnviarArquivo(
+    tipo: "documento_identidade" | "comprovante_endereco",
+    evento: ChangeEvent<HTMLInputElement>,
+  ) {
     const arquivo = evento.target.files?.[0];
     if (!arquivo) return;
 
-    setErroDocumento(null);
-    setEnviandoDocumento(true);
-    setDocumentoEnviado(false);
+    const isIdentidade = tipo === "documento_identidade";
+
+    if (isIdentidade) {
+      setErroIdentidade(null);
+      setEnviandoIdentidade(true);
+      setIdentidadeEnviada(false);
+    } else {
+      setErroEndereco(null);
+      setEnviandoEndereco(true);
+      setEnderecoEnviado(false);
+    }
 
     try {
       const corpo = new FormData();
       corpo.append("arquivo", arquivo);
+      corpo.append("tipo", tipo);
 
       const resposta = await fetch(`/api/coleta/${token}/documento`, {
         method: "POST",
@@ -72,24 +103,105 @@ export function ColetaCliente({
       const resultado = await resposta.json();
 
       if (!resposta.ok || !resultado.ok) {
-        setErroDocumento(resultado.motivo ?? "Não foi possível enviar o documento.");
+        const msg = resultado.motivo ?? "Não foi possível enviar o documento.";
+        if (isIdentidade) setErroIdentidade(msg);
+        else setErroEndereco(msg);
         return;
       }
 
-      setDocumentoEnviado(true);
-      setNomeArquivoEnviado(arquivo.name);
+      if (isIdentidade) {
+        setIdentidadeEnviada(true);
+        setNomeArquivoIdentidade(arquivo.name);
+      } else {
+        setEnderecoEnviado(true);
+        setNomeArquivoEndereco(arquivo.name);
+      }
     } catch {
-      setErroDocumento("Falha de conexão ao enviar o documento. Tente novamente.");
+      const msg = "Falha de conexão ao enviar o arquivo. Tente novamente.";
+      if (isIdentidade) setErroIdentidade(msg);
+      else setErroEndereco(msg);
     } finally {
-      setEnviandoDocumento(false);
-      // Permite escolher o mesmo arquivo de novo (por exemplo, depois de corrigir
-      // e tentar de novo) — sem isso o navegador ignora uma segunda seleção idêntica.
+      if (isIdentidade) setEnviandoIdentidade(false);
+      else setEnviandoEndereco(false);
       evento.target.value = "";
     }
   }
 
+  async function handleCepChange(evento: ChangeEvent<HTMLInputElement>) {
+    const valorDigitado = evento.target.value;
+    const formatado = formatarCep(valorDigitado);
+    setCep(formatado);
+
+    const digitos = limparCep(valorDigitado);
+    if (digitos.length < 8) {
+      setFeedbackCep(null);
+      return;
+    }
+
+    if (digitos.length === 8) {
+      setBuscandoCep(true);
+      setFeedbackCep(null);
+
+      try {
+        let resultado = await buscarEnderecoPorCep(digitos);
+
+        if (!resultado.sucesso && resultado.erro !== "CEP não encontrado.") {
+          // Se falhou por bloqueador de anúncios ou política de rede no cliente, tenta o proxy interno
+          try {
+            const respProxy = await fetch(`/api/cep/${digitos}`);
+            if (respProxy.ok) {
+              const jsonProxy = await respProxy.json();
+              if (jsonProxy.ok && jsonProxy.dados) {
+                resultado = { sucesso: true, dados: jsonProxy.dados };
+              }
+            }
+          } catch {
+            // Mantém resultado original de fallback
+          }
+        }
+
+        if (resultado.sucesso && resultado.dados) {
+          const dados = resultado.dados;
+          setEndereco(dados.enderecoFormatado);
+          setFeedbackCep({
+            tipo: "sucesso",
+            texto: `✓ Endereço localizado: ${[
+              dados.bairro,
+              dados.cidade && dados.uf ? `${dados.cidade}/${dados.uf}` : dados.cidade,
+            ]
+              .filter(Boolean)
+              .join(", ")}. Complete o número e complemento abaixo.`,
+          });
+          setTimeout(() => {
+            const input = enderecoInputRef.current;
+            if (input) {
+              input.focus();
+              const idx = dados.enderecoFormatado.indexOf("nº ");
+              if (idx !== -1) {
+                const pos = idx + 3;
+                input.setSelectionRange(pos, pos);
+              }
+            }
+          }, 60);
+        } else {
+          setFeedbackCep({
+            tipo: "erro",
+            texto: resultado.erro ?? "CEP não encontrado. Digite o endereço manualmente.",
+          });
+        }
+      } catch {
+        setFeedbackCep({
+          tipo: "erro",
+          texto: "Não foi possível consultar o CEP automaticamente. Digite o endereço manualmente.",
+        });
+      } finally {
+        setBuscandoCep(false);
+      }
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-paper text-ink flex flex-col justify-between">
+    <div className="min-h-screen bg-canvas text-ink flex flex-col justify-between">
       <header className="border-b border-line bg-surface px-4 py-3 sticky top-0 z-30">
         <div className="mx-auto max-w-md flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -98,7 +210,10 @@ export function ColetaCliente({
               COLETA SEGURA
             </span>
           </div>
-          <Badge status="enviado" rotuloPersonalizado={organizacaoNome} />
+          <div className="flex items-center gap-2.5">
+            <SeletorTema />
+            <Badge status="enviado" rotuloPersonalizado={organizacaoNome} />
+          </div>
         </div>
       </header>
 
@@ -108,14 +223,14 @@ export function ColetaCliente({
             <span>ETAPA {etapa} DE 3</span>
             <span>
               {etapa === 1 && "DADOS COMPLEMENTARES"}
-              {etapa === 2 && "DOCUMENTO"}
+              {etapa === 2 && "DOCUMENTAÇÃO"}
               {etapa === 3 && "REVISÃO E ENVIO"}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-1.5 h-1 bg-line">
-            <div className={`h-full ${etapa >= 1 ? "bg-seal" : "bg-transparent"}`} />
-            <div className={`h-full ${etapa >= 2 ? "bg-seal" : "bg-transparent"}`} />
-            <div className={`h-full ${etapa >= 3 ? "bg-seal" : "bg-transparent"}`} />
+            <div className={`h-full ${etapa >= 1 ? "bg-primary" : "bg-transparent"}`} />
+            <div className={`h-full ${etapa >= 2 ? "bg-primary" : "bg-transparent"}`} />
+            <div className={`h-full ${etapa >= 3 ? "bg-primary" : "bg-transparent"}`} />
           </div>
         </div>
 
@@ -128,29 +243,12 @@ export function ColetaCliente({
                 Olá, {primeiroNome}
               </h1>
               <p className="text-small text-ink-muted leading-relaxed">
-                Complete os dados abaixo para a formalização do seu contrato de trabalho
+                Complete os dados complementares abaixo para a formalização do seu contrato de trabalho
                 temporário com {organizacaoNome}.
               </p>
             </div>
 
             <div className="space-y-4 border-t border-line pt-6">
-              <Campo
-                rotulo="Telefone celular (WhatsApp)"
-                id="telefone"
-                name="telefone"
-                mono
-                required
-                inputMode="tel"
-                placeholder="(00) 00000-0000"
-                auxiliar="Você receberá avisos sobre o contrato por aqui."
-              />
-              <Campo
-                rotulo="E-mail"
-                id="email"
-                name="email"
-                type="email"
-                placeholder="seu@email.com"
-              />
               <Campo rotulo="RG" id="rg" name="rg" mono required placeholder="00.000.000-0" />
               <Campo
                 rotulo="Data de nascimento"
@@ -160,32 +258,60 @@ export function ColetaCliente({
                 required
               />
               <Campo
-                rotulo="Endereço"
-                id="endereco"
-                name="endereco"
-                required
-                placeholder="Rua, número, bairro"
-              />
-              <Campo
                 rotulo="CEP"
                 id="cep"
                 name="cep"
                 mono
                 required
                 inputMode="numeric"
+                maxLength={9}
                 placeholder="00000-000"
+                value={cep}
+                onChange={handleCepChange}
+                auxiliar={
+                  buscandoCep ? (
+                    <span className="text-seal font-medium flex items-center gap-1.5 animate-pulse">
+                      <span className="font-mono">⏳</span> Consultando ViaCEP...
+                    </span>
+                  ) : feedbackCep ? (
+                    <span
+                      className={
+                        feedbackCep.tipo === "sucesso"
+                          ? "text-success font-medium flex items-center gap-1"
+                          : "text-atencao font-medium"
+                      }
+                    >
+                      {feedbackCep.texto}
+                    </span>
+                  ) : (
+                    "Digite o CEP para preencher o endereço automaticamente sem erros."
+                  )
+                }
               />
               <Campo
-                rotulo="Banco"
-                id="banco"
-                name="banco"
+                ref={enderecoInputRef}
+                rotulo="Endereço residencial completo"
+                id="endereco"
+                name="endereco"
                 required
-                placeholder="Nome do banco"
+                placeholder="Rua, número, complemento, bairro"
+                value={endereco}
+                onChange={(e) => setEndereco(e.target.value)}
+                auxiliar={
+                  endereco.includes("nº ")
+                    ? "Substitua ou complete com o número e complemento da residência."
+                    : "Rua/Avenida, número, complemento e bairro."
+                }
               />
-              <div className="grid grid-cols-2 gap-4">
-                <Campo rotulo="Agência" id="agencia" name="agencia" mono required />
-                <Campo rotulo="Conta" id="conta" name="conta" mono required />
-              </div>
+              <Campo
+                rotulo="Chave PIX para pagamento"
+                id="chavePix"
+                name="chavePix"
+                required
+                maxLength={140}
+                placeholder="CPF, e-mail, telefone ou chave aleatória"
+                auxiliar="Os pagamentos são feitos por PIX nesta chave."
+              />
             </div>
 
             <div className="pt-2">
@@ -195,69 +321,177 @@ export function ColetaCliente({
                 className="w-full py-3.5 text-base"
                 onClick={() => setEtapa(2)}
               >
-                Continuar para envio de documento →
+                Continuar para documentação →
               </Selo>
             </div>
           </div>
 
-          {/* ETAPA 2: DOCUMENTO */}
+          {/* ETAPA 2: DOCUMENTAÇÃO (IDENTIDADE + COMPROVANTE DE RESIDÊNCIA) */}
           <div className={etapa === 2 ? "space-y-6" : "hidden"}>
             <div className="space-y-2">
               <h1 className="text-h1 font-semibold text-ink leading-tight">
-                Documento de Identidade
+                Documentação
               </h1>
               <p className="text-small text-ink-muted leading-relaxed">
-                Fotografe seu <strong>RG</strong> (frente e verso) ou sua <strong>CNH aberta</strong>.
-                Certifique-se de que as informações estejam nítidas e sem reflexos.
+                Envie as fotos ou arquivos dos documentos solicitados abaixo para a formalização cadastral.
               </p>
             </div>
 
-            <div className="border-t border-line pt-6 space-y-4">
-              <label
-                htmlFor="upload-doc"
-                className="block border-2 border-dashed border-line hover:border-seal p-6 text-center bg-surface/60 cursor-pointer transition-colors"
-              >
-                <input
-                  id="upload-doc"
-                  type="file"
-                  accept="image/jpeg,image/png,application/pdf"
-                  capture="environment"
-                  className="hidden"
-                  disabled={enviandoDocumento}
-                  onChange={handleArquivoSelecionado}
-                />
-                <div className="space-y-2">
-                  <div className="font-mono text-2xl text-seal">
-                    {enviandoDocumento ? "…" : documentoEnviado ? "✓" : "📷"}
+            <div className="border-t border-line pt-6 space-y-6">
+              {/* Slot 1: Documento de Identidade */}
+              <div className="border border-line bg-surface/40 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary font-mono text-xs font-semibold">
+                      1
+                    </span>
+                    <h2 className="text-small font-semibold text-ink">
+                      Documento de Identidade
+                    </h2>
                   </div>
-                  <div className="text-small font-medium text-ink">
-                    {enviandoDocumento
-                      ? "Enviando e verificando…"
-                      : documentoEnviado
-                        ? `Enviado: ${nomeArquivoEnviado}`
-                        : "Tirar foto ou anexar documento"}
-                  </div>
-                  <p className="text-xs text-ink-muted">Formatos JPG, PNG ou PDF até 20 MB</p>
+                  {identidadeEnviada ? (
+                    <span className="font-mono text-xs text-success font-medium flex items-center gap-1">
+                      ✓ Enviado
+                    </span>
+                  ) : (
+                    <span className="text-[0.6875rem] font-mono uppercase text-ink-muted bg-surface px-1.5 py-0.5 border border-line">
+                      Obrigatório
+                    </span>
+                  )}
                 </div>
-              </label>
 
-              {erroDocumento && (
-                <Alerta tom="critico" titulo="Não foi possível aceitar este arquivo">
-                  {erroDocumento}
-                </Alerta>
-              )}
+                <p className="text-xs text-ink-muted leading-relaxed">
+                  Fotografe seu <strong>RG</strong> (frente e verso) ou sua <strong>CNH aberta</strong>.
+                  Certifique-se de que as informações estejam nítidas e sem reflexos.
+                </p>
 
-              {documentoEnviado && (
-                <Alerta tom="sucesso" titulo="Documento recebido">
-                  Já pode avançar para a revisão final.
-                </Alerta>
-              )}
+                <label
+                  htmlFor="upload-identidade"
+                  className={`block border-2 border-dashed p-5 text-center cursor-pointer transition-colors ${
+                    identidadeEnviada
+                      ? "border-success/60 bg-success/5"
+                      : erroIdentidade
+                        ? "border-critico/60 bg-critico/5"
+                        : "border-line hover:border-seal bg-canvas"
+                  }`}
+                >
+                  <input
+                    id="upload-identidade"
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    capture="environment"
+                    className="hidden"
+                    disabled={enviandoIdentidade}
+                    onChange={(e) => handleEnviarArquivo("documento_identidade", e)}
+                  />
+                  <div className="space-y-1.5">
+                    <div className="font-mono text-2xl text-seal">
+                      {enviandoIdentidade ? "…" : identidadeEnviada ? "✓" : "📷"}
+                    </div>
+                    <div className="text-small font-medium text-ink">
+                      {enviandoIdentidade
+                        ? "Enviando e verificando documento…"
+                        : identidadeEnviada
+                          ? `Identidade enviada: ${nomeArquivoIdentidade}`
+                          : "Tirar foto ou anexar RG / CNH"}
+                    </div>
+                    <p className="text-xs text-ink-muted">Formatos JPG, PNG ou PDF até 20 MB</p>
+                  </div>
+                </label>
 
+                {erroIdentidade && (
+                  <Alerta tom="critico" titulo="Não foi possível aceitar este arquivo">
+                    {erroIdentidade}
+                  </Alerta>
+                )}
+
+                {identidadeEnviada && (
+                  <Alerta tom="sucesso" titulo="Documento de identidade recebido">
+                    Arquivo verificado e registrado com sucesso.
+                  </Alerta>
+                )}
+              </div>
+
+              {/* Slot 2: Comprovante de Residência */}
+              <div className="border border-line bg-surface/40 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary font-mono text-xs font-semibold">
+                      2
+                    </span>
+                    <h2 className="text-small font-semibold text-ink">
+                      Comprovante de Residência
+                    </h2>
+                  </div>
+                  {enderecoEnviado ? (
+                    <span className="font-mono text-xs text-success font-medium flex items-center gap-1">
+                      ✓ Enviado
+                    </span>
+                  ) : (
+                    <span className="text-[0.6875rem] font-mono uppercase text-ink-muted bg-surface px-1.5 py-0.5 border border-line">
+                      Recomendado
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-ink-muted leading-relaxed">
+                  Conta recente de <strong>água, luz, gás, internet ou telefone</strong> emitida nos
+                  últimos 90 dias, em seu nome ou de parentes de 1º grau.
+                </p>
+
+                <label
+                  htmlFor="upload-endereco"
+                  className={`block border-2 border-dashed p-5 text-center cursor-pointer transition-colors ${
+                    enderecoEnviado
+                      ? "border-success/60 bg-success/5"
+                      : erroEndereco
+                        ? "border-critico/60 bg-critico/5"
+                        : "border-line hover:border-seal bg-canvas"
+                  }`}
+                >
+                  <input
+                    id="upload-endereco"
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    capture="environment"
+                    className="hidden"
+                    disabled={enviandoEndereco}
+                    onChange={(e) => handleEnviarArquivo("comprovante_endereco", e)}
+                  />
+                  <div className="space-y-1.5">
+                    <div className="font-mono text-2xl text-seal">
+                      {enviandoEndereco ? "…" : enderecoEnviado ? "✓" : "📄"}
+                    </div>
+                    <div className="text-small font-medium text-ink">
+                      {enviandoEndereco
+                        ? "Enviando e verificando comprovante…"
+                        : enderecoEnviado
+                          ? `Comprovante enviado: ${nomeArquivoEndereco}`
+                          : "Tirar foto ou anexar comprovante de residência"}
+                    </div>
+                    <p className="text-xs text-ink-muted">Formatos JPG, PNG ou PDF até 20 MB</p>
+                  </div>
+                </label>
+
+                {erroEndereco && (
+                  <Alerta tom="critico" titulo="Não foi possível aceitar este arquivo">
+                    {erroEndereco}
+                  </Alerta>
+                )}
+
+                {enderecoEnviado && (
+                  <Alerta tom="sucesso" titulo="Comprovante de residência recebido">
+                    Arquivo verificado e registrado com sucesso.
+                  </Alerta>
+                )}
+              </div>
+
+              {/* Dica de qualidade */}
               <div className="p-3 bg-surface border-l-2 border-info text-xs text-ink-muted space-y-1">
                 <strong>Dica de qualidade:</strong>
                 <p>
-                  Coloque o documento sobre uma mesa bem iluminada e evite usar o flash
-                  diretamente sobre o plástico de proteção.
+                  Coloque os documentos sobre uma mesa bem iluminada, sem cortes nas bordas e evite usar
+                  o flash diretamente sobre plásticos protetores.
                 </p>
               </div>
             </div>
@@ -267,19 +501,20 @@ export function ColetaCliente({
                 type="button"
                 voz="selo"
                 onClick={() => setEtapa(3)}
-                disabled={!documentoEnviado || enviandoDocumento}
+                disabled={enviandoIdentidade || enviandoEndereco || !identidadeEnviada}
                 className="w-full py-3.5 text-base"
               >
                 Avançar para revisão →
               </Selo>
-              {!documentoEnviado && (
+              {(!identidadeEnviada || !enderecoEnviado) && (
                 <Selo
                   type="button"
                   voz="linha"
                   onClick={() => setEtapa(3)}
+                  disabled={enviandoIdentidade || enviandoEndereco}
                   className="text-center text-xs"
                 >
-                  Enviar o documento depois, continuar sem ele por enquanto
+                  Enviar os documentos depois, continuar sem eles por enquanto
                 </Selo>
               )}
               <Selo
@@ -300,9 +535,36 @@ export function ColetaCliente({
                 Revisão e Consentimento
               </h1>
               <p className="text-small text-ink-muted leading-relaxed">
-                Confira se os dados e o documento das etapas anteriores estão corretos antes de
-                enviar.
+                Confira se os dados e os documentos anexados nas etapas anteriores estão corretos antes de
+                concluir o envio.
               </p>
+            </div>
+
+            {/* Resumo dos documentos anexados */}
+            <div className="border border-line bg-surface/50 p-4 space-y-2.5">
+              <div className="font-mono text-[0.7rem] uppercase tracking-wider text-ink-muted">
+                Documentos Anexados
+              </div>
+              <div className="flex items-center justify-between text-xs py-1.5 border-b border-line/60">
+                <span className="text-ink font-medium">Documento de Identidade</span>
+                {identidadeEnviada ? (
+                  <span className="font-mono text-success font-medium flex items-center gap-1">
+                    ✓ Enviado {nomeArquivoIdentidade ? `(${nomeArquivoIdentidade})` : ""}
+                  </span>
+                ) : (
+                  <span className="font-mono text-ink-muted">Não enviado</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-xs py-1.5">
+                <span className="text-ink font-medium">Comprovante de Residência</span>
+                {enderecoEnviado ? (
+                  <span className="font-mono text-success font-medium flex items-center gap-1">
+                    ✓ Enviado {nomeArquivoEndereco ? `(${nomeArquivoEndereco})` : ""}
+                  </span>
+                ) : (
+                  <span className="font-mono text-ink-muted">Não enviado</span>
+                )}
+              </div>
             </div>
 
             {estado.status === "erro" && (
@@ -321,7 +583,7 @@ export function ColetaCliente({
                   className="mt-1 h-4 w-4 rounded border-line text-seal focus:ring-seal"
                 />
                 <span className="text-xs leading-relaxed text-ink">
-                  Declaro que as informações e o documento fornecidos são verídicos e autorizo sua
+                  Declaro que as informações e os documentos fornecidos são verídicos e autorizo sua
                   utilização exclusiva para a{" "}
                   <strong>formalização do contrato de trabalho temporário</strong> e para a{" "}
                   <strong>prestação de contas eleitoral perante a Justiça Eleitoral</strong>, em
@@ -347,7 +609,7 @@ export function ColetaCliente({
                 onClick={() => setEtapa(2)}
                 className="text-center text-xs"
               >
-                ← Voltar para o documento
+                ← Voltar para a documentação
               </Selo>
             </div>
           </div>
@@ -365,13 +627,18 @@ function TelaSucesso({
   primeiroNome,
   organizacaoNome,
   token,
-  documentoEnviado,
+  identidadeEnviada,
+  enderecoEnviado,
 }: {
   primeiroNome: string;
   organizacaoNome: string;
   token: string;
-  documentoEnviado: boolean;
+  identidadeEnviada: boolean;
+  enderecoEnviado: boolean;
 }) {
+  const algumDocumentoEnviado = identidadeEnviada || enderecoEnviado;
+  const todosDocumentosEnviados = identidadeEnviada && enderecoEnviado;
+
   return (
     <div className="min-h-screen bg-paper text-ink flex flex-col justify-between">
       <main className="flex-1 mx-auto w-full max-w-md px-4 py-10 space-y-6 text-center">
@@ -382,8 +649,9 @@ function TelaSucesso({
         <div className="space-y-2">
           <h1 className="text-h1 font-semibold text-ink">Cadastro recebido com sucesso!</h1>
           <p className="text-small text-ink-muted leading-relaxed">
-            Obrigado, <strong>{primeiroNome}</strong>. Seus dados{documentoEnviado ? " e documento" : ""}{" "}
-            foram recebidos pela coordenação de {organizacaoNome}.
+            Obrigado, <strong>{primeiroNome}</strong>. Seus dados cadastrais{" "}
+            {algumDocumentoEnviado ? "e documentos " : ""}foram recebidos pela coordenação de{" "}
+            <strong>{organizacaoNome}</strong>.
           </p>
         </div>
 
@@ -399,25 +667,36 @@ function TelaSucesso({
               </span>
             </p>
             <p>
-              Status:{" "}
-              <span className="text-success font-medium">
-                {documentoEnviado ? "Dados e documento recebidos" : "Dados recebidos"}
+              Status dos dados:{" "}
+              <span className="text-success font-medium">Recebidos com sucesso</span>
+            </p>
+            <p>
+              Documento de Identidade:{" "}
+              <span className={identidadeEnviada ? "text-success font-medium" : "text-atencao font-medium"}>
+                {identidadeEnviada ? "✓ Recebido" : "Pendente"}
+              </span>
+            </p>
+            <p>
+              Comprovante de Residência:{" "}
+              <span className={enderecoEnviado ? "text-success font-medium" : "text-ink-muted font-medium"}>
+                {enderecoEnviado ? "✓ Recebido" : "Não enviado"}
               </span>
             </p>
           </div>
         </div>
 
-        {!documentoEnviado && (
-          <Alerta tom="atencao" titulo="Documento pendente">
-            Você concluiu sem enviar o documento de identidade. A coordenação vai entrar em
-            contato para pedir o envio separadamente.
+        {!todosDocumentosEnviados && (
+          <Alerta tom="atencao" titulo="Documentação complementar">
+            {!identidadeEnviada
+              ? "Você concluiu sem anexar o documento de identidade. A coordenação entrará em contato para solicitar o envio."
+              : "Você concluiu sem o comprovante de residência. Caso necessário para sua região ou função, a coordenação solicitará posteriormente."}
           </Alerta>
         )}
 
         <div className="p-4 bg-paper border border-line text-xs text-ink-muted leading-relaxed">
           <strong>Próximos passos:</strong>
           <p className="mt-1">
-            Assim que o contrato for emitido, você receberá um novo link para assinatura.
+            Assim que a documentação for validada e o contrato emitido, você receberá um link para assinatura digital.
           </p>
         </div>
 

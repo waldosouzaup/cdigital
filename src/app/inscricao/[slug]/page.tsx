@@ -29,7 +29,7 @@ export default async function InscricaoPublicaPage({
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-paper text-ink flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-canvas text-ink flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-md space-y-6 text-center">
           <Marca className="justify-center" />
           <Alerta tom="critico" titulo="Inscrições indisponíveis">

@@ -14,6 +14,8 @@ import {
   extensaoPorMime,
   validarDimensaoImagem,
   validarTipoETamanho,
+  TIPOS_DOCUMENTO_VALIDOS,
+  type TipoDocumentoColeta,
 } from "@/lib/documentos/upload";
 import { renderizarEmailDocumentoRejeitado } from "@/emails/documento-rejeitado";
 import { sendNotification } from "@/lib/notificacoes/enviar";
@@ -22,10 +24,7 @@ import { createResendTransport } from "@/lib/notificacoes/transporte";
 
 export const runtime = "nodejs";
 
-// Um único tipo de documento nesta primeira versão (RG/CNH/comprovante juntos) — a
-// tabela `documentos.tipo` é texto livre (Seção 5 não define enum), então nada
-// impede um tipo mais granular depois sem migration.
-const TIPO_DOCUMENTO_PADRAO = "documento_identidade";
+const TIPO_DOCUMENTO_PADRAO: TipoDocumentoColeta = "documento_identidade";
 
 interface LinkColetaInfo {
   pessoa_id: string;
@@ -101,10 +100,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const hash = calcularHashSha256(buffer);
 
+  const tipoParam = formData.get("tipo");
+  const tipo: TipoDocumentoColeta =
+    typeof tipoParam === "string" && (TIPOS_DOCUMENTO_VALIDOS as readonly string[]).includes(tipoParam)
+      ? (tipoParam as TipoDocumentoColeta)
+      : TIPO_DOCUMENTO_PADRAO;
+
   const { data: registro, error: erroRegistro } = await supabase
     .rpc("registrar_documento_coleta", {
       p_token: token,
-      p_tipo: TIPO_DOCUMENTO_PADRAO,
+      p_tipo: tipo,
       p_nome_original: arquivo.name,
       p_hash: hash,
       p_largura: checagemDimensao.largura ?? null,
@@ -143,7 +148,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, tipo });
 }
 
 async function dispararDocumentoRejeitado(params: {

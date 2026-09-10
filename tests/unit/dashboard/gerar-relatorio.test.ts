@@ -24,7 +24,7 @@ describe("gerarPdfRelatorio", () => {
         valorTotalGeral: 15000,
       },
       regioes: [
-        { nome: "Águas Claras", totalPessoas: 20, pessoasAptas: 18, contratosAssinados: 10, coberturaDocumentalPct: 90 },
+        { nome: "Águas Claras", totalPessoas: 20, pessoasAptas: 18, pessoasComContratoAssinado: 10, conclusaoPct: 50 },
       ],
     });
 

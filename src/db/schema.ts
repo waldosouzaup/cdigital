@@ -41,6 +41,7 @@ import { authenticatedRole, authUsers } from "drizzle-orm/supabase";
 // ---------------------------------------------------------------------------
 
 export const userRoleEnum = pgEnum("papel_usuario", [
+  "superadmin",
   "gestor",
   "coord_comite",
   "coord_regiao",
@@ -215,16 +216,22 @@ export const organizations = pgTable(
       as: "permissive",
       for: "select",
       to: authenticatedRole,
-      using: sql`${table.id} = (select public.organizacao_id())`,
+      using: sql`${table.id} = (select public.organizacao_id()) OR (select public.papel()) = 'superadmin'`,
     }),
-    // Item 4: o gestor edita a identidade (nome/CNPJ) da própria organização.
-    // Migration 0014. A restritiva de MFA continua valendo por cima.
+    pgPolicy("organizacoes_insert_superadmin", {
+      as: "permissive",
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`(select public.papel()) = 'superadmin'`,
+    }),
+    // Item 4: o gestor edita a identidade (nome/CNPJ) da própria organização; superadmin edita qualquer uma.
+    // Migration 0014 e 0023. A restritiva de MFA continua valendo por cima.
     pgPolicy("organizacoes_update_gestor", {
       as: "permissive",
       for: "update",
       to: authenticatedRole,
-      using: sql`${table.id} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
-      withCheck: sql`${table.id} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+      using: sql`(${table.id} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+      withCheck: sql`(${table.id} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
     }),  ],
 );
 
@@ -313,26 +320,26 @@ export const users = pgTable(
       as: "permissive",
       for: "select",
       to: authenticatedRole,
-      using: sql`${table.organizationId} = (select public.organizacao_id())`,
+      using: sql`${table.organizationId} = (select public.organizacao_id()) OR (select public.papel()) = 'superadmin'`,
     }),
     pgPolicy("usuarios_insert_gestor", {
       as: "permissive",
       for: "insert",
       to: authenticatedRole,
-      withCheck: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+      withCheck: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
     }),
     pgPolicy("usuarios_update_gestor", {
       as: "permissive",
       for: "update",
       to: authenticatedRole,
-      using: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
-      withCheck: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+      using: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
+      withCheck: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
     }),
     pgPolicy("usuarios_delete_gestor", {
       as: "permissive",
       for: "delete",
       to: authenticatedRole,
-      using: sql`${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor'`,
+      using: sql`(${table.organizationId} = (select public.organizacao_id()) AND (select public.papel()) = 'gestor') OR (select public.papel()) = 'superadmin'`,
     }),
   ],
 );
@@ -358,9 +365,12 @@ export const people = pgTable(
     email: text("email"),
     regionId: uuid("regiao_id").references(() => regions.id),
     role: text("funcao"),
+    // banco/agencia/conta: legado — a coleta passou a pedir a chave PIX (migration
+    // 0019). Colunas mantidas para não perder dado antigo.
     bank: text("banco"),
     bankBranch: text("agencia"),
     bankAccount: text("conta"),
+    pixKey: text("chave_pix"),
     eligible: boolean("apta").notNull().default(false),
     // Origem do cadastro (migration 0017): "autoinscricao" quando veio do link
     // público `/inscricao/[slug]`. NULL = legado / cadastro pelo painel.
@@ -437,6 +447,10 @@ export const contracts = pgTable(
     pdfPath: text("caminho_pdf"),
     signedPdfPath: text("caminho_pdf_assinado"),
     distratoTermPath: text("caminho_termo_distrato"),
+    signatureToken: text("token_assinatura").unique(),
+    signatureExpiresAt: timestamp("assinatura_expira_em", { withTimezone: true }),
+    pdfSha256: text("pdf_sha256"),
+    signatureEvidence: jsonb("assinatura_evidencias"),
     ...timestamps,
   },
   (table) => [
@@ -686,3 +700,37 @@ export const auditLog = pgTable(
       sql`${table.organizationId} = (select public.organizacao_id())`,
     ),  ],
 );
+
+// ---------------------------------------------------------------------------
+// dados_excluidos — Arquivamento permanente de registros excluídos do painel
+// ---------------------------------------------------------------------------
+
+export const deletedRecords = pgTable(
+  "dados_excluidos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organizacao_id")
+      .notNull()
+      .references(() => organizations.id),
+    recordType: text("tipo_registro").notNull().default("contrato"),
+    recordId: uuid("registro_id"),
+    data: jsonb("dados").notNull(),
+    userId: uuid("usuario_id").references(() => users.id),
+    userName: text("usuario_nome").notNull(),
+    userLogin: text("usuario_login").notNull(),
+    reason: text("motivo"),
+    deletedAt: timestamp("excluido_em", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (table) => [
+    index("dados_excluidos_organizacao_id_excluido_em_idx").on(
+      table.organizationId,
+      table.deletedAt,
+    ),
+    ...organizationReadInsertPolicies(
+      "dados_excluidos_organizacao",
+      sql`${table.organizationId} = (select public.organizacao_id())`,
+    ),
+  ],
+);
+

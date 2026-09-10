@@ -1,11 +1,8 @@
 import type { ReactNode } from "react";
 
 /**
- * Carimbo / Etiqueta de status institucional.
- *
- * Emprega a fonte de registro (IBM Plex Mono) em tamanho reduzido, com contorno
- * discreto e preenchimento suave — transmite autenticidade e rigor de auditoria,
- * sem parecer uma tag de SaaS genérico.
+ * Selo / Badge de status institucional (§4.1, §4.2 e §7.3 do DESIGN-SYSTEM.md).
+ * Formato pill (rounded-full), ícone obrigatório + rótulo textual legível.
  */
 export type StatusTipo =
   | "rascunho"
@@ -24,100 +21,89 @@ export type StatusTipo =
   | "projeto"
   | "campanha";
 
-const estilos: Record<
-  StatusTipo,
-  { texto: string; anel: string; fundo: string; rotulo: string; pulsar?: boolean }
-> = {
+interface ConfiguracaoStatus {
+  rotulo: string;
+  icone: string;
+  classes: string;
+  pulsar?: boolean;
+}
+
+const configuracoes: Record<StatusTipo, ConfiguracaoStatus> = {
   rascunho: {
     rotulo: "Rascunho",
-    texto: "text-ink-muted",
-    anel: "ring-line",
-    fundo: "bg-surface/60",
+    icone: "○",
+    classes: "bg-neutral-100 text-ink-muted ring-1 ring-line",
   },
   emitido: {
     rotulo: "Emitido",
-    texto: "text-brand-yellow",
-    anel: "ring-brand-yellow/40",
-    fundo: "bg-brand-yellow/10",
+    icone: "▸",
+    classes: "bg-primary-tint text-primary ring-1 ring-primary/30",
   },
   enviado: {
     rotulo: "Enviado",
-    texto: "text-sky-400",
-    anel: "ring-sky-500/40",
-    fundo: "bg-sky-500/10",
+    icone: "➤",
+    classes: "bg-primary-tint text-primary font-semibold ring-1 ring-primary/40",
   },
   assinado: {
     rotulo: "Assinado",
-    texto: "text-emerald-400",
-    anel: "ring-emerald-500/40",
-    fundo: "bg-emerald-500/10",
-  },
-  distratado: {
-    rotulo: "Distratado",
-    texto: "text-red-400",
-    anel: "ring-red-500/40",
-    fundo: "bg-red-500/10",
-  },
-  distrato_assinado: {
-    rotulo: "Distrato assinado",
-    texto: "text-red-400",
-    anel: "ring-red-500/50",
-    fundo: "bg-red-500/15",
+    icone: "✓",
+    classes: "bg-primary text-white font-semibold ring-1 ring-primary/40",
   },
   encerrado: {
     rotulo: "Encerrado",
-    texto: "text-ink-muted",
-    anel: "ring-line",
-    fundo: "bg-line/30",
+    icone: "✓✓",
+    classes: "bg-surface-sunken text-ink-muted font-semibold ring-1 ring-line",
+  },
+  distratado: {
+    rotulo: "Distratado",
+    icone: "✕",
+    classes: "bg-danger-tint text-danger ring-1 ring-danger/30",
+  },
+  distrato_assinado: {
+    rotulo: "Distrato assinado",
+    icone: "✕",
+    classes: "bg-danger-tint text-danger font-medium ring-1 ring-danger/40",
   },
   cancelado: {
     rotulo: "Cancelado",
-    texto: "text-ink-muted",
-    anel: "ring-line",
-    fundo: "bg-surface/40",
+    icone: "✕",
+    classes: "bg-neutral-100 text-ink-muted line-through ring-1 ring-line",
   },
   pendente: {
     rotulo: "Pendente",
-    texto: "text-amber-400",
-    anel: "ring-amber-500/40",
-    fundo: "bg-amber-500/10",
+    icone: "⧗",
+    classes: "bg-warning-tint text-warning ring-1 ring-warning/30",
     pulsar: true,
   },
   aprovado: {
     rotulo: "Aprovado",
-    texto: "text-emerald-400",
-    anel: "ring-emerald-500/40",
-    fundo: "bg-emerald-500/10",
+    icone: "✓",
+    classes: "bg-success-tint text-success ring-1 ring-success/30",
   },
   rejeitado: {
     rotulo: "Rejeitado",
-    texto: "text-red-400",
-    anel: "ring-red-500/40",
-    fundo: "bg-red-500/10",
+    icone: "✕",
+    classes: "bg-danger-tint text-danger ring-1 ring-danger/30",
   },
   apta: {
     rotulo: "Apta",
-    texto: "text-emerald-400",
-    anel: "ring-emerald-500/40",
-    fundo: "bg-emerald-500/10",
+    icone: "✓",
+    classes: "bg-success-tint text-success ring-1 ring-success/30",
   },
   projeto: {
-    rotulo: "Projeto de Lei",
-    texto: "text-emerald-300 font-bold",
-    anel: "ring-emerald-400/50",
-    fundo: "bg-emerald-950/80",
+    rotulo: "Projeto",
+    icone: "§",
+    classes: "bg-primary-tint text-primary font-semibold ring-1 ring-primary/30",
   },
   campanha: {
     rotulo: "Eleições 2026",
-    texto: "text-brand-yellow font-bold",
-    anel: "ring-brand-yellow/50",
-    fundo: "bg-brand-yellow/15",
+    icone: "•",
+    classes: "bg-surface-tint text-primary font-bold ring-1 ring-primary/20",
   },
   neutro: {
     rotulo: "Neutro",
-    texto: "text-ink-muted",
-    anel: "ring-line",
-    fundo: "bg-surface/50",
+    icone: "○",
+    classes: "bg-neutral-100 text-ink-muted ring-1 ring-line",
   },
 };
 
@@ -132,19 +118,16 @@ export function Badge({
   className?: string;
   children?: ReactNode;
 }) {
-  const conf = estilos[status] ?? estilos.neutro;
+  const conf = configuracoes[status] ?? configuracoes.neutro;
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[0.75rem] font-medium tracking-wide ring-1 ring-inset ${conf.anel} ${conf.fundo} ${conf.texto} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[0.72rem] font-medium tracking-wide shadow-2xs ${conf.classes} ${className}`}
     >
-      <span className="relative flex h-1.5 w-1.5 shrink-0">
-        {conf.pulsar && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60" />
-        )}
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current opacity-90" />
+      <span className="shrink-0 text-[0.7rem] leading-none select-none font-bold">
+        {conf.icone}
       </span>
-      {children ?? rotuloPersonalizado ?? conf.rotulo}
+      <span>{children ?? rotuloPersonalizado ?? conf.rotulo}</span>
     </span>
   );
 }

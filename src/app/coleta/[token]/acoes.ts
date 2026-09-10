@@ -28,9 +28,7 @@ export async function enviarDadosColeta(
     p_cep: campoOuNulo(formData, "cep"),
     p_rg: campoOuNulo(formData, "rg"),
     p_data_nascimento: campoOuNulo(formData, "dataNascimento"),
-    p_banco: campoOuNulo(formData, "banco"),
-    p_agencia: campoOuNulo(formData, "agencia"),
-    p_conta: campoOuNulo(formData, "conta"),
+    p_chave_pix: campoOuNulo(formData, "chavePix"),
     p_email: campoOuNulo(formData, "email"),
   });
 

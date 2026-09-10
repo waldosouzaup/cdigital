@@ -16,18 +16,18 @@ function PessoaAptaEmail({ nomePessoa, urlPainel }: PessoaAptaEmailProps) {
     <Html lang="pt-BR">
       <Head />
       <Preview>{`${nomePessoa} está com a documentação completa`}</Preview>
-      <Body style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#eceeeb", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "24px", maxWidth: "480px" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#1b2430" }}>
+      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
+        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
             Documentação aprovada
           </Heading>
-          <Text style={{ color: "#1b2430" }}>
+          <Text style={{ color: "#0A0F0D" }}>
             <strong>{nomePessoa}</strong> teve toda a documentação conferida e aprovada. Já está
             liberado(a) para emissão de contrato.
           </Text>
           <Text>
-            <Link href={urlPainel} style={{ color: "#b8752e" }}>
-              Ver no painel
+            <Link href={urlPainel} style={{ color: "#157F58", fontWeight: "600" }}>
+              Ver no painel →
             </Link>
           </Text>
         </Container>

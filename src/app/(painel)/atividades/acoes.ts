@@ -88,5 +88,6 @@ export async function registrarAtividade(
   });
 
   revalidatePath("/atividades");
+  revalidatePath("/configuracoes");
   return { status: "sucesso", marca: Date.now() };
 }

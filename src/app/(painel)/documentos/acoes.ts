@@ -10,23 +10,35 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { obterContextoUsuario } from "@/lib/supabase/contexto-usuario";
+import { randomBytes } from "node:crypto";
 import {
   registerDocumentReview,
   registerPersonWrite,
+  registerContractWrite,
 } from "@/lib/auditoria/registrar";
 import { pessoaEstaApta } from "@/lib/pessoas/aptidao";
 import { criarUrlAssinada } from "@/lib/documentos/url-assinada";
 import { gerarTokenColeta } from "@/lib/coleta/token";
 import { renderizarEmailPessoaApta } from "@/emails/pessoa-apta";
 import { renderizarEmailDocumentoRejeitado } from "@/emails/documento-rejeitado";
+import { renderizarEmailContratoEnviado } from "@/emails/contrato-enviado";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
 import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
+import { substituirMarcadores } from "@/lib/contratos/marcadores";
+import { gerarPdfContrato, htmlParaTexto } from "@/lib/contratos/gerar-pdf";
+import { amountInWords } from "@/lib/contratos/valor-extenso";
 
 export interface ResultadoAcaoDocumento {
   ok: boolean;
   mensagem?: string;
   pessoaFicouApta?: boolean;
+  contratoId?: string;
+  tokenAssinatura?: string;
+  urlAssinatura?: string;
+  emailEnviado?: boolean;
+  destinatarioEmail?: string | null;
+  pessoaNome?: string;
 }
 
 // Trava de papel (migration 0016): aprovar/rejeitar documento é exclusivo de gestor
@@ -35,20 +47,32 @@ export interface ResultadoAcaoDocumento {
 const PAPEIS_TRIAGEM = ["gestor", "coord_comite"];
 const RECUSA_PAPEL = "Só gestores ou coordenadores de comitê podem validar documentos.";
 
-export async function aprovarDocumento(documentoId: string): Promise<ResultadoAcaoDocumento> {
+function formatarValorBRL(valor: number): string {
+  return `R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatarDataBR(isoDate: string): string {
+  const [ano, mes, dia] = isoDate.split("-");
+  return `${dia}/${mes}/${ano}`;
+}
+
+export async function aprovarDocumentoEGerarContrato(
+  documentoId: string,
+): Promise<ResultadoAcaoDocumento> {
   const supabase = await createClient();
   const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
   if (!PAPEIS_TRIAGEM.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL };
 
-  const { data: documento, error } = await supabase
+  // 1. Aprova o documento
+  const { data: documento, error: erroDoc } = await supabase
     .from("documentos")
     .update({ status: "aprovado", motivo_rejeicao: null })
     .eq("id", documentoId)
     .select("id, pessoa_id")
     .single();
 
-  if (error || !documento) {
+  if (erroDoc || !documento) {
     return { ok: false, mensagem: "Não foi possível aprovar o documento." };
   }
 
@@ -60,6 +84,7 @@ export async function aprovarDocumento(documentoId: string): Promise<ResultadoAc
     action: "aprovacao",
   });
 
+  // 2. Reavalia aptidão
   const pessoaFicouApta = await reavaliarAptidao({
     supabase,
     organizationId,
@@ -67,9 +92,200 @@ export async function aprovarDocumento(documentoId: string): Promise<ResultadoAc
     pessoaId: documento.pessoa_id,
   });
 
+  // 3. Busca dados cadastrais completos da pessoa
+  const { data: pessoa } = await supabase
+    .from("pessoas")
+    .select("id, nome_completo, cpf, endereco, chave_pix, funcao, email, regiao_id")
+    .eq("id", documento.pessoa_id)
+    .single();
+
+  if (!pessoa) {
+    revalidatePath("/documentos");
+    return { ok: true, pessoaFicouApta, mensagem: "Documento aprovado." };
+  }
+
+  // 4. Seleciona o modelo de contrato correspondente à função ou template ativo padrão
+  const { data: templates } = await supabase
+    .from("templates_contrato")
+    .select("id, nome, objeto, corpo_html, valor_padrao")
+    .eq("organizacao_id", organizationId)
+    .eq("ativo", true);
+
+  let templateEscolhido = templates?.find((t) => {
+    if (!pessoa.funcao) return false;
+    const funcLower = pessoa.funcao.toLowerCase().trim();
+    return (
+      t.objeto.toLowerCase().trim() === funcLower ||
+      t.nome.toLowerCase().includes(funcLower)
+    );
+  });
+
+  if (!templateEscolhido && templates && templates.length > 0) {
+    templateEscolhido = templates[0];
+  }
+
+  if (!templateEscolhido) {
+    revalidatePath("/documentos");
+    revalidatePath("/pessoas");
+    return {
+      ok: true,
+      pessoaFicouApta,
+      pessoaNome: pessoa.nome_completo,
+      mensagem: "Documento aprovado com sucesso. Nenhum modelo de contrato ativo encontrado.",
+    };
+  }
+
+  // 5. Configura vigência, remuneração e token exclusivo
+  const valor =
+    templateEscolhido.valor_padrao && Number(templateEscolhido.valor_padrao) > 0
+      ? Number(templateEscolhido.valor_padrao)
+      : 3553;
+  const valorExtenso = amountInWords(valor);
+  const vigenciaInicio = "2026-09-01";
+  const vigenciaFim = "2026-10-03";
+  const tokenAssinatura = randomBytes(24).toString("hex");
+
+  // 6. Insere o contrato em rascunho com o token_assinatura
+  const { data: contrato, error: erroInsercaoContrato } = await supabase
+    .from("contratos")
+    .insert({
+      organizacao_id: organizationId,
+      pessoa_id: pessoa.id,
+      template_id: templateEscolhido.id,
+      objeto: templateEscolhido.objeto,
+      valor,
+      valor_extenso: valorExtenso,
+      vigencia_inicio: vigenciaInicio,
+      vigencia_fim: vigenciaFim,
+      token_assinatura: tokenAssinatura,
+      regiao_id: pessoa.regiao_id,
+    })
+    .select("id")
+    .single();
+
+  if (erroInsercaoContrato || !contrato) {
+    revalidatePath("/documentos");
+    return {
+      ok: true,
+      pessoaFicouApta,
+      pessoaNome: pessoa.nome_completo,
+      mensagem: "Documento aprovado, mas ocorreu um erro ao gerar o registro de contrato.",
+    };
+  }
+
+  // 7. Renderiza e compila o PDF oficial do contrato
+  const corpoComDados = substituirMarcadores(templateEscolhido.corpo_html, {
+    nome: pessoa.nome_completo,
+    cpf: pessoa.cpf,
+    endereco: pessoa.endereco ?? "não informado",
+    chavePix: pessoa.chave_pix ?? "não informada",
+    objeto: templateEscolhido.objeto,
+    valor: formatarValorBRL(valor),
+    valorExtenso,
+    vigenciaInicio: formatarDataBR(vigenciaInicio),
+    vigenciaFim: formatarDataBR(vigenciaFim),
+  });
+
+  const pdfBytes = await gerarPdfContrato({
+    titulo: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS — ${templateEscolhido.objeto.toUpperCase()}`,
+    corpo: htmlParaTexto(corpoComDados),
+  });
+
+  const pdfPath = `${organizationId}/${pessoa.id}/contrato_${contrato.id}.pdf`;
+  const { error: erroUpload } = await supabase.storage
+    .from("contratos")
+    .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true });
+
+  if (!erroUpload) {
+    await supabase.from("contratos").update({ caminho_pdf: pdfPath }).eq("id", contrato.id);
+  }
+
+  // 8. Transiciona atomicamente: rascunho -> emitido
+  await supabase.rpc("gravar_transicao_contrato", {
+    p_contrato_id: contrato.id,
+    p_status_anterior: "rascunho",
+    p_status_novo: "emitido",
+    p_observacao: "Emissão automática após aprovação na mesa de conferência documental.",
+  });
+
+  // 9. Atualiza canal de envio e transiciona: emitido -> enviado
+  await supabase
+    .from("contratos")
+    .update({
+      canal_envio: "email",
+      enviado_para: pessoa.email ?? "sem-email-cadastrado",
+    })
+    .eq("id", contrato.id);
+
+  await supabase.rpc("gravar_transicao_contrato", {
+    p_contrato_id: contrato.id,
+    p_status_anterior: "emitido",
+    p_status_novo: "enviado",
+    p_observacao: `Contrato disponibilizado para assinatura pública via link.${pessoa.email ? ` Notificação despachada para ${pessoa.email}.` : ""}`,
+  });
+
+  await registerContractWrite({
+    supabase,
+    organizationId,
+    userId,
+    contractId: contrato.id,
+    action: "emissao",
+  });
+
+  // 10. Dispara e-mail com link do contrato para o colaborador
+  const baseUrl = process.env.APP_URL || "http://localhost:3000";
+  const urlAssinatura = `${baseUrl}/assinar/${tokenAssinatura}`;
+  let emailEnviado = false;
+
+  if (pessoa.email) {
+    const primeiroNome = pessoa.nome_completo.split(" ")[0];
+    const { subject, html, text } = await renderizarEmailContratoEnviado({
+      primeiroNome,
+      objeto: templateEscolhido.objeto,
+      urlAssinatura,
+      urlContato: baseUrl,
+    });
+
+    const resultadoEnvio = await sendNotification({
+      supabase,
+      transport: transporteEmailPadrao(),
+      organizationId,
+      type: "contrato_enviado",
+      recipientEmail: pessoa.email,
+      entity: "contratos",
+      entityId: contrato.id,
+      idempotencyKey: idempotencyKey("contrato_enviado", contrato.id),
+      subject,
+      html,
+      text,
+    });
+    emailEnviado = resultadoEnvio.sent;
+  }
+
   revalidatePath("/documentos");
+  revalidatePath("/contratos");
   revalidatePath("/pessoas");
-  return { ok: true, pessoaFicouApta };
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    pessoaFicouApta,
+    contratoId: contrato.id,
+    tokenAssinatura,
+    urlAssinatura,
+    emailEnviado,
+    destinatarioEmail: pessoa.email,
+    pessoaNome: pessoa.nome_completo,
+    mensagem: emailEnviado
+      ? `Documento aprovado! Contrato gerado em PDF e link de assinatura enviado por e-mail para ${pessoa.email}.`
+      : pessoa.email
+        ? `Documento aprovado e contrato gerado em PDF! Link de assinatura pronto.`
+        : `Documento aprovado e contrato gerado em PDF! (Colaborador sem e-mail cadastrado — copie o link de assinatura).`,
+  };
+}
+
+export async function aprovarDocumento(documentoId: string): Promise<ResultadoAcaoDocumento> {
+  return aprovarDocumentoEGerarContrato(documentoId);
 }
 
 export async function rejeitarDocumento(

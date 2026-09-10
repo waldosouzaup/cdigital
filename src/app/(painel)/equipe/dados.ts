@@ -13,6 +13,7 @@ export interface MembroEquipe {
   regiaoId: string | null;
   regiaoNome: string | null;
   ativo: boolean;
+  criadoEm?: string;
 }
 
 interface LinhaUsuario {
@@ -22,6 +23,7 @@ interface LinhaUsuario {
   papel: string;
   regiao_id: string | null;
   ativo: boolean;
+  criado_em?: string;
   regioes: { nome: string } | null;
 }
 
@@ -29,7 +31,7 @@ export async function listarEquipe(): Promise<MembroEquipe[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("usuarios")
-    .select("id, nome, email, papel, regiao_id, ativo, regioes ( nome )")
+    .select("id, nome, email, papel, regiao_id, ativo, criado_em, regioes ( nome )")
     .order("nome")
     .returns<LinhaUsuario[]>();
 
@@ -43,5 +45,6 @@ export async function listarEquipe(): Promise<MembroEquipe[]> {
     regiaoId: u.regiao_id,
     regiaoNome: u.regioes?.nome ?? null,
     ativo: u.ativo,
+    criadoEm: u.criado_em,
   }));
 }

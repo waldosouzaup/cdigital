@@ -31,20 +31,20 @@ function ResumoDiarioEmail({ dataReferencia, numeros, urlPainel }: ResumoDiarioE
     <Html lang="pt-BR">
       <Head />
       <Preview>Resumo do dia — Comitê Digital</Preview>
-      <Body style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#eceeeb", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "24px", maxWidth: "480px" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#1b2430" }}>
+      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
+        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
             Resumo de {dataReferencia}
           </Heading>
-          <Text style={{ color: "#1b2430" }}>Movimento das últimas 24 horas:</Text>
+          <Text style={{ color: "#0A0F0D" }}>Movimento das últimas 24 horas:</Text>
           {linhas.map(([rotulo, valor]) => (
-            <Text key={rotulo} style={{ color: "#1b2430", margin: "4px 0" }}>
+            <Text key={rotulo} style={{ color: "#0A0F0D", margin: "4px 0" }}>
               {rotulo}: <strong>{valor}</strong>
             </Text>
           ))}
           <Text>
-            <Link href={urlPainel} style={{ color: "#b8752e" }}>
-              Abrir o painel
+            <Link href={urlPainel} style={{ color: "#157F58", fontWeight: "600" }}>
+              Abrir o painel →
             </Link>
           </Text>
         </Container>

@@ -6,6 +6,7 @@
  */
 import { createClient } from "@/lib/supabase/server";
 import { calcularPendencias, type Pendencia } from "@/lib/pessoas/pendencias";
+import { calcularIdade } from "@/lib/pessoas/relatorio-idade";
 import type { ContractStatus } from "@/lib/contratos/maquina-estados";
 
 export interface RegiaoOpcao {
@@ -17,6 +18,8 @@ export interface PessoaListada {
   id: string;
   nomeCompleto: string;
   cpf: string;
+  dataNascimento: string | null;
+  idade: number | null;
   telefone: string | null;
   funcao: string | null;
   regiaoId: string | null;
@@ -34,6 +37,7 @@ interface LinhaPessoa {
   id: string;
   nome_completo: string;
   cpf: string;
+  data_nascimento: string | null;
   telefone: string | null;
   funcao: string | null;
   regiao_id: string | null;
@@ -51,12 +55,28 @@ export async function listarRegioes(): Promise<RegiaoOpcao[]> {
   return data ?? [];
 }
 
+/**
+ * Quantos cadastros vindos da autoinscrição pública ainda não passaram pela
+ * triagem (não estão aptos). Usado para o aviso no painel — RLS do usuário escopa
+ * por organização/região.
+ */
+export async function contarAutoinscritosPendentes(): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("pessoas")
+    .select("id", { count: "exact", head: true })
+    .eq("origem", "autoinscricao")
+    .eq("apta", false);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 export async function listarPessoas(): Promise<PessoaListada[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("pessoas")
     .select(
-      "id, nome_completo, cpf, telefone, funcao, apta, origem, regiao_id, regioes ( nome ), " +
+      "id, nome_completo, cpf, data_nascimento, telefone, funcao, apta, origem, regiao_id, regioes ( nome ), " +
         "contratos ( status, criado_em ), documentos ( tipo, status, versao )",
     )
     .order("criado_em", { ascending: false })
@@ -76,6 +96,8 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
       id: linha.id,
       nomeCompleto: linha.nome_completo,
       cpf: linha.cpf,
+      dataNascimento: linha.data_nascimento,
+      idade: calcularIdade(linha.data_nascimento),
       telefone: linha.telefone,
       funcao: linha.funcao,
       regiaoId: linha.regiao_id,

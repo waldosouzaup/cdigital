@@ -91,4 +91,26 @@ describe("validarEntradaUsuario", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erros.nome).toBeTruthy();
   });
+
+  it("aceita papel superadmin quando incluído nos papéis válidos (chamada de superadmin)", () => {
+    const papeisComSuperadmin = ["superadmin", ...PAPEIS];
+    const r = validarEntradaUsuario(base({ papel: "superadmin" }), {
+      papeisValidos: papeisComSuperadmin,
+      regioesIds: REGIOES,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.valores.papel).toBe("superadmin");
+      expect(r.valores.regiaoId).toBeNull();
+    }
+  });
+
+  it("recusa papel superadmin quando não incluído nos papéis válidos (gestor comum)", () => {
+    const r = validarEntradaUsuario(base({ papel: "superadmin" }), {
+      papeisValidos: PAPEIS,
+      regioesIds: REGIOES,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erros.papel).toBeTruthy();
+  });
 });

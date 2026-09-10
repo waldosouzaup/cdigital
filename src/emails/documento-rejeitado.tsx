@@ -16,17 +16,17 @@ function DocumentoRejeitadoEmail({ primeiroNome, motivo, urlReenvio }: Documento
     <Html lang="pt-BR">
       <Head />
       <Preview>Não foi possível aceitar o documento enviado — tente novamente</Preview>
-      <Body style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#eceeeb", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "24px", maxWidth: "480px" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#1b2430" }}>
+      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
+        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
             Olá, {primeiroNome}
           </Heading>
-          <Text style={{ color: "#1b2430" }}>
+          <Text style={{ color: "#0A0F0D" }}>
             O documento que você enviou não pôde ser aceito. {motivo}
           </Text>
           <Text>
-            <Link href={urlReenvio} style={{ color: "#b8752e" }}>
-              Clique aqui para enviar novamente
+            <Link href={urlReenvio} style={{ color: "#157F58", fontWeight: "600" }}>
+              Clique aqui para enviar novamente →
             </Link>
           </Text>
         </Container>

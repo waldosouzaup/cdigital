@@ -18,6 +18,8 @@ export function Modal({
   rotuloSecundario = "Cancelar",
   vozPrimaria = "selo",
   desabilitarConfirmacao = false,
+  larguraMaxima = "max-w-lg",
+  ocultarRodapePadrao = false,
 }: {
   aberto: boolean;
   aoFechar: () => void;
@@ -29,6 +31,8 @@ export function Modal({
   rotuloSecundario?: string;
   vozPrimaria?: "selo" | "perigo";
   desabilitarConfirmacao?: boolean;
+  larguraMaxima?: string;
+  ocultarRodapePadrao?: boolean;
 }) {
   useEffect(() => {
     function tratarEsc(evento: KeyboardEvent) {
@@ -54,7 +58,9 @@ export function Modal({
         onClick={aoFechar}
       />
 
-      <div className="relative w-full max-w-lg border border-line bg-surface p-6 text-ink shadow-lg md:p-8">
+      <div
+        className={`relative w-full ${larguraMaxima} border border-line bg-surface p-6 text-ink shadow-lg md:p-8 max-h-[90vh] overflow-y-auto`}
+      >
         <div className="regua mb-6">
           <h2 className="text-h2 font-semibold tracking-tight">{titulo}</h2>
           {descricao && <p className="mt-1.5 text-small text-ink-muted">{descricao}</p>}
@@ -62,21 +68,23 @@ export function Modal({
 
         {children && <div className="mb-6">{children}</div>}
 
-        <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:justify-end">
-          <Selo voz="linha" onClick={aoFechar}>
-            {rotuloSecundario}
-          </Selo>
-          {acaoPrimaria && (
-            <Selo
-              voz={vozPrimaria}
-              onClick={acaoPrimaria}
-              disabled={desabilitarConfirmacao}
-              className="sm:w-auto"
-            >
-              {rotuloPrimario}
+        {!ocultarRodapePadrao && (
+          <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:justify-end">
+            <Selo voz="linha" onClick={aoFechar}>
+              {rotuloSecundario}
             </Selo>
-          )}
-        </div>
+            {acaoPrimaria && (
+              <Selo
+                voz={vozPrimaria}
+                onClick={acaoPrimaria}
+                disabled={desabilitarConfirmacao}
+                className="sm:w-auto"
+              >
+                {rotuloPrimario}
+              </Selo>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

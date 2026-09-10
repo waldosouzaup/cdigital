@@ -143,12 +143,12 @@ export default function MfaPage() {
   const eCadastro = estado.fase === "cadastro";
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-[#0d1728] p-8 sm:p-10 shadow-2xl space-y-6">
+    <div className="rounded-2xl border border-line bg-surface p-8 sm:p-10 shadow-card space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-white">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">
           {eCadastro ? "Configurar autenticador" : "Código de verificação"}
         </h1>
-        <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+        <p className="mt-2 text-sm text-ink-muted leading-relaxed">
           {eCadastro
             ? "Escaneie o QR Code com o aplicativo autenticador ou use a chave manual."
             : "Digite o código de 6 dígitos gerado no seu aplicativo autenticador."}
@@ -156,10 +156,10 @@ export default function MfaPage() {
       </div>
 
       {eCadastro && (
-        <div className="space-y-4 border-t border-slate-800 pt-5">
-          <div className="p-4 border border-slate-800 bg-slate-900/80 rounded-xl space-y-4">
+        <div className="space-y-4 border-t border-line pt-5">
+          <div className="p-4 border border-line bg-surface-sunken rounded-xl space-y-4">
             <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="shrink-0 border border-white/20 bg-white p-2 rounded-lg">
+              <div className="shrink-0 border border-line bg-surface p-2 rounded-lg shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={estado.qrCode}
@@ -170,12 +170,12 @@ export default function MfaPage() {
                 />
               </div>
 
-              <div className="space-y-2 text-xs text-slate-300">
-                <p className="font-semibold text-white text-sm">Como configurar:</p>
-                <ol className="list-decimal list-inside space-y-1.5 text-slate-400">
+              <div className="space-y-2 text-xs text-ink-muted">
+                <p className="font-semibold text-ink text-sm">Como configurar:</p>
+                <ol className="list-decimal list-inside space-y-1.5 text-ink-muted">
                   <li>
-                    Abra o <strong className="text-white">Google Authenticator</strong> ou{" "}
-                    <strong className="text-white">Authy</strong>.
+                    Abra o <strong className="text-ink font-medium">Google Authenticator</strong> ou{" "}
+                    <strong className="text-ink font-medium">Authy</strong>.
                   </li>
                   <li>Aponte a câmera para o QR Code.</li>
                   <li>Digite o código gerado abaixo.</li>
@@ -183,18 +183,18 @@ export default function MfaPage() {
               </div>
             </div>
 
-            <div className="border-t border-slate-800 pt-3">
-              <span className="block text-xs text-slate-400 mb-1 font-mono">
+            <div className="border-t border-line pt-3">
+              <span className="block text-xs text-ink-muted mb-1 font-mono">
                 Chave para configuração manual:
               </span>
-              <div className="flex items-center justify-between gap-2 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                <span className="font-mono text-xs text-brand-yellow font-bold tracking-wider break-all select-all">
+              <div className="flex items-center justify-between gap-2 bg-surface p-2.5 rounded-lg border border-line">
+                <span className="font-mono text-xs text-primary font-bold tracking-wider break-all select-all">
                   {estado.secret}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleCopiarSegredo(estado.secret)}
-                  className="shrink-0 px-2.5 py-1 text-xs font-semibold text-slate-950 bg-brand-yellow rounded hover:bg-brand-yellow-hover cursor-pointer transition"
+                  className="shrink-0 px-2.5 py-1 text-xs font-semibold text-white bg-primary rounded hover:bg-primary-hover cursor-pointer transition"
                 >
                   {copiado ? "Copiado ✓" : "Copiar"}
                 </button>
@@ -204,11 +204,11 @@ export default function MfaPage() {
         </div>
       )}
 
-      <div className={eCadastro ? "space-y-4" : "border-t border-slate-800 pt-5 space-y-4"}>
+      <div className={eCadastro ? "space-y-4" : "border-t border-line pt-5 space-y-4"}>
         <div>
           <label
             htmlFor="codigo"
-            className="block text-xs font-medium text-slate-300 mb-1.5 text-center"
+            className="block text-xs font-medium text-ink-muted mb-1.5 text-center"
           >
             Código de 6 dígitos
           </label>
@@ -222,7 +222,7 @@ export default function MfaPage() {
             value={codigo}
             onChange={(event) => setCodigo(event.target.value.replace(/\D/g, ""))}
             placeholder="000000"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900/90 px-4 py-3 text-center text-3xl font-mono tracking-[0.4em] text-brand-yellow placeholder:text-slate-600 outline-none transition focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow font-bold"
+            className="w-full rounded-lg border border-line bg-surface px-4 py-3 text-center text-3xl font-mono tracking-[0.4em] text-primary placeholder:text-ink-subtle outline-none transition focus:border-primary focus:ring-1 focus:ring-primary font-bold"
           />
         </div>
 
@@ -236,11 +236,11 @@ export default function MfaPage() {
           type="button"
           onClick={handleVerificar}
           disabled={verificando || codigo.length !== 6}
-          className="btn-gold w-full py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+          className="w-full py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 cursor-pointer transition bg-primary text-white hover:bg-primary-hover disabled:opacity-50"
         >
           {verificando ? (
             <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950 border-t-transparent" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               <span>Verificando…</span>
             </>
           ) : (
@@ -248,8 +248,8 @@ export default function MfaPage() {
           )}
         </button>
 
-        <div className="pt-2 text-center text-xs text-slate-400">
-          <Link href="/configuracoes" className="hover:text-brand-yellow hover:underline transition">
+        <div className="pt-2 text-center text-xs text-ink-muted">
+          <Link href="/configuracoes" className="hover:text-primary hover:underline transition">
             ← Voltar
           </Link>
         </div>

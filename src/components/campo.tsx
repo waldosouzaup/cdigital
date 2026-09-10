@@ -1,15 +1,14 @@
 import type {
   InputHTMLAttributes,
   ReactNode,
+  Ref,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
 
 /**
- * Campo de formulário no estilo "papel timbrado".
- *
- * Rótulo institucional acima, entrada sublinhada por um hairline que reage ao foco
- * com a cor de selo, ou alerta em caso de erro.
+ * Campo de formulário institucional (§7.2 do DESIGN-SYSTEM.md).
+ * Fundo surface, bordas em line, foco em primary com anel sutil, erro em danger.
  */
 type BaseProps = {
   rotulo: string;
@@ -23,6 +22,7 @@ type CampoInputProps = InputHTMLAttributes<HTMLInputElement> &
   BaseProps & {
     mono?: boolean;
     icone?: ReactNode;
+    ref?: Ref<HTMLInputElement>;
   };
 
 export function Campo({
@@ -33,6 +33,7 @@ export function Campo({
   erro,
   icone,
   className = "",
+  ref,
   ...props
 }: CampoInputProps) {
   return (
@@ -41,23 +42,24 @@ export function Campo({
         {rotulo}
       </label>
       <div className="relative mt-1.5 flex items-center">
-        {icone && <span className="absolute left-0 text-ink-muted/70">{icone}</span>}
+        {icone && <span className="absolute left-3 text-ink-muted/70">{icone}</span>}
         <input
+          ref={ref}
           id={id}
           aria-invalid={Boolean(erro)}
           aria-describedby={erro ? `${id}-erro` : auxiliar ? `${id}-aux` : undefined}
-          className={`w-full border-b bg-transparent py-2 text-ink outline-none transition-colors placeholder:text-ink-muted/50 focus:border-seal ${
-            erro ? "border-alert" : "border-line"
-          } ${mono ? "font-mono" : ""} ${icone ? "pl-6" : ""} ${className}`}
+          className={`w-full rounded-md border bg-surface px-3 py-2 text-ink outline-none transition-all placeholder:text-ink-subtle focus:border-primary focus:ring-1 focus:ring-focus text-small ${
+            erro ? "border-danger ring-1 ring-danger" : "border-line"
+          } ${mono ? "font-mono" : ""} ${icone ? "pl-9" : ""} ${className}`}
           {...props}
         />
       </div>
       {erro ? (
-        <p id={`${id}-erro`} role="alert" className="mt-1.5 text-xs text-alert">
+        <p id={`${id}-erro`} role="alert" className="mt-1.5 text-xs text-danger font-medium">
           {erro}
         </p>
       ) : auxiliar ? (
-        <div id={`${id}-aux`} className="mt-1.5 text-xs text-ink-muted">
+        <div id={`${id}-aux`} className="mt-1.5 text-xs text-ink-muted leading-relaxed">
           {auxiliar}
         </div>
       ) : null}
@@ -83,17 +85,17 @@ function Area({
         id={id}
         rows={rows}
         aria-invalid={Boolean(erro)}
-        className={`mt-1.5 w-full border bg-transparent p-2.5 text-ink outline-none transition-colors placeholder:text-ink-muted/50 focus:border-seal text-small leading-relaxed ${
-          erro ? "border-alert" : "border-line"
+        className={`mt-1.5 w-full rounded-md border bg-surface p-3 text-ink outline-none transition-all placeholder:text-ink-subtle focus:border-primary focus:ring-1 focus:ring-focus text-small leading-relaxed ${
+          erro ? "border-danger ring-1 ring-danger" : "border-line"
         } ${className}`}
         {...props}
       />
       {erro ? (
-        <p role="alert" className="mt-1.5 text-xs text-alert">
+        <p role="alert" className="mt-1.5 text-xs text-danger font-medium">
           {erro}
         </p>
       ) : auxiliar ? (
-        <div className="mt-1.5 text-xs text-ink-muted">{auxiliar}</div>
+        <div className="mt-1.5 text-xs text-ink-muted leading-relaxed">{auxiliar}</div>
       ) : null}
     </div>
   );
@@ -116,19 +118,19 @@ function Selecao({
       <select
         id={id}
         aria-invalid={Boolean(erro)}
-        className={`mt-1.5 w-full border-b bg-transparent py-2 text-ink outline-none transition-colors focus:border-seal text-small cursor-pointer ${
-          erro ? "border-alert" : "border-line"
+        className={`mt-1.5 w-full rounded-md border bg-surface px-3 py-2 text-ink outline-none transition-all focus:border-primary focus:ring-1 focus:ring-focus text-small cursor-pointer ${
+          erro ? "border-danger ring-1 ring-danger" : "border-line"
         } ${className}`}
         {...props}
       >
         {children}
       </select>
       {erro ? (
-        <p role="alert" className="mt-1.5 text-xs text-alert">
+        <p role="alert" className="mt-1.5 text-xs text-danger font-medium">
           {erro}
         </p>
       ) : auxiliar ? (
-        <div className="mt-1.5 text-xs text-ink-muted">{auxiliar}</div>
+        <div className="mt-1.5 text-xs text-ink-muted leading-relaxed">{auxiliar}</div>
       ) : null}
     </div>
   );

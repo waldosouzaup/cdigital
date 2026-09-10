@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, type StatusTipo } from "@/components/badge";
 import { Selo } from "@/components/selo";
@@ -14,11 +14,20 @@ import {
   emitirContrato,
   emitirContratosEmLote,
   enviarContrato,
+  excluirContrato,
   gerarUrlPdfContrato,
-  marcarContratoAssinado,
+  prepararLinkAssinatura,
+  carregarPessoasParaEmissao,
   marcarDistratoAssinado,
 } from "./acoes";
-import type { ContratoListado, PessoaParaEmissao, TemplateParaEmissao } from "./dados";
+import { Paginacao } from "@/components/paginacao";
+import { calcularProporcionalDistrato } from "@/lib/contratos/distrato";
+import type {
+  PaginaContratos,
+  ContratoListado,
+  PessoaParaEmissao,
+  TemplateParaEmissao,
+} from "./dados";
 
 const CANAIS_ENVIO = [
   { valor: "email" as const, rotulo: "E-mail" },
@@ -36,28 +45,72 @@ function formatarData(iso: string) {
 }
 
 export function ContratosCliente({
-  contratosIniciais,
-  pessoasAptas,
+  paginaContratos,
   templates,
 }: {
-  contratosIniciais: ContratoListado[];
-  pessoasAptas: PessoaParaEmissao[];
+  paginaContratos: PaginaContratos;
   templates: TemplateParaEmissao[];
 }) {
   const router = useRouter();
-  const [abaAtiva, setAbaAtiva] = useState<"ativos" | "distratos">("ativos");
+  const [pessoasAptas, setPessoasAptas] = useState<PessoaParaEmissao[]>([]);
+  const [carregandoPessoas, setCarregandoPessoas] = useState(false);
+  const [busca, setBusca] = useState(paginaContratos.busca);
+  const [statusFiltro, setStatusFiltro] = useState(paginaContratos.status || "");
+  const [navegando, startTransition] = useTransition();
+  const abaAtiva = paginaContratos.aba;
+  useEffect(() => setBusca(paginaContratos.busca), [paginaContratos.busca]);
+  useEffect(() => setStatusFiltro(paginaContratos.status || ""), [paginaContratos.status]);
+  function navegar(alteracoes: Partial<PaginaContratos>) {
+    const filtros = { ...paginaContratos, ...alteracoes };
+    if (alteracoes.aba && alteracoes.aba !== paginaContratos.aba && !alteracoes.status) {
+      if (
+        (alteracoes.aba === "distratos" &&
+          !["distratado", "distrato_assinado"].includes(filtros.status || "")) ||
+        (alteracoes.aba === "ativos" &&
+          ["distratado", "distrato_assinado"].includes(filtros.status || ""))
+      ) {
+        filtros.status = "";
+      }
+    }
+    const params = new URLSearchParams({
+      busca: filtros.busca,
+      ...(filtros.status ? { status: filtros.status } : {}),
+      aba: filtros.aba,
+      pagina: String(filtros.pagina),
+      porPagina: String(filtros.porPagina),
+    });
+    startTransition(() => router.push(`/contratos?${params}`, { scroll: false }));
+  }
+  async function carregarPessoas() {
+    setCarregandoPessoas(true);
+    try {
+      const resultado = await carregarPessoasParaEmissao();
+      if (!resultado.ok) {
+        mostrarFeedback("critico", resultado.mensagem);
+        return false;
+      }
+      if (!resultado.pessoas.length) {
+        mostrarFeedback(
+          "critico",
+          "Não há pessoas aptas sem contrato ativo. Confira os cadastros e os documentos.",
+        );
+        return false;
+      }
+      setPessoasAptas(resultado.pessoas);
+      return true;
+    } catch {
+      mostrarFeedback("critico", "Não foi possível carregar as pessoas aptas.");
+      return false;
+    } finally {
+      setCarregandoPessoas(false);
+    }
+  }
   const [processando, setProcessando] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tom: "sucesso" | "critico"; texto: string } | null>(
     null,
   );
 
-  const contratosAtivos = contratosIniciais.filter(
-    (c) => c.status !== "distratado" && c.status !== "distrato_assinado",
-  );
-  const contratosDistratados = contratosIniciais.filter(
-    (c) => c.status === "distratado" || c.status === "distrato_assinado",
-  );
-  const listaExibida = abaAtiva === "ativos" ? contratosAtivos : contratosDistratados;
+  const listaExibida = paginaContratos.contratos;
 
   function mostrarFeedback(tom: "sucesso" | "critico", texto: string) {
     setFeedback({ tom, texto });
@@ -82,7 +135,8 @@ export function ContratosCliente({
     }
   }, [estadoEmissao.status, estadoEmissao.mensagem, router]);
 
-  function abrirModalEmissao() {
+  async function abrirModalEmissao() {
+    if (!(await carregarPessoas())) return;
     setTemplateSelecionado(templates[0] ?? null);
     setModalEmissaoAberto(true);
   }
@@ -107,7 +161,8 @@ export function ContratosCliente({
     }
   }, [estadoLote.status, estadoLote.mensagem, router]);
 
-  function abrirModalLote() {
+  async function abrirModalLote() {
+    if (!(await carregarPessoas())) return;
     setTemplateLote(templates[0] ?? null);
     setPessoasSelecionadasLote(new Set());
     setModalLoteAberto(true);
@@ -137,51 +192,80 @@ export function ContratosCliente({
   function abrirModalEnvio(contrato: ContratoListado) {
     setContratoParaEnvio(contrato);
     setCanalEnvio("email");
-    setDestinatarioEnvio("");
+    setDestinatarioEnvio(contrato.pessoaEmail ?? "");
     setModalEnvioAberto(true);
   }
 
   async function handleConfirmarEnvio() {
     if (!contratoParaEnvio || !destinatarioEnvio.trim()) return;
     setProcessando(contratoParaEnvio.id);
-    const resultado = await enviarContrato(contratoParaEnvio.id, canalEnvio, destinatarioEnvio.trim());
-    setProcessando(null);
-    setModalEnvioAberto(false);
-    mostrarFeedback(
-      resultado.ok ? "sucesso" : "critico",
-      resultado.ok ? "Envio registrado. O contratado foi avisado." : (resultado.mensagem ?? "Falha."),
-    );
-    if (resultado.ok) router.refresh();
+    try {
+      const resultado = await enviarContrato(
+        contratoParaEnvio.id,
+        canalEnvio,
+        destinatarioEnvio.trim(),
+      );
+      setModalEnvioAberto(false);
+      mostrarFeedback(
+        resultado.ok ? "sucesso" : "critico",
+        resultado.mensagem ?? "Não foi possível enviar o contrato.",
+      );
+      router.refresh();
+    } catch {
+      mostrarFeedback("critico", "Falha de conexão ao enviar. Tente novamente.");
+    } finally {
+      setProcessando(null);
+    }
   }
 
   // --- Ações diretas: marcar assinado, distratar, ver termo -----------------
-  async function handleMarcarAssinado(contrato: ContratoListado) {
-    setProcessando(contrato.id);
-    const resultado = await marcarContratoAssinado(contrato.id);
-    setProcessando(null);
-    mostrarFeedback(resultado.ok ? "sucesso" : "critico", resultado.mensagem ?? "Contrato assinado.");
-    if (resultado.ok) router.refresh();
-  }
-
   const [modalDistratoAberto, setModalDistratoAberto] = useState(false);
   const [contratoParaDistrato, setContratoParaDistrato] = useState<ContratoListado | null>(null);
   const [motivoDistrato, setMotivoDistrato] = useState("");
+  const [dataDistrato, setDataDistrato] = useState("");
 
   function abrirModalDistrato(contrato: ContratoListado) {
     setContratoParaDistrato(contrato);
-    setMotivoDistrato("");
+    setMotivoDistrato("desacordo");
+    const hoje = new Date().toISOString().split("T")[0];
+    let dataInicial = hoje;
+    if (hoje < contrato.vigenciaInicio) {
+      dataInicial = contrato.vigenciaInicio;
+    } else if (hoje > contrato.vigenciaFim) {
+      dataInicial = contrato.vigenciaFim;
+    }
+    setDataDistrato(dataInicial);
     setModalDistratoAberto(true);
   }
 
+  const calculoDistrato = useMemo(() => {
+    if (!contratoParaDistrato || !dataDistrato) return null;
+    try {
+      return calcularProporcionalDistrato({
+        vigenciaInicio: contratoParaDistrato.vigenciaInicio,
+        vigenciaFim: contratoParaDistrato.vigenciaFim,
+        dataDistrato: dataDistrato,
+        valor: Number(contratoParaDistrato.valor),
+      });
+    } catch {
+      return null;
+    }
+  }, [contratoParaDistrato, dataDistrato]);
+
   async function handleConfirmarDistrato() {
-    if (!contratoParaDistrato || !motivoDistrato.trim()) return;
+    if (!contratoParaDistrato || !motivoDistrato.trim() || !dataDistrato) return;
     setProcessando(contratoParaDistrato.id);
-    const resultado = await distratarContrato(contratoParaDistrato.id, motivoDistrato.trim());
+    const resultado = await distratarContrato(
+      contratoParaDistrato.id,
+      motivoDistrato.trim(),
+      dataDistrato,
+    );
     setProcessando(null);
     setModalDistratoAberto(false);
     mostrarFeedback(
       resultado.ok ? "sucesso" : "critico",
-      resultado.mensagem ?? (resultado.ok ? "Distrato registrado e termo gerado." : "Falha ao distratar."),
+      resultado.mensagem ??
+        (resultado.ok ? "Distrato registrado e termo gerado." : "Falha ao distratar."),
     );
     if (resultado.ok) router.refresh();
   }
@@ -190,8 +274,40 @@ export function ContratosCliente({
     setProcessando(contrato.id);
     const resultado = await marcarDistratoAssinado(contrato.id);
     setProcessando(null);
-    mostrarFeedback(resultado.ok ? "sucesso" : "critico", resultado.mensagem ?? "Recebimento confirmado.");
+    mostrarFeedback(
+      resultado.ok ? "sucesso" : "critico",
+      resultado.mensagem ?? "Recebimento confirmado.",
+    );
     if (resultado.ok) router.refresh();
+  }
+
+  // --- Ação: Excluir Contratado (DadosExcluidos) ----------------------------
+  const [modalExclusaoAberto, setModalExclusaoAberto] = useState(false);
+  const [contratoParaExclusao, setContratoParaExclusao] = useState<ContratoListado | null>(null);
+  const [motivoExclusao, setMotivoExclusao] = useState("");
+
+  function abrirModalExclusao(contrato: ContratoListado) {
+    setContratoParaExclusao(contrato);
+    setMotivoExclusao("");
+    setModalExclusaoAberto(true);
+  }
+
+  async function handleConfirmarExclusao() {
+    if (!contratoParaExclusao) return;
+    setProcessando(contratoParaExclusao.id);
+    try {
+      const resultado = await excluirContrato(contratoParaExclusao.id, motivoExclusao.trim());
+      setProcessando(null);
+      setModalExclusaoAberto(false);
+      mostrarFeedback(
+        resultado.ok ? "sucesso" : "critico",
+        resultado.mensagem ?? (resultado.ok ? "Contratado excluído com sucesso." : "Falha ao excluir."),
+      );
+      if (resultado.ok) router.refresh();
+    } catch {
+      setProcessando(null);
+      mostrarFeedback("critico", "Falha de conexão ao excluir o contratado.");
+    }
   }
 
   async function handleVerTermo(
@@ -199,50 +315,40 @@ export function ContratosCliente({
     versao: "gerado" | "assinado" | "distrato" = "gerado",
   ) {
     setProcessando(contrato.id);
-    const resultado = await gerarUrlPdfContrato(contrato.id, versao);
-    setProcessando(null);
-    if (!resultado.ok || !resultado.url) {
-      mostrarFeedback("critico", resultado.mensagem ?? "PDF indisponível.");
-      return;
-    }
-    window.open(resultado.url, "_blank", "noopener,noreferrer");
-  }
-
-  // --- Modal: Anexar PDF assinado (item 12) ----------------------------------
-  const [modalAssinaturaAberto, setModalAssinaturaAberto] = useState(false);
-  const [contratoParaAssinatura, setContratoParaAssinatura] = useState<ContratoListado | null>(null);
-  const [arquivoAssinatura, setArquivoAssinatura] = useState<File | null>(null);
-  const [enviandoAssinatura, setEnviandoAssinatura] = useState(false);
-
-  function abrirModalAssinatura(contrato: ContratoListado) {
-    setContratoParaAssinatura(contrato);
-    setArquivoAssinatura(null);
-    setModalAssinaturaAberto(true);
-  }
-
-  async function handleConfirmarAssinatura() {
-    if (!contratoParaAssinatura || !arquivoAssinatura) return;
-    setEnviandoAssinatura(true);
-
     try {
-      const corpo = new FormData();
-      corpo.append("arquivo", arquivoAssinatura);
-      const resposta = await fetch(`/api/contratos/${contratoParaAssinatura.id}/assinatura`, {
-        method: "POST",
-        body: corpo,
-      });
-      const resultado = await resposta.json();
-
-      setModalAssinaturaAberto(false);
-      mostrarFeedback(
-        resposta.ok && resultado.ok ? "sucesso" : "critico",
-        resultado.mensagem ?? (resposta.ok ? "PDF assinado anexado." : "Falha ao enviar."),
-      );
-      if (resposta.ok && resultado.ok) router.refresh();
+      const resultado = await gerarUrlPdfContrato(contrato.id, versao);
+      if (!resultado.ok || !resultado.url) {
+        mostrarFeedback("critico", resultado.mensagem ?? "PDF indisponível.");
+        return;
+      }
+      setTermoUrl(resultado.url);
+      setTermoTexto(resultado.texto ?? null);
+      setModalTermoAberto(true);
     } catch {
-      mostrarFeedback("critico", "Falha de conexão ao enviar o PDF assinado.");
+      mostrarFeedback("critico", "Não foi possível abrir o contrato. Tente novamente.");
     } finally {
-      setEnviandoAssinatura(false);
+      setProcessando(null);
+    }
+  }
+
+  const [modalTermoAberto, setModalTermoAberto] = useState(false);
+  const [termoUrl, setTermoUrl] = useState("");
+  const [termoTexto, setTermoTexto] = useState<string | null>(null);
+  const [linkAssinatura, setLinkAssinatura] = useState("");
+  async function abrirModalAssinatura(contrato: ContratoListado) {
+    setProcessando(contrato.id);
+    try {
+      const resultado = await prepararLinkAssinatura(contrato.id);
+      if (!resultado.ok || !resultado.url)
+        mostrarFeedback("critico", resultado.mensagem ?? "Não foi possível preparar o link.");
+      else {
+        setLinkAssinatura(new URL(resultado.url, window.location.origin).href);
+        router.refresh();
+      }
+    } catch {
+      mostrarFeedback("critico", "Falha de conexão ao preparar o link.");
+    } finally {
+      setProcessando(null);
     }
   }
 
@@ -256,7 +362,7 @@ export function ContratosCliente({
           </span>
           <h1 className="text-h1 font-semibold text-ink">Gestão de Contratos e Vigor</h1>
           <p className="mt-1 text-small text-ink-muted">
-            Emissão com valor por extenso, transições seguras e trilha de eventos.
+            Encontre colaboradores, confira contratos e acompanhe assinaturas.
           </p>
         </div>
 
@@ -265,7 +371,7 @@ export function ContratosCliente({
             voz="neutro"
             onClick={abrirModalLote}
             className="text-xs"
-            disabled={pessoasAptas.length === 0 || templates.length === 0}
+            disabled={carregandoPessoas || templates.length === 0}
           >
             📄 Emissão em Lote
           </Selo>
@@ -273,14 +379,14 @@ export function ContratosCliente({
             voz="selo"
             onClick={abrirModalEmissao}
             className="text-xs"
-            disabled={pessoasAptas.length === 0 || templates.length === 0}
+            disabled={carregandoPessoas || templates.length === 0}
           >
             + Emitir Contrato
           </Selo>
         </div>
       </div>
 
-      {(pessoasAptas.length === 0 || templates.length === 0) && (
+      {templates.length === 0 && (
         <Alerta tom="atencao" titulo="Emissão indisponível no momento">
           {templates.length === 0
             ? "Cadastre um modelo de contrato em Configurações antes de emitir."
@@ -289,30 +395,201 @@ export function ContratosCliente({
       )}
 
       {feedback && (
-        <Alerta tom={feedback.tom === "sucesso" ? "sucesso" : "critico"} titulo="Transição">
+        <Alerta tom={feedback.tom === "sucesso" ? "sucesso" : "critico"} titulo="Contratos">
           {feedback.texto}
         </Alerta>
       )}
 
+      <form
+        action="/contratos"
+        method="get"
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          navegar({ busca: busca.trim(), status: statusFiltro, pagina: 1 });
+        }}
+        className="flex flex-wrap items-end gap-3"
+      >
+        <input type="hidden" name="aba" value={abaAtiva} />
+        <input type="hidden" name="porPagina" value={paginaContratos.porPagina} />
+        <div className="flex-1 min-w-60">
+          <Campo
+            rotulo="Pesquisar colaborador"
+            id="busca-contrato"
+            name="busca"
+            type="search"
+            value={busca}
+            onChange={(event) => setBusca(event.target.value)}
+            maxLength={120}
+            placeholder="Nome, CPF, e-mail ou telefone"
+          />
+        </div>
+        <div className="w-56 min-w-44">
+          <label
+            htmlFor="filtro-estado-contrato"
+            className="block text-small font-medium text-ink mb-1"
+          >
+            Filtrar por Estado
+          </label>
+          <select
+            id="filtro-estado-contrato"
+            name="status"
+            value={statusFiltro}
+            onChange={(e) => {
+              const novoStatus = e.target.value;
+              setStatusFiltro(novoStatus);
+              let novaAba = abaAtiva;
+              if (["distratado", "distrato_assinado"].includes(novoStatus)) {
+                novaAba = "distratos";
+              } else if (novoStatus && abaAtiva === "distratos") {
+                novaAba = "ativos";
+              }
+              navegar({ status: novoStatus, aba: novaAba, pagina: 1 });
+            }}
+            className="w-full h-[42px] px-3 border border-line bg-surface text-small text-ink focus:border-seal focus:ring-1 focus:ring-seal outline-none cursor-pointer transition-colors"
+          >
+            <option value="">Todos os Estados</option>
+            <optgroup label="Quadro Ativo">
+              <option value="assinado">✓ Assinado</option>
+              <option value="enviado">➤ Enviado</option>
+              <option value="emitido">▸ Emitido</option>
+              <option value="rascunho">○ Rascunho</option>
+              <option value="cancelado">✕ Cancelado</option>
+              <option value="encerrado">✓✓ Encerrado</option>
+            </optgroup>
+            <optgroup label="Distratos">
+              <option value="distratado">✕ Distratado</option>
+              <option value="distrato_assinado">✓ Distrato Assinado</option>
+            </optgroup>
+          </select>
+        </div>
+        <Selo type="submit" disabled={navegando}>
+          {navegando ? "Buscando…" : "Pesquisar"}
+        </Selo>
+        {(paginaContratos.busca || paginaContratos.status) && (
+          <Selo
+            voz="neutro"
+            onClick={() => {
+              setBusca("");
+              setStatusFiltro("");
+              navegar({ busca: "", status: "", pagina: 1 });
+            }}
+          >
+            Limpar Filtros
+          </Selo>
+        )}
+      </form>
+
+      {/* Filtros Rápidos por Estado (Pills) */}
+      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+        <span className="text-xs text-ink-muted font-medium mr-1 flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 text-seal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+          Estado:
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFiltro("");
+            navegar({ status: "", pagina: 1 });
+          }}
+          className={`px-2.5 py-1 text-xs rounded-full border transition-all cursor-pointer ${
+            !statusFiltro
+              ? "bg-seal/15 border-seal text-seal font-semibold shadow-sm"
+              : "border-line text-ink-muted hover:border-ink-muted hover:text-ink bg-surface/50"
+          }`}
+        >
+          Todos
+        </button>
+        {abaAtiva === "ativos" ? (
+          <>
+            {[
+              { id: "assinado", rotulo: "Assinado", icone: "✓", badgeClasses: "text-primary border-primary/40 bg-primary/10" },
+              { id: "enviado", rotulo: "Enviado", icone: "➤", badgeClasses: "text-primary border-primary/40 bg-primary/10" },
+              { id: "emitido", rotulo: "Emitido", icone: "▸", badgeClasses: "text-primary border-primary/40 bg-primary/10" },
+              { id: "rascunho", rotulo: "Rascunho", icone: "○", badgeClasses: "text-ink-muted border-line bg-paper/40" },
+              { id: "cancelado", rotulo: "Cancelado", icone: "✕", badgeClasses: "text-ink-muted border-line bg-paper/40" },
+              { id: "encerrado", rotulo: "Encerrado", icone: "✓✓", badgeClasses: "text-ink-muted border-line bg-paper/40" },
+            ].map((st) => {
+              const ativo = statusFiltro === st.id;
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => {
+                    const novo = ativo ? "" : st.id;
+                    setStatusFiltro(novo);
+                    navegar({ status: novo, pagina: 1 });
+                  }}
+                  className={`px-2.5 py-1 text-xs rounded-full border transition-all cursor-pointer flex items-center gap-1.5 ${
+                    ativo
+                      ? `${st.badgeClasses} font-semibold ring-1 ring-seal/40 shadow-sm`
+                      : "border-line text-ink-muted hover:border-ink-muted hover:text-ink bg-surface/50"
+                  }`}
+                >
+                  <span className="text-[0.7rem]">{st.icone}</span>
+                  {st.rotulo}
+                </button>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            {[
+              { id: "distratado", rotulo: "Distratado", icone: "✕", badgeClasses: "text-alert border-alert/40 bg-alert/10" },
+              { id: "distrato_assinado", rotulo: "Distrato Assinado", icone: "✓", badgeClasses: "text-alert border-alert/40 bg-alert/10" },
+            ].map((st) => {
+              const ativo = statusFiltro === st.id;
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => {
+                    const novo = ativo ? "" : st.id;
+                    setStatusFiltro(novo);
+                    navegar({ status: novo, pagina: 1 });
+                  }}
+                  className={`px-2.5 py-1 text-xs rounded-full border transition-all cursor-pointer flex items-center gap-1.5 ${
+                    ativo
+                      ? `${st.badgeClasses} font-semibold ring-1 ring-seal/40 shadow-sm`
+                      : "border-line text-ink-muted hover:border-ink-muted hover:text-ink bg-surface/50"
+                  }`}
+                >
+                  <span className="text-[0.7rem]">{st.icone}</span>
+                  {st.rotulo}
+                </button>
+              );
+            })}
+          </>
+        )}
+      </div>
+      <div role="status" className="sr-only">
+        {navegando ? "Carregando contratos" : `${paginaContratos.total} contratos encontrados`}
+      </div>
       {/* Abas */}
       <div className="flex border-b border-line gap-6">
         <button
           type="button"
-          onClick={() => setAbaAtiva("ativos")}
+          onClick={() => navegar({ aba: "ativos", pagina: 1 })}
           className={`pb-3 text-small font-medium border-b-2 cursor-pointer transition-colors ${
-            abaAtiva === "ativos" ? "border-seal text-ink" : "border-transparent text-ink-muted hover:text-ink"
+            abaAtiva === "ativos"
+              ? "border-seal text-ink"
+              : "border-transparent text-ink-muted hover:text-ink"
           }`}
         >
-          Quadro Ativo ({contratosAtivos.length})
+          Quadro Ativo ({paginaContratos.totalAtivos})
         </button>
         <button
           type="button"
-          onClick={() => setAbaAtiva("distratos")}
+          onClick={() => navegar({ aba: "distratos", pagina: 1 })}
           className={`pb-3 text-small font-medium border-b-2 cursor-pointer transition-colors ${
-            abaAtiva === "distratos" ? "border-alert text-alert" : "border-transparent text-ink-muted hover:text-ink"
+            abaAtiva === "distratos"
+              ? "border-alert text-alert"
+              : "border-transparent text-ink-muted hover:text-ink"
           }`}
         >
-          Visão de Distratos ({contratosDistratados.length})
+          Visão de Distratos ({paginaContratos.totalDistratos})
         </button>
       </div>
 
@@ -327,7 +604,7 @@ export function ContratosCliente({
                 <th className="p-3.5">Remuneração (Valor por Extenso)</th>
                 <th className="p-3.5">Vigência</th>
                 <th className="p-3.5 text-center">Estado</th>
-                <th className="p-3.5 text-right">Ações da Máquina</th>
+                <th className="p-3.5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -359,14 +636,14 @@ export function ContratosCliente({
                     </td>
                     <td className="p-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {c.status === "emitido" && (
+                        {["emitido", "enviado"].includes(c.status) && (
                           <button
                             type="button"
                             disabled={ocupado}
                             onClick={() => abrirModalEnvio(c)}
                             className="px-2 py-1 text-xs border border-info text-info hover:bg-info/10 cursor-pointer disabled:opacity-50"
                           >
-                            Registrar Envio
+                            Enviar link
                           </button>
                         )}
                         {c.status === "enviado" && (
@@ -376,18 +653,9 @@ export function ContratosCliente({
                               disabled={ocupado}
                               onClick={() => abrirModalAssinatura(c)}
                               className="px-2 py-1 text-xs border border-success text-success hover:bg-success/10 cursor-pointer disabled:opacity-50"
-                              title="Anexar o PDF assinado enviado pelo contratado"
+                              title="Preparar link para assinatura na tela e foto do rosto"
                             >
-                              Anexar PDF Assinado
-                            </button>
-                            <button
-                              type="button"
-                              disabled={ocupado}
-                              onClick={() => handleMarcarAssinado(c)}
-                              className="px-2 py-1 text-xs text-ink-muted hover:text-ink hover:underline cursor-pointer disabled:opacity-50"
-                              title="Assinatura feita presencialmente, sem arquivo"
-                            >
-                              Marcar Assinado (Presencial)
+                              Link de assinatura
                             </button>
                           </>
                         )}
@@ -413,10 +681,10 @@ export function ContratosCliente({
                         )}
                         <button
                           type="button"
-                          disabled={ocupado || !c.pdfPath}
+                          disabled={ocupado}
                           onClick={() => handleVerTermo(c, "gerado")}
                           className="px-2 py-1 text-xs text-ink hover:underline cursor-pointer disabled:opacity-40"
-                          title={c.pdfPath ? "Abrir o PDF gerado pelo sistema na emissão" : "PDF ainda não gerado"}
+                          title="Visualizar o contrato completo preenchido"
                         >
                           Ver Termo
                         </button>
@@ -442,6 +710,15 @@ export function ContratosCliente({
                             Ver Termo de Distrato
                           </button>
                         )}
+                        <button
+                          type="button"
+                          disabled={ocupado}
+                          onClick={() => abrirModalExclusao(c)}
+                          className="px-2 py-1 text-xs border border-alert/30 text-alert hover:bg-alert/10 cursor-pointer disabled:opacity-40 transition-colors"
+                          title="Excluir contratado do painel e arquivar em DadosExcluidos"
+                        >
+                          Excluir
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -453,10 +730,25 @@ export function ContratosCliente({
       ) : (
         <EstadoVazio
           titulo="Nenhum contrato encontrado nesta visão"
-          descricao="Não existem contratos associados a esta lista ainda."
+          descricao={
+            paginaContratos.status || paginaContratos.busca
+              ? `Nenhum contrato encontrado com os filtros atuais${
+                  paginaContratos.status ? ` (estado: ${paginaContratos.status})` : ""
+                }${paginaContratos.busca ? ` para "${paginaContratos.busca}"` : ""}. Tente limpar os filtros.`
+              : "Não existem contratos associados a esta lista ainda."
+          }
         />
       )}
 
+      <Paginacao
+        paginaAtual={paginaContratos.pagina}
+        totalItens={paginaContratos.total}
+        itensPorPagina={paginaContratos.porPagina}
+        rotuloItem="contrato"
+        rotuloItemPlural="contratos"
+        aoMudarPagina={(pagina) => navegar({ pagina })}
+        aoMudarItensPorPagina={(porPagina) => navegar({ porPagina, pagina: 1 })}
+      />
       {/* MODAL: EMITIR CONTRATO */}
       <Modal
         aberto={modalEmissaoAberto}
@@ -474,7 +766,12 @@ export function ContratosCliente({
             </Alerta>
           )}
 
-          <Campo.Selecao rotulo="Pessoa (apta, sem contrato ativo)" id="pessoaId" name="pessoaId" required>
+          <Campo.Selecao
+            rotulo="Pessoa (apta, sem contrato ativo)"
+            id="pessoaId"
+            name="pessoaId"
+            required
+          >
             {pessoasAptas.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nomeCompleto} — {p.regiaoNome ?? "sem região"}
@@ -488,7 +785,9 @@ export function ContratosCliente({
             name="templateId"
             required
             value={templateSelecionado?.id ?? ""}
-            onChange={(e) => setTemplateSelecionado(templates.find((t) => t.id === e.target.value) ?? null)}
+            onChange={(e) =>
+              setTemplateSelecionado(templates.find((t) => t.id === e.target.value) ?? null)
+            }
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -509,8 +808,20 @@ export function ContratosCliente({
           />
 
           <div className="grid grid-cols-2 gap-4">
-            <Campo rotulo="Vigência — início" id="vigenciaInicio" name="vigenciaInicio" type="date" required />
-            <Campo rotulo="Vigência — fim" id="vigenciaFim" name="vigenciaFim" type="date" required />
+            <Campo
+              rotulo="Vigência — início"
+              id="vigenciaInicio"
+              name="vigenciaInicio"
+              type="date"
+              required
+            />
+            <Campo
+              rotulo="Vigência — fim"
+              id="vigenciaFim"
+              name="vigenciaFim"
+              type="date"
+              required
+            />
           </div>
         </form>
       </Modal>
@@ -521,7 +832,11 @@ export function ContratosCliente({
         aoFechar={() => setModalLoteAberto(false)}
         titulo="Emissão de Contratos em Lote"
         descricao="Gera contrato (com PDF) para todas as pessoas selecionadas, com o mesmo modelo, valor e vigência."
-        rotuloPrimario={emitindoLotePendente ? "Emitindo…" : `Emitir ${pessoasSelecionadasLote.size || ""} Contrato(s)`}
+        rotuloPrimario={
+          emitindoLotePendente
+            ? "Emitindo…"
+            : `Emitir ${pessoasSelecionadasLote.size || ""} Contrato(s)`
+        }
         acaoPrimaria={() => formLoteRef.current?.requestSubmit()}
         desabilitarConfirmacao={emitindoLotePendente || pessoasSelecionadasLote.size === 0}
       >
@@ -549,7 +864,9 @@ export function ContratosCliente({
             name="templateId"
             required
             value={templateLote?.id ?? ""}
-            onChange={(e) => setTemplateLote(templates.find((t) => t.id === e.target.value) ?? null)}
+            onChange={(e) =>
+              setTemplateLote(templates.find((t) => t.id === e.target.value) ?? null)
+            }
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -570,8 +887,20 @@ export function ContratosCliente({
           />
 
           <div className="grid grid-cols-2 gap-4">
-            <Campo rotulo="Vigência — início" id="vigenciaInicioLote" name="vigenciaInicio" type="date" required />
-            <Campo rotulo="Vigência — fim" id="vigenciaFimLote" name="vigenciaFim" type="date" required />
+            <Campo
+              rotulo="Vigência — início"
+              id="vigenciaInicioLote"
+              name="vigenciaInicio"
+              type="date"
+              required
+            />
+            <Campo
+              rotulo="Vigência — fim"
+              id="vigenciaFimLote"
+              name="vigenciaFim"
+              type="date"
+              required
+            />
           </div>
 
           <div>
@@ -584,7 +913,9 @@ export function ContratosCliente({
                 onClick={alternarTodasPessoasLote}
                 className="text-xs text-seal hover:underline cursor-pointer"
               >
-                {pessoasSelecionadasLote.size === pessoasAptas.length ? "Limpar seleção" : "Selecionar todas"}
+                {pessoasSelecionadasLote.size === pessoasAptas.length
+                  ? "Limpar seleção"
+                  : "Selecionar todas"}
               </button>
             </div>
             <div className="border border-line max-h-48 overflow-y-auto divide-y divide-line">
@@ -614,8 +945,8 @@ export function ContratosCliente({
       <Modal
         aberto={modalEnvioAberto}
         aoFechar={() => setModalEnvioAberto(false)}
-        titulo="Registrar Envio do Contrato"
-        descricao="Dispara um aviso por e-mail ao contratado (se houver e-mail cadastrado)."
+        titulo="Enviar link de assinatura"
+        descricao="Envie o contrato preenchido por e-mail ou prepare o link para compartilhar pela coordenação."
         rotuloPrimario={processando === contratoParaEnvio?.id ? "Enviando…" : "Confirmar Envio"}
         acaoPrimaria={handleConfirmarEnvio}
         desabilitarConfirmacao={!destinatarioEnvio.trim() || processando === contratoParaEnvio?.id}
@@ -625,7 +956,17 @@ export function ContratosCliente({
             <label className="block text-small font-medium text-ink mb-1.5">Canal de Envio</label>
             <select
               value={canalEnvio}
-              onChange={(e) => setCanalEnvio(e.target.value as typeof canalEnvio)}
+              onChange={(e) => {
+                const canal = e.target.value as typeof canalEnvio;
+                setCanalEnvio(canal);
+                setDestinatarioEnvio(
+                  canal === "email"
+                    ? (contratoParaEnvio?.pessoaEmail ?? "")
+                    : canal === "whatsapp"
+                      ? (contratoParaEnvio?.pessoaTelefone ?? "")
+                      : (contratoParaEnvio?.pessoaNome ?? ""),
+                );
+              }}
               className="w-full border-b border-line bg-transparent py-2 text-small text-ink outline-none focus:border-seal cursor-pointer"
             >
               {CANAIS_ENVIO.map((c) => (
@@ -645,73 +986,278 @@ export function ContratosCliente({
         </div>
       </Modal>
 
-      {/* MODAL: CONFIRMAÇÃO DE DISTRATO (item 13) */}
+      {/* MODAL: CONFIRMAÇÃO DE DISTRATO COM CÁLCULO PROPORCIONAL */}
       <Modal
         aberto={modalDistratoAberto}
         aoFechar={() => setModalDistratoAberto(false)}
-        titulo="Registrar Distrato"
-        descricao="Gera o termo de distrato em PDF e retira a pessoa do quadro ativo. O contrato original é preservado, não apagado."
-        rotuloPrimario={processando === contratoParaDistrato?.id ? "Gerando termo…" : "Confirmar e Gerar Distrato"}
+        titulo="Registrar Distrato / Rescisão"
+        descricao="Insira a data do distrato para calcular automaticamente o valor proporcional aos dias trabalhados e gerar o termo em PDF conforme o modelo oficial."
+        rotuloPrimario={
+          processando === contratoParaDistrato?.id ? "Gerando termo…" : "Confirmar e Gerar Distrato"
+        }
         rotuloSecundario="Desistir"
         vozPrimaria="perigo"
         acaoPrimaria={handleConfirmarDistrato}
-        desabilitarConfirmacao={!motivoDistrato.trim() || processando === contratoParaDistrato?.id}
+        desabilitarConfirmacao={
+          !motivoDistrato.trim() || !dataDistrato || processando === contratoParaDistrato?.id
+        }
       >
-        <div className="space-y-3">
+        <div className="space-y-4 text-small">
           <Alerta tom="critico" titulo="Atenção à legislação eleitoral">
-            O distrato preserva integralmente o histórico financeiro e o contrato original para
-            prestação de contas, mas impede novos lançamentos e pagamentos.
+            O distrato preserva o histórico financeiro e o contrato original para prestação de
+            contas. O valor proporcional calculado constará no Termo de Rescisão oficial.
           </Alerta>
-          <p className="text-small text-ink">
-            Contratado: <strong>{contratoParaDistrato?.pessoaNome}</strong>
-          </p>
+
+          <div className="p-3 bg-paper/60 border border-line text-small text-ink space-y-1 rounded-sm">
+            <div className="flex justify-between items-baseline">
+              <span className="text-xs text-ink-muted uppercase tracking-wider font-mono">
+                Contratado
+              </span>
+              <span className="font-mono text-xs text-ink-muted">
+                CPF: {contratoParaDistrato?.pessoaCpf}
+              </span>
+            </div>
+            <p className="font-semibold text-ink text-base">{contratoParaDistrato?.pessoaNome}</p>
+            <p className="text-xs text-ink-muted">
+              Objeto: <span className="text-ink font-medium">{contratoParaDistrato?.objeto}</span>
+            </p>
+            <div className="pt-1.5 flex flex-wrap justify-between text-xs border-t border-line/60 gap-2">
+              <span>
+                Vigência contratual:{" "}
+                <strong className="font-mono">
+                  {contratoParaDistrato ? formatarData(contratoParaDistrato.vigenciaInicio) : ""} a{" "}
+                  {contratoParaDistrato ? formatarData(contratoParaDistrato.vigenciaFim) : ""}
+                </strong>
+              </span>
+              <span>
+                Remuneração mensal:{" "}
+                <strong className="font-mono">
+                  {contratoParaDistrato ? formatarValor(contratoParaDistrato.valor) : ""}
+                </strong>
+              </span>
+            </div>
+          </div>
+
           <div>
-            <label className="block text-small font-medium text-ink mb-1.5">Motivo do Distrato</label>
+            <label
+              htmlFor="data-distrato-input"
+              className="block text-small font-medium text-ink mb-1"
+            >
+              Data do Distrato (Período de término trabalhado)
+            </label>
+            <input
+              type="date"
+              id="data-distrato-input"
+              value={dataDistrato}
+              min={contratoParaDistrato?.vigenciaInicio}
+              max={contratoParaDistrato?.vigenciaFim}
+              onChange={(e) => setDataDistrato(e.target.value)}
+              className="w-full border border-line bg-surface p-2.5 text-small text-ink outline-none focus:border-seal focus:ring-1 focus:ring-seal"
+              required
+            />
+            <p className="text-xs text-ink-muted mt-1">
+              Data de encerramento efetivo das atividades para cálculo dos dias corridos.
+            </p>
+          </div>
+
+          {calculoDistrato && (
+            <div className="p-3.5 bg-surface border border-seal/40 space-y-2 rounded-sm shadow-inner">
+              <div className="flex items-center justify-between text-xs border-b border-line pb-2">
+                <span className="text-ink font-medium flex items-center gap-1.5">
+                  <svg
+                    className="w-3.5 h-3.5 text-seal"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                  Cálculo Proporcional Automático
+                </span>
+                <span className="font-mono text-ink-muted text-[0.75rem]">
+                  {calculoDistrato.diasTrabalhados} de {calculoDistrato.diasTotais} dias corridos
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                <div>
+                  <span className="text-ink-muted block text-[0.7rem]">Período trabalhado</span>
+                  <strong className="text-ink font-mono">
+                    {calculoDistrato.vigenciaInicioFormatada} a{" "}
+                    {calculoDistrato.dataDistratoFormatada}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-ink-muted block text-[0.7rem]">Valor da diária</span>
+                  <strong className="text-ink font-mono">
+                    R${" "}
+                    {calculoDistrato.valorDiario.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    / dia
+                  </strong>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-line/60">
+                <span className="text-xs text-ink-muted block">
+                  Valor a ser pago ao colaborador:
+                </span>
+                <div className="text-lg font-bold text-success font-mono">
+                  R${" "}
+                  {calculoDistrato.valorProporcional.toLocaleString("pt-BR", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <div className="text-xs text-ink-muted italic leading-snug">
+                  ({calculoDistrato.valorProporcionalExtenso})
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label
+              htmlFor="motivo-distrato-input"
+              className="block text-small font-medium text-ink mb-1"
+            >
+              Motivo do Distrato
+            </label>
             <textarea
-              rows={3}
+              id="motivo-distrato-input"
+              rows={2}
               value={motivoDistrato}
               onChange={(e) => setMotivoDistrato(e.target.value)}
               className="w-full border border-line bg-transparent p-2.5 text-small text-ink outline-none focus:border-seal leading-relaxed"
-              placeholder="Ex: Pedido de desligamento do próprio contratado."
+              placeholder="Ex: desacordo ou pedido de desligamento do próprio contratado."
             />
           </div>
         </div>
       </Modal>
 
-      {/* MODAL: ANEXAR PDF ASSINADO (item 12) */}
+      {/* MODAL: EXCLUIR CONTRATADO (DadosExcluidos) */}
       <Modal
-        aberto={modalAssinaturaAberto}
-        aoFechar={() => setModalAssinaturaAberto(false)}
-        titulo="Anexar PDF Assinado"
-        descricao="Envie o contrato assinado que o contratado devolveu (escaneado ou fotografado em PDF)."
-        rotuloPrimario={enviandoAssinatura ? "Enviando…" : "Confirmar Assinatura"}
-        acaoPrimaria={handleConfirmarAssinatura}
-        desabilitarConfirmacao={!arquivoAssinatura || enviandoAssinatura}
+        aberto={modalExclusaoAberto}
+        aoFechar={() => setModalExclusaoAberto(false)}
+        titulo="Excluir Contratado do Painel"
+        descricao="O registro será removido das listas do painel para não confundir o administrador, e os dados completos serão arquivados com segurança na tabela DadosExcluidos."
+        rotuloPrimario={
+          processando === contratoParaExclusao?.id ? "Excluindo…" : "Confirmar Exclusão"
+        }
+        rotuloSecundario="Cancelar"
+        vozPrimaria="perigo"
+        acaoPrimaria={handleConfirmarExclusao}
+        desabilitarConfirmacao={processando === contratoParaExclusao?.id}
       >
-        <div className="space-y-4 text-small">
-          <p className="text-small text-ink">
-            Contratado: <strong>{contratoParaAssinatura?.pessoaNome}</strong>
-          </p>
-          <label
-            htmlFor="upload-assinatura"
-            className="block border-2 border-dashed border-line hover:border-seal p-6 text-center bg-surface/60 cursor-pointer transition-colors"
-          >
-            <input
-              id="upload-assinatura"
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(e) => setArquivoAssinatura(e.target.files?.[0] ?? null)}
+        <div className="space-y-4">
+          <Alerta tom="atencao" titulo="Controle total e registros de atividades">
+            Ao excluir, o contrato desaparece deste painel, mas o histórico completo e os dados cadastrais
+            ficam permanentemente registrados na tabela <strong>DadosExcluidos</strong> para fins de auditoria,
+            incluindo seu nome e login como responsável pela exclusão.
+          </Alerta>
+          <div className="p-3 bg-paper/60 border border-line text-small text-ink space-y-1">
+            <p>
+              Contratado: <strong>{contratoParaExclusao?.pessoaNome}</strong>
+            </p>
+            <p className="text-xs text-ink-muted">
+              CPF: <span className="font-mono">{contratoParaExclusao?.pessoaCpf}</span> · Função:{" "}
+              {contratoParaExclusao?.objeto}
+            </p>
+            <p className="text-xs text-ink-muted">
+              Remuneração: {contratoParaExclusao ? formatarValor(contratoParaExclusao.valor) : ""} · Estado atual:{" "}
+              <span className="font-mono font-medium text-ink uppercase">{contratoParaExclusao?.status}</span>
+            </p>
+          </div>
+          <div>
+            <label className="block text-small font-medium text-ink mb-1.5">
+              Motivo da Exclusão <span className="text-xs text-ink-muted">(opcional)</span>
+            </label>
+            <textarea
+              rows={2}
+              value={motivoExclusao}
+              onChange={(e) => setMotivoExclusao(e.target.value)}
+              className="w-full border border-line bg-transparent p-2.5 text-small text-ink outline-none focus:border-seal leading-relaxed"
+              placeholder="Ex: Contratação cancelada por desistência do candidato antes do início."
             />
-            <div className="space-y-1">
-              <div className="font-mono text-2xl text-seal">📄</div>
-              <div className="text-small font-medium text-ink">
-                {arquivoAssinatura ? arquivoAssinatura.name : "Selecionar arquivo PDF"}
-              </div>
-              <p className="text-xs text-ink-muted">Somente PDF, até 20 MB</p>
-            </div>
-          </label>
+          </div>
         </div>
+      </Modal>
+
+      <Modal
+        aberto={modalTermoAberto}
+        aoFechar={() => setModalTermoAberto(false)}
+        titulo="Contrato completo"
+        larguraMaxima="max-w-5xl"
+        rotuloSecundario="Fechar"
+      >
+        <a
+          href={termoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-seal underline"
+        >
+          Abrir ou baixar PDF
+        </a>
+        {modalTermoAberto &&
+          (termoTexto ? (
+            <article
+              aria-label="Texto integral do contrato"
+              className="mt-4 max-h-[65vh] overflow-y-auto whitespace-pre-line break-words bg-white p-6 text-sm leading-7 text-slate-900"
+              tabIndex={0}
+            >
+              <h3 className="mb-5 text-center font-semibold">CONTRATO DE PRESTAÇÃO DE SERVIÇOS</h3>
+              {termoTexto}
+            </article>
+          ) : (
+            <iframe
+              title="Contrato completo preenchido"
+              src={termoUrl}
+              className="mt-3 h-[65vh] w-full bg-white"
+            />
+          ))}
+      </Modal>
+      <Modal
+        aberto={!!linkAssinatura}
+        aoFechar={() => setLinkAssinatura("")}
+        titulo="Link de assinatura"
+        descricao="O colaborador confere o contrato, assina na tela e tira uma foto do rosto. O PDF assinado será anexado automaticamente."
+      >
+        <Campo
+          rotulo="Link para o colaborador"
+          id="link-assinatura"
+          value={linkAssinatura}
+          readOnly
+        />
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Selo
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(linkAssinatura);
+                mostrarFeedback("sucesso", "Link copiado.");
+              } catch {
+                mostrarFeedback("critico", "Selecione e copie o link acima.");
+              }
+            }}
+          >
+            Copiar link
+          </Selo>
+          <a
+            href={linkAssinatura}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-seal underline self-center"
+          >
+            Abrir contrato
+          </a>
+        </div>
+        <p className="mt-4 text-small text-ink-muted">
+          Válido por 7 dias. Compartilhe apenas com o colaborador.
+        </p>
       </Modal>
     </div>
   );

@@ -30,6 +30,7 @@ export interface FatosPessoa {
 
 const ROTULO_TIPO_DOCUMENTO: Record<string, string> = {
   documento_identidade: "Documento de identidade",
+  comprovante_endereco: "Comprovante de residência",
 };
 
 function rotuloTipo(tipo: string): string {

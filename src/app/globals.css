@@ -1,48 +1,100 @@
 @import "tailwindcss";
 
 /*
- * Tokens de design — direção "papel oficial" (Tarefa 8, processo de duas passadas da
- * skill front-end-design; registro em CONSULTAS.md).
- *
- * Passe de elevação: a paleta NÃO mudou. O que mudou é a escala tipográfica, a régua
- * de margem que marca linhas de registro, e o papel do mono — que agora carrega todo
- * dado verificável (hora, identificador, CPF, estado, valor), enquanto a proporcional
- * carrega texto escrito por gente. O tipo faz trabalho de informação, não só entrega.
- *
- * Direção: comitê de campanha lidando com contrato, documento e prazo — seriedade
- * institucional, não SaaS genérico. Um único acento (cor de selo/lacre). Sem serifada
- * de exposição, sem cartão-com-sombra, sem eyebrow em caixa alta.
+ * Comitê Digital — Design System Oficial (docs/DESIGN-SYSTEM.md)
+ * Padrão canônico claro, verde como cor de ação e progresso, lime como acento de energia.
  */
 :root {
-  --color-paper: #eceeeb;
-  --color-surface: #f5f6f4;
-  --color-ink: #1b2430;
-  --color-ink-muted: #5b6472;
-  --color-seal: #ffcc00; /* Dourado / Amarelo oficial da campanha */
-  --color-seal-ink: #070d18; /* Texto escuro sobre o amarelo */
-  --color-line: #d4d2c9;
-  --color-line-subtle: #e2e0d7;
-  --color-alert: #dc2626;
-  --color-success: #009c3b; /* Verde cívico oficial */
-  --color-warning: #f59e0b;
-  --color-info: #0284c7;
+  /* =========================================================================
+     2. Cores — Tokens Primitivos (Paleta Crua)
+     ========================================================================= */
+  --green-50: #F1F9F4;
+  --green-100: #DDF3E6;
+  --green-200: #BFE8D0;
+  --green-300: #8FD9AE;
+  --green-400: #54C98C;
+  --green-500: #2FBF83;
+  --green-600: #1FA871;
+  --green-700: #157F58;
+  --green-800: #0F5F42;
+  --green-900: #0C1512;
 
-  /* Cores de alta autoridade institucional do Comitê Digital */
-  --color-brand-green: #009c3b;
-  --color-brand-green-dark: #074e20;
-  --color-brand-yellow: #ffcc00;
-  --color-brand-yellow-hover: #ffd633;
-  --color-brand-blue: #002776;
-  --color-brand-navy: #070d18;
-  --color-brand-surface: #0d1728;
-  --color-brand-surface-elevated: #14223d;
-  --color-brand-line: #1e3256;
-  --color-brand-line-subtle: #162540;
-  --color-brand-text: #f8fafc;
-  --color-brand-text-muted: #94a3b8;
+  --lime-300: #D6E85F;
+  --lime-400: #C4D830;
+  --lime-500: #AEC426;
 
-  /* Régua de margem com acento de ouro */
-  --rule-margin: color-mix(in srgb, var(--color-brand-yellow) 60%, transparent);
+  --ink-900: #0C1512;
+  --ink-800: #14211C;
+  --ink-600: #3C4A44;
+  --ink-500: #5E6B78;
+  --ink-400: #8A98A0;
+
+  --neutral-200: #CDD5CD;
+  --neutral-150: #E2E7E1;
+  --neutral-100: #EEF1EE;
+  --surface-tint: #E9F5EE;
+  --surface-sunken: #F8FAF8;
+  --canvas: #FFFFFF;
+  --white: #FFFFFF;
+
+  --positive-500: #1FA871;
+  --positive-100: #DDF3E6;
+  --warning-500: #E0A32E;
+  --warning-100: #FBEFD6;
+  --danger-500: #E5533D;
+  --danger-100: #FCE7E2;
+  --info-500: #2F80B5;
+  --info-100: #E3EFF6;
+  --muted-500: #94A3A0;
+
+  /* =========================================================================
+     3. Cores — Tokens Semânticos (Light Mode Canônico — Padrão)
+     ========================================================================= */
+  --color-canvas: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #F8FAF9;
+  --color-surface-tint: #E9F5EE;
+  --color-ink: #0A0F0D;
+  --color-ink-strong: #000000;
+  --color-ink-muted: #52605B;
+  --color-ink-subtle: #8A98A0;
+  --color-ink-on-primary: #FFFFFF;
+
+  --color-line: #E2E8F0;
+  --color-line-strong: #CBD5E1;
+
+  --color-primary: #1FA871;
+  --color-primary-base: #2FBF83;
+  --color-primary-hover: #157F58;
+  --color-primary-tint: #E9F5EE;
+
+  --color-accent: #BACB41;
+  --color-focus: #1FA871;
+
+  --color-success: #1FA871;
+  --color-success-tint: #DDF3E6;
+  --color-warning: #D97706;
+  --color-warning-tint: #FEF3C7;
+  --color-danger: #DC2626;
+  --color-danger-tint: #FEE2E2;
+  --color-info: #0284C7;
+  --color-info-tint: #E0F2FE;
+  --color-neutral-status: #64748B;
+
+  /* Aliases de retrocompatibilidade para componentes existentes */
+  --color-paper: var(--color-canvas);
+  --color-seal: var(--color-primary);
+  --color-seal-ink: var(--color-ink-on-primary);
+  --color-alert: var(--color-danger);
+  --color-line-subtle: var(--color-line-strong);
+
+  /* Régua de margem oficial */
+  --rule-margin: color-mix(in srgb, var(--color-primary) 35%, transparent);
+
+  /* Tipografia oficial */
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Escala tipográfica */
   --text-display: clamp(2.5rem, 1.6rem + 4vw, 4.25rem);
@@ -51,84 +103,13 @@
   --text-body: 1rem;
   --text-small: 0.875rem;
   --text-register: 0.8125rem;
-
   --measure: 66ch;
-}
 
-/* Valores do tema escuro. Aplicados quando o SO está em modo escuro OU quando
-   `data-theme="dark"` está no <html> (o padrão fixo da aplicação — ver
-   src/app/layout.tsx). O bloco é duplicado porque `@media` e um seletor de
-   atributo não podem ser combinados numa única regra. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-paper: #070d18;
-    --color-surface: #0d1728;
-    --color-ink: #f8fafc;
-    --color-ink-muted: #94a3b8;
-    --color-seal: #ffcc00;
-    --color-seal-ink: #070d18;
-    --color-line: #1e3256;
-    --color-line-subtle: #162540;
-    --color-alert: #ef4444;
-    --color-success: #22c55e;
-    --color-warning: #fbbf24;
-    --color-info: #38bdf8;
-    --rule-margin: color-mix(in srgb, var(--color-brand-yellow) 70%, transparent);
-  }
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --color-paper: #070d18;
-  --color-surface: #0d1728;
-  --color-ink: #f8fafc;
-  --color-ink-muted: #94a3b8;
-  --color-seal: #ffcc00;
-  --color-seal-ink: #070d18;
-  --color-line: #1e3256;
-  --color-line-subtle: #162540;
-  --color-alert: #ef4444;
-  --color-success: #22c55e;
-  --color-warning: #fbbf24;
-  --color-info: #38bdf8;
-  --rule-margin: color-mix(in srgb, var(--color-brand-yellow) 70%, transparent);
-}
-
-@theme inline {
-  --color-paper: var(--color-paper);
-  --color-surface: var(--color-surface);
-  --color-ink: var(--color-ink);
-  --color-ink-muted: var(--color-ink-muted);
-  --color-seal: var(--color-seal);
-  --color-seal-ink: var(--color-seal-ink);
-  --color-line: var(--color-line);
-  --color-line-subtle: var(--color-line-subtle);
-  --color-alert: var(--color-alert);
-  --color-success: var(--color-success);
-  --color-warning: var(--color-warning);
-  --color-info: var(--color-info);
-
-  --color-brand-green: var(--color-brand-green);
-  --color-brand-green-dark: var(--color-brand-green-dark);
-  --color-brand-yellow: var(--color-brand-yellow);
-  --color-brand-yellow-hover: var(--color-brand-yellow-hover);
-  --color-brand-blue: var(--color-brand-blue);
-  --color-brand-navy: var(--color-brand-navy);
-  --color-brand-surface: var(--color-brand-surface);
-  --color-brand-surface-elevated: var(--color-brand-surface-elevated);
-  --color-brand-line: var(--color-brand-line);
-  --color-brand-line-subtle: var(--color-brand-line-subtle);
-  --color-brand-text: var(--color-brand-text);
-  --color-brand-text-muted: var(--color-brand-text-muted);
-
-  --font-sans: var(--font-archivo);
-  --font-mono: var(--font-plex-mono);
-
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
-  --shadow-elevation: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  /* Elevações e Raios */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-elevation: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.04);
   --shadow-dropdown: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
-  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.06);
-  --shadow-gold: 0 0 20px -3px rgba(255, 204, 0, 0.35);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.04);
 
   --radius-xs: 0.125rem;
   --radius-sm: 0.25rem;
@@ -139,154 +120,225 @@
   --radius-full: 9999px;
 }
 
-body {
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  text-rendering: optimizeLegibility;
+/* =========================================================================
+   Tokens Semânticos — Dark Mode Premium
+   ========================================================================= */
+:root[data-theme="dark"],
+.dark {
+  color-scheme: dark;
+  --color-canvas: #0A0E11;
+  --color-surface: #11161B;
+  --color-surface-sunken: #171F25;
+  --color-surface-tint: #132B20;
+
+  --color-ink: #F1F5F9;
+  --color-ink-strong: #FFFFFF;
+  --color-ink-muted: #8E9CA6;
+  --color-ink-subtle: #5E707A;
+  --color-ink-on-primary: #FFFFFF;
+
+  --color-line: #1E272E;
+  --color-line-strong: #2D3A44;
+
+  --color-primary: #22C55E;
+  --color-primary-base: #2FBF83;
+  --color-primary-hover: #16A34A;
+  --color-primary-tint: #143525;
+
+  --color-accent: #C5D844;
+  --color-focus: #22C55E;
+
+  --color-success: #22C55E;
+  --color-success-tint: #143525;
+  --color-warning: #F59E0B;
+  --color-warning-tint: #3B2A10;
+  --color-danger: #EF4444;
+  --color-danger-tint: #3E1B1B;
+  --color-info: #38BDF8;
+  --color-info-tint: #0C2C3D;
+  --color-neutral-status: #798B88;
+
+  --color-paper: var(--color-canvas);
+  --color-seal: var(--color-primary);
+  --color-seal-ink: var(--color-ink-on-primary);
+  --color-alert: var(--color-danger);
+  --color-line-subtle: var(--color-line-strong);
+
+  --rule-margin: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.25);
+  --shadow-elevation: 0 4px 8px -1px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.35);
+  --shadow-dropdown: 0 10px 15px -3px rgb(0 0 0 / 0.55), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.65), 0 8px 10px -6px rgb(0 0 0 / 0.5);
 }
 
-/* Foco visível acessível em amarelo ouro */
+/* =========================================================================
+   Tailwind v4 Inline Theme Tokens
+   ========================================================================= */
+@theme inline {
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-surface-sunken: var(--color-surface-sunken);
+  --color-surface-tint: var(--color-surface-tint);
+
+  --color-ink: var(--color-ink);
+  --color-ink-strong: var(--color-ink-strong);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-subtle: var(--color-ink-subtle);
+  --color-ink-on-primary: var(--color-ink-on-primary);
+
+  --color-line: var(--color-line);
+  --color-line-strong: var(--color-line-strong);
+  --color-line-subtle: var(--color-line-subtle);
+
+  --color-primary: var(--color-primary);
+  --color-primary-base: var(--color-primary-base);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-tint: var(--color-primary-tint);
+
+  --color-accent: var(--color-accent);
+  --color-focus: var(--color-focus);
+
+  --color-success: var(--color-success);
+  --color-success-tint: var(--color-success-tint);
+  --color-warning: var(--color-warning);
+  --color-warning-tint: var(--color-warning-tint);
+  --color-danger: var(--color-danger);
+  --color-danger-tint: var(--color-danger-tint);
+  --color-info: var(--color-info);
+  --color-info-tint: var(--color-info-tint);
+  --color-neutral-status: var(--color-neutral-status);
+
+  /* Aliases mantidos */
+  --color-paper: var(--color-paper);
+  --color-seal: var(--color-seal);
+  --color-seal-ink: var(--color-seal-ink);
+  --color-alert: var(--color-alert);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-archivo: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-elevation: var(--shadow-elevation);
+  --shadow-dropdown: var(--shadow-dropdown);
+  --shadow-modal: var(--shadow-modal);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-full: var(--radius-full);
+}
+
+/* =========================================================================
+   Utilitários Tipográficos Oficiais do Design System (§5 do DESIGN-SYSTEM.md)
+   ========================================================================= */
+@utility text-display {
+  font-size: clamp(2.5rem, 1.6rem + 4vw, 4.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+@utility text-h1 {
+  font-size: 1.75rem;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+@utility text-h2 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+
+@utility text-body {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@utility text-small {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+@utility text-register {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-family: var(--font-mono);
+}
+
+html,
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Herança estrita de tipografia para elementos de formulário */
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Legibilidade e contraste de selects e options em light e dark mode */
+select {
+  color-scheme: light dark;
+}
+
+:root[data-theme="dark"] select,
+.dark select {
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+}
+
+:root[data-theme="dark"] select option,
+:root[data-theme="dark"] select optgroup,
+.dark select option,
+.dark select optgroup {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+}
+
+/* Foco visível acessível em verde de ação (§10) */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--color-brand-yellow);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
-/* Régua de margem cívica */
+
+/* Régua de margem cívica (§7.8) */
 .regua {
   padding-left: 1.25rem;
   border-left: 2px solid var(--rule-margin);
 }
 
-/* Card temático da campanha */
-.card-campaign {
-  background-color: var(--color-brand-surface);
-  border: 1px solid var(--color-brand-line);
-  color: var(--color-brand-text);
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.4);
-  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.card-campaign:hover {
-  border-color: color-mix(in srgb, var(--color-brand-yellow) 40%, var(--color-brand-line));
-  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
-}
-
-/* Botão Amarelo Ouro de Alta Conversão */
-.btn-gold {
-  background-color: var(--color-brand-yellow);
-  color: #070d18;
-  font-weight: 700;
-  border-radius: 9999px;
-  box-shadow: 0 2px 8px rgba(255, 204, 0, 0.3);
-  transition: all 150ms ease-out;
-}
-
-.btn-gold:hover {
-  background-color: var(--color-brand-yellow-hover);
-  box-shadow: 0 4px 16px rgba(255, 204, 0, 0.45);
-  transform: translateY(-1px);
-}
-
-.btn-gold:active {
-  transform: scale(0.98);
-}
-
-/* Fundo da campanha verde com profundidade */
-.bg-campaign-green {
-  background: radial-gradient(circle at 50% 20%, #0da143 0%, #009c3b 45%, #054f21 100%);
-}
-
-/* Fundo azul marinho noite de comando */
-.bg-campaign-navy {
-  background: radial-gradient(ellipse at top, #112240 0%, #070d18 70%);
-}
-
-/* Fundo Azul Cobalto / Royal Patriótico da referência */
-.bg-campaign-royal {
-  background: linear-gradient(135deg, #0056b3 0%, #004085 60%, #002752 100%);
-}
-
-/* Fundo Marfim Suave de Alto Contraste */
-.bg-campaign-cream {
-  background-color: #faf9f5;
-}
-
-/* Botões Pílula de Alto Impacto do Projeto Gráfico */
-.btn-campaign-yellow {
-  background-color: #ffd200;
-  color: #002040;
-  font-weight: 800;
-  border-radius: 9999px;
-  box-shadow: 0 4px 14px rgba(255, 210, 0, 0.4);
-  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.btn-campaign-yellow:hover {
-  background-color: #ffe033;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 210, 0, 0.55);
-}
-
-.btn-campaign-yellow:active {
-  transform: scale(0.98);
-}
-
-.btn-campaign-green {
-  background-color: #009c3b;
-  color: #ffffff;
-  font-weight: 700;
-  border-radius: 9999px;
-  box-shadow: 0 4px 14px rgba(0, 156, 59, 0.35);
-  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.btn-campaign-green:hover {
-  background-color: #008733;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 156, 59, 0.5);
-}
-
-.btn-campaign-green:active {
-  transform: scale(0.98);
-}
-
-/* Cunha diagonal dourada do Hero da referência */
-.hero-wedge-yellow {
-  clip-path: polygon(25% 0, 100% 0, 100% 100%, 0% 100%);
-}
-
-
-/* O único momento de movimento: o registro do hero se preenche uma vez, no load. */
-@keyframes registro-entra {
-  from {
-    opacity: 0;
-    transform: translateY(0.4rem);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.registro-linha {
-  opacity: 0;
-  animation: registro-entra 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
-}
-
+/* Movimento acessível (§10) */
 @media (prefers-reduced-motion: reduce) {
-  .registro-linha {
-    opacity: 1;
-    animation: none;
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
-/* Oculta o indicador de desenvolvimento do Next.js (ícone N no canto inferior) */
+/* Oculta o indicador de desenvolvimento do Next.js */
 nextjs-portal,
 [data-nextjs-toast],
 [data-nextjs-dev-tools-button],
 #nextjs-dev-overlay {
   display: none !important;
 }
-

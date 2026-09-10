@@ -113,3 +113,41 @@ export function computarFunil(pessoas: PessoaParaFunil[]): Funil {
     assinado: pessoas.filter((p) => posicaoAlcancada(p.statusContrato) >= 3).length,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Resumo por região — o card "Cobertura por Região" do dashboard. Conta PESSOAS
+// distintas (não linhas de contrato: uma pessoa recontratada após distrato tem
+// mais de um contrato). `statusContrato` é o do contrato MAIS RECENTE da pessoa.
+// ---------------------------------------------------------------------------
+
+const STATUS_CONTRATO_ATIVO = new Set<ContractStatus>(ACTIVE_BOARD_STATUSES);
+
+export interface PessoaParaRegiao {
+  apta: boolean;
+  statusContrato: ContractStatus | null;
+}
+
+export interface ResumoRegional {
+  totalPessoas: number;
+  pessoasAptas: number;
+  pessoasComContratoAtivo: number;
+  pessoasComContratoAssinado: number;
+  /** % de pessoas com contrato assinado. `null` (não 0) quando a região não tem
+   * ninguém — ausência não é zero (mesmo cuidado da Seção 11 com Taguatinga). */
+  conclusaoPct: number | null;
+}
+
+export function computarResumoRegional(pessoas: PessoaParaRegiao[]): ResumoRegional {
+  const total = pessoas.length;
+  const assinadas = pessoas.filter((p) => p.statusContrato === "assinado").length;
+
+  return {
+    totalPessoas: total,
+    pessoasAptas: pessoas.filter((p) => p.apta).length,
+    pessoasComContratoAtivo: pessoas.filter(
+      (p) => p.statusContrato !== null && STATUS_CONTRATO_ATIVO.has(p.statusContrato),
+    ).length,
+    pessoasComContratoAssinado: assinadas,
+    conclusaoPct: total === 0 ? null : Math.round((assinadas / total) * 100),
+  };
+}

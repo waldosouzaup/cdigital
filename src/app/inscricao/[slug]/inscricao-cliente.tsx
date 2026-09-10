@@ -6,6 +6,7 @@ import { Marca } from "@/components/marca";
 import { Campo } from "@/components/campo";
 import { Selo } from "@/components/selo";
 import { Alerta } from "@/components/alerta";
+import { SeletorTema } from "@/components/seletor-tema";
 import { inscreverCandidato } from "./acoes";
 import { ESTADO_INICIAL_INSCRICAO } from "./estado";
 
@@ -37,7 +38,7 @@ export function InscricaoCliente({
 
   if (estado.status === "sucesso") {
     return (
-      <div className="min-h-screen bg-paper text-ink flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-canvas text-ink flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-md space-y-6 text-center">
           <Marca className="justify-center" />
           <Alerta tom="sucesso" titulo="Inscrição recebida">
@@ -51,9 +52,12 @@ export function InscricaoCliente({
   }
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="min-h-screen bg-canvas text-ink">
       <div className="mx-auto w-full max-w-lg px-4 py-10">
-        <Marca />
+        <div className="flex items-center justify-between">
+          <Marca />
+          <SeletorTema />
+        </div>
         <header className="mt-6 border-b border-line pb-4">
           <h1 className="text-h1 font-semibold">Inscrição — {organizacaoNome}</h1>
           <p className="mt-1 text-small text-ink-muted">

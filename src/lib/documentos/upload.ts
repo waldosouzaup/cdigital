@@ -11,6 +11,9 @@ import { createHash } from "node:crypto";
 export const TIPOS_ACEITOS = ["image/jpeg", "image/png", "application/pdf"] as const;
 export type TipoAceito = (typeof TIPOS_ACEITOS)[number];
 
+export const TIPOS_DOCUMENTO_VALIDOS = ["documento_identidade", "comprovante_endereco"] as const;
+export type TipoDocumentoColeta = (typeof TIPOS_DOCUMENTO_VALIDOS)[number];
+
 export const TAMANHO_MAXIMO_BYTES = 20 * 1024 * 1024;
 export const DIMENSAO_MINIMA_PX = 800;
 

@@ -16,22 +16,22 @@ function LinkColetaEmail({ primeiroNome, url, prazoDias }: LinkColetaEmailProps)
     <Html lang="pt-BR">
       <Head />
       <Preview>{`Link para enviar seus dados — válido por ${prazoDias} dia${prazoDias === 1 ? "" : "s"}`}</Preview>
-      <Body style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#eceeeb", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "24px", maxWidth: "480px" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#1b2430" }}>
+      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
+        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
             Olá, {primeiroNome}
           </Heading>
-          <Text style={{ color: "#1b2430" }}>
+          <Text style={{ color: "#0A0F0D" }}>
             Use o link abaixo para enviar seus dados de contato e o documento pedidos pela
             coordenação da campanha. Ele vale por {prazoDias} dia{prazoDias === 1 ? "" : "s"} e só
             pode ser usado uma vez.
           </Text>
           <Text>
-            <Link href={url} style={{ color: "#b8752e" }}>
+            <Link href={url} style={{ color: "#157F58", fontWeight: "600" }}>
               {url}
             </Link>
           </Text>
-          <Text style={{ fontSize: "12px", color: "#666666" }}>
+          <Text style={{ fontSize: "12px", color: "#52605B" }}>
             Se você não esperava este e-mail, é seguro ignorá-lo.
           </Text>
         </Container>

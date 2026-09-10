@@ -90,3 +90,11 @@ describe("extensaoPorMime", () => {
     expect(extensaoPorMime("image/gif")).toBeNull();
   });
 });
+
+describe("TIPOS_DOCUMENTO_VALIDOS", () => {
+  it("inclui documento_identidade e comprovante_endereco", async () => {
+    const { TIPOS_DOCUMENTO_VALIDOS } = await import("@/lib/documentos/upload");
+    expect(TIPOS_DOCUMENTO_VALIDOS).toContain("documento_identidade");
+    expect(TIPOS_DOCUMENTO_VALIDOS).toContain("comprovante_endereco");
+  });
+});

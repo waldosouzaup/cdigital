@@ -16,8 +16,8 @@ export interface DadosRelatorio {
     nome: string;
     totalPessoas: number;
     pessoasAptas: number;
-    contratosAssinados: number;
-    coberturaDocumentalPct: number | null;
+    pessoasComContratoAssinado: number;
+    conclusaoPct: number | null;
   }[];
 }
 
@@ -132,7 +132,7 @@ export async function gerarPdfRelatorio(dados: DadosRelatorio): Promise<Uint8Arr
   espaco(10);
 
   // Visão regional
-  escrever("COBERTURA POR REGIÃO", { fonte: fonteNegrito, tamanho: TAMANHO_SECAO });
+  escrever("CONCLUSÃO POR REGIÃO", { fonte: fonteNegrito, tamanho: TAMANHO_SECAO });
   espaco(4);
   escrever(
     colunas(
@@ -140,7 +140,7 @@ export async function gerarPdfRelatorio(dados: DadosRelatorio): Promise<Uint8Arr
       { texto: "Pessoas", largura: 9 },
       { texto: "Aptas", largura: 8 },
       { texto: "Assinados", largura: 10 },
-      { texto: "Cobertura", largura: 10 },
+      { texto: "Conclusão", largura: 10 },
     ),
     { fonte: fonteNegrito },
   );
@@ -150,9 +150,9 @@ export async function gerarPdfRelatorio(dados: DadosRelatorio): Promise<Uint8Arr
         { texto: r.nome, largura: 22 },
         { texto: String(r.totalPessoas), largura: 9 },
         { texto: String(r.pessoasAptas), largura: 8 },
-        { texto: String(r.contratosAssinados), largura: 10 },
+        { texto: String(r.pessoasComContratoAssinado), largura: 10 },
         // "não informado", nunca 0%, quando a região não tem pessoa (Seção 11).
-        { texto: r.coberturaDocumentalPct === null ? "não informado" : `${r.coberturaDocumentalPct}%`, largura: 10 },
+        { texto: r.conclusaoPct === null ? "não informado" : `${r.conclusaoPct}%`, largura: 10 },
       ),
     );
   }

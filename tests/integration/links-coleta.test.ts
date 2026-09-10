@@ -125,9 +125,7 @@ describe("Fase 2 — links_coleta (acesso público via SECURITY DEFINER)", () =>
       p_cep: "70000-000",
       p_rg: "1234567",
       p_data_nascimento: "1990-01-01",
-      p_banco: "Banco Teste",
-      p_agencia: "0001",
-      p_conta: "12345-6",
+      p_chave_pix: "fulano-pix@exemplo.invalid",
       p_email: "fulano-teste-coleta@exemplo.invalid",
     });
 
@@ -136,11 +134,11 @@ describe("Fase 2 — links_coleta (acesso público via SECURITY DEFINER)", () =>
 
     const { data: pessoaAtualizada } = await admin
       .from("pessoas")
-      .select("telefone, banco")
+      .select("telefone, chave_pix")
       .eq("id", pessoaId)
       .single();
     expect(pessoaAtualizada?.telefone).toBe("(61) 99999-0000");
-    expect(pessoaAtualizada?.banco).toBe("Banco Teste");
+    expect(pessoaAtualizada?.chave_pix).toBe("fulano-pix@exemplo.invalid");
   });
 
   it("recusa reenvio pelo mesmo link (expiração no uso)", async () => {
@@ -152,9 +150,7 @@ describe("Fase 2 — links_coleta (acesso público via SECURITY DEFINER)", () =>
       p_cep: null,
       p_rg: null,
       p_data_nascimento: null,
-      p_banco: null,
-      p_agencia: null,
-      p_conta: null,
+      p_chave_pix: null,
       p_email: null,
     });
 

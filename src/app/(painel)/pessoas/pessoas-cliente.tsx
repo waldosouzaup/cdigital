@@ -10,6 +10,8 @@ import { Modal } from "@/components/modal";
 import { OcrDocumento } from "@/components/ocr-documento";
 import { EstadoVazio } from "@/components/estado-vazio";
 import { Alerta } from "@/components/alerta";
+import { Paginacao } from "@/components/paginacao";
+import { RelatorioIdadeSecao } from "./relatorio-idade-secao";
 import { criarPessoa, gerarLinkColeta } from "./acoes";
 import { ESTADO_INICIAL_CRIAR_PESSOA } from "./estado";
 import type { PessoaListada, RegiaoOpcao } from "./dados";
@@ -51,6 +53,14 @@ export function PessoasCliente({
   const [busca, setBusca] = useState("");
   const [filtroRegiao, setFiltroRegiao] = useState("todas");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(20);
+  const [exibirRelatorioIdade, setExibirRelatorioIdade] = useState(false);
+
+  // Reseta para a primeira página ao alterar o termo de busca ou filtros
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [busca, filtroRegiao, filtroStatus]);
 
   const [modalNovoAberto, setModalNovoAberto] = useState(false);
   const [modalLinkAberto, setModalLinkAberto] = useState(false);
@@ -93,6 +103,16 @@ export function PessoasCliente({
       (filtroStatus === "autoinscritos" && p.origem === "autoinscricao");
     return bateBusca && bateRegiao && bateStatus;
   });
+
+  const totalPaginas = Math.max(1, Math.ceil(pessoasFiltradas.length / itensPorPagina));
+  const paginaAjustada = Math.min(Math.max(1, paginaAtual), totalPaginas);
+  const indiceInicial = (paginaAjustada - 1) * itensPorPagina;
+  const pessoasExibidas = pessoasFiltradas.slice(indiceInicial, indiceInicial + itensPorPagina);
+
+  function handleMudarItensPorPagina(novosItensPorPagina: number) {
+    setItensPorPagina(novosItensPorPagina);
+    setPaginaAtual(1);
+  }
 
   function abrirModalNovo() {
     setModalNovoAberto(true);
@@ -145,9 +165,9 @@ export function PessoasCliente({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
-            href="/regioes"
+            href="/configuracoes?aba=regioes"
             className="text-small font-medium text-seal underline decoration-seal/40 underline-offset-4"
           >
             Regiões
@@ -158,11 +178,47 @@ export function PessoasCliente({
           >
             Importar planilha
           </Link>
+          <Link
+            href="/configuracoes"
+            className="text-small font-medium text-seal underline decoration-seal/40 underline-offset-4"
+            title="Endereço público de autoinscrição — em Configurações"
+          >
+            Link de inscrição
+          </Link>
+          <button
+            type="button"
+            onClick={() => setExibirRelatorioIdade(!exibirRelatorioIdade)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded transition-all cursor-pointer inline-flex items-center gap-1.5 border ${
+              exibirRelatorioIdade
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-surface-sunken hover:bg-surface text-ink border-line"
+            }`}
+            title="Exibir ou ocultar relatório analítico de média de idade por Função e Região"
+          >
+            <span>📊</span>
+            <span>{exibirRelatorioIdade ? "Ocultar Média de Idade" : "Média de Idade (Função & Região)"}</span>
+          </button>
           <Selo voz="selo" onClick={abrirModalNovo} className="text-xs">
             + Cadastrar Pessoa
           </Selo>
         </div>
       </div>
+
+      {/* Relatório Analítico de Média de Idade por Função e Região */}
+      {exibirRelatorioIdade && (
+        <RelatorioIdadeSecao
+          pessoas={pessoasIniciais}
+          aoFechar={() => setExibirRelatorioIdade(false)}
+          aoFiltrarNaLista={(funcao, regiao) => {
+            setFiltroRegiao(regiao === "Sem região" ? "todas" : regiao);
+            setBusca(funcao === "Não informada" ? "" : funcao);
+            const tabelaEl = document.getElementById("tabela-pessoas");
+            if (tabelaEl) {
+              tabelaEl.scrollIntoView({ behavior: "smooth" });
+            }
+          }}
+        />
+      )}
 
       {/* Barra de Filtros e Busca */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-surface p-4 border border-line">
@@ -177,13 +233,14 @@ export function PessoasCliente({
         </div>
 
         <div>
-          <label className="block text-small font-medium text-ink mb-1.5">
+          <label htmlFor="filtro-regiao" className="block text-small font-medium text-ink mb-1.5">
             Região / Localidade
           </label>
           <select
+            id="filtro-regiao"
             value={filtroRegiao}
             onChange={(e) => setFiltroRegiao(e.target.value)}
-            className="w-full border-b border-line bg-transparent py-2 text-small text-ink outline-none focus:border-seal cursor-pointer"
+            className="w-full h-[42px] px-3 rounded-md border border-line bg-surface text-small text-ink focus:border-primary focus:ring-1 focus:ring-focus outline-none cursor-pointer transition-colors [&>option]:bg-surface [&>option]:text-ink"
           >
             <option value="todas">Todas as regiões</option>
             {regioes.map((r) => (
@@ -195,13 +252,14 @@ export function PessoasCliente({
         </div>
 
         <div>
-          <label className="block text-small font-medium text-ink mb-1.5">
+          <label htmlFor="filtro-condicao" className="block text-small font-medium text-ink mb-1.5">
             Condição Documental
           </label>
           <select
+            id="filtro-condicao"
             value={filtroStatus}
             onChange={(e) => setFiltroStatus(e.target.value)}
-            className="w-full border-b border-line bg-transparent py-2 text-small text-ink outline-none focus:border-seal cursor-pointer"
+            className="w-full h-[42px] px-3 rounded-md border border-line bg-surface text-small text-ink focus:border-primary focus:ring-1 focus:ring-focus outline-none cursor-pointer transition-colors [&>option]:bg-surface [&>option]:text-ink"
           >
             <option value="todos">Todos os status</option>
             <option value="apta">Apenas aptos (doc aprovado)</option>
@@ -210,12 +268,29 @@ export function PessoasCliente({
             <option value="autoinscritos">Somente autoinscritos</option>
           </select>
         </div>
+
+        <div className="sm:col-span-4 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-line/60 text-xs text-ink-muted">
+          <span>Use os campos acima para refinar a busca individual de colaboradores.</span>
+          <button
+            type="button"
+            onClick={() => setExibirRelatorioIdade(!exibirRelatorioIdade)}
+            className="text-primary hover:underline font-medium cursor-pointer inline-flex items-center gap-1"
+          >
+            <span>📊</span>
+            <span>
+              {exibirRelatorioIdade
+                ? "Ocultar painel de média de idade ↑"
+                : "Gerar relatório de média de idade por Função e Região →"}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Tabela de Pessoas */}
       {pessoasFiltradas.length > 0 ? (
-        <div className="overflow-x-auto border border-line bg-surface">
-          <table className="w-full border-collapse text-left text-small">
+        <div className="border border-line bg-surface" id="tabela-pessoas">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left text-small">
             <thead>
               <tr className="border-b border-line bg-paper/60 font-mono text-xs text-ink-muted">
                 <th className="p-3.5">Nome / Identificação</th>
@@ -228,13 +303,23 @@ export function PessoasCliente({
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {pessoasFiltradas.map((p) => {
+              {pessoasExibidas.map((p) => {
                 const statusBadge = statusContratoParaBadge(p.statusContrato);
                 return (
                   <tr key={p.id} className="hover:bg-paper/40 transition-colors">
                     <td className="p-3.5">
                       <div className="font-medium text-ink">{p.nomeCompleto}</div>
-                      <div className="font-mono text-xs text-ink-muted">{p.cpf}</div>
+                      <div className="font-mono text-xs text-ink-muted flex items-center gap-1.5 mt-0.5">
+                        <span>{p.cpf}</span>
+                        {p.idade !== null && (
+                          <span
+                            className="text-[0.68rem] bg-surface-sunken px-1.5 py-0.5 rounded text-ink font-sans font-medium border border-line/50"
+                            title={`Data de nascimento: ${p.dataNascimento ?? "—"}`}
+                          >
+                            {p.idade} anos
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3.5 text-xs">
                       <div className="text-ink font-medium">{p.funcao ?? "—"}</div>
@@ -288,6 +373,16 @@ export function PessoasCliente({
               })}
             </tbody>
           </table>
+          </div>
+          <Paginacao
+            paginaAtual={paginaAjustada}
+            totalItens={pessoasFiltradas.length}
+            itensPorPagina={itensPorPagina}
+            aoMudarPagina={setPaginaAtual}
+            aoMudarItensPorPagina={handleMudarItensPorPagina}
+            rotuloItem="colaborador"
+            rotuloItemPlural="colaboradores"
+          />
         </div>
       ) : (
         <EstadoVazio

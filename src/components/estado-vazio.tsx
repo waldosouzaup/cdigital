@@ -1,11 +1,8 @@
 import type { ReactNode } from "react";
 
 /**
- * Estado vazio (Empty State).
- *
- * Princípio da skill front-end-design: uma tela vazia é um convite à ação,
- * não uma ausência melancólica. Deve explicar de forma construtiva o que
- * deve existir ali e como iniciar.
+ * Estado vazio (Empty State) institucional (§7.6 do DESIGN-SYSTEM.md).
+ * Ícone em ink-subtle dentro de círculo surface-tint, título ink e ação opcional.
  */
 export function EstadoVazio({
   titulo,
@@ -20,9 +17,9 @@ export function EstadoVazio({
 }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center border border-dashed border-line p-10 text-center ${className}`}
+      className={`flex flex-col items-center justify-center border border-dashed border-line bg-surface/40 rounded-xl p-10 text-center ${className}`}
     >
-      <div className="flex h-10 w-10 items-center justify-center border border-line font-mono text-xs text-ink-muted">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-tint font-mono text-sm text-ink-subtle">
         ∅
       </div>
       <h3 className="mt-4 text-small font-semibold text-ink">{titulo}</h3>

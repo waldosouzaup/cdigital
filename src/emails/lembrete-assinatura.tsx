@@ -23,12 +23,12 @@ function LembreteAssinaturaEmail({
     <Html lang="pt-BR">
       <Head />
       <Preview>Contrato aguardando assinatura</Preview>
-      <Body style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#eceeeb", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "24px", maxWidth: "480px" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#1b2430" }}>
+      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
+        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
             {paraCoordenador ? "Assinatura pendente" : `Olá, ${primeiroNome}`}
           </Heading>
-          <Text style={{ color: "#1b2430" }}>
+          <Text style={{ color: "#0A0F0D" }}>
             {paraCoordenador ? (
               <>
                 O contrato de <strong>{objeto}</strong> de {primeiroNome} está há 3 dias enviado sem
@@ -42,8 +42,8 @@ function LembreteAssinaturaEmail({
             )}
           </Text>
           <Text>
-            <Link href={urlContato} style={{ color: "#b8752e" }}>
-              {paraCoordenador ? "Abrir a lista de contratos" : "Saiba mais sobre o Comitê Digital"}
+            <Link href={urlContato} style={{ color: "#157F58", fontWeight: "600" }}>
+              {paraCoordenador ? "Abrir a lista de contratos →" : "Saiba mais sobre o Comitê Digital →"}
             </Link>
           </Text>
         </Container>

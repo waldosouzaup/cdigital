@@ -72,5 +72,6 @@ export async function alterarPapelUsuario(
   }
 
   revalidatePath("/equipe");
+  revalidatePath("/configuracoes");
   return { status: "sucesso", mensagem: "Acesso atualizado. Vale a partir do próximo login do membro." };
 }

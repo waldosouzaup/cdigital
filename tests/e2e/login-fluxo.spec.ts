@@ -111,7 +111,7 @@ test("senha temporária: login leva a /definir-senha e só libera o painel após
 
     // Nova sessão: recarregar o painel não volta mais para /definir-senha.
     await page.goto("/regioes", { waitUntil: "networkidle" });
-    await expect(page).toHaveURL(/\/regioes$/);
+    await expect(page).toHaveURL(/\/(regioes|configuracoes)/);
   } finally {
     await admin.from("usuarios").delete().eq("id", user.id);
     await admin.auth.admin.deleteUser(user.id).catch(() => {});

@@ -18,6 +18,8 @@ const ROTAS_PUBLICAS = [
   // Autoinscrição pública (Feature B) — `/inscricao/[slug]`, sem sessão. A Server
   // Action da página faz POST para o próprio path, que também precisa ser público.
   "/inscricao",
+  // Assinatura eletrônica pública de contrato pelo colaborador — `/assinar/[token]`
+  "/assinar",
 ];
 
 // Recursos do PWA (Fase 4, item 2) que o navegador busca sem cookie de sessão:

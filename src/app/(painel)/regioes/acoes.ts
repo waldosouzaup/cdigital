@@ -56,6 +56,7 @@ export async function criarRegiao(
   }
 
   revalidatePath("/regioes");
+  revalidatePath("/configuracoes");
   revalidatePath("/pessoas");
   return { status: "sucesso", mensagem: `Região "${validacao.nome}" criada.` };
 }
@@ -93,6 +94,7 @@ export async function renomearRegiao(
   }
 
   revalidatePath("/regioes");
+  revalidatePath("/configuracoes");
   revalidatePath("/pessoas");
   return { status: "sucesso", mensagem: "Região renomeada." };
 }

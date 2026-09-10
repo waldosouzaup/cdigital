@@ -1,41 +1,44 @@
 import type { ReactNode } from "react";
 
 /**
- * Banner de comunicação e orientação.
- *
- * Segue o princípio de copywriting da skill: tom ativo, explicativo e resolutivo.
- * O erro ou alerta não pede desculpas: explica claramente o que aconteceu e aponta
- * como solucionar o problema.
+ * Banner de comunicação e orientação institucional (§7.4 do DESIGN-SYSTEM.md).
+ * Fundo em tinte pálido sem saturação excessiva, ícone obrigatório e borda semântica.
  */
 export type AlertaTom = "informativo" | "sucesso" | "atencao" | "critico";
 
-const estilos: Record<AlertaTom, { borda: string; fundo: string; titulo: string; icone: string }> =
-  {
-    informativo: {
-      borda: "border-info/30",
-      fundo: "bg-info/5",
-      titulo: "text-info",
-      icone: "ℹ",
-    },
-    sucesso: {
-      borda: "border-success/30",
-      fundo: "bg-success/5",
-      titulo: "text-success",
-      icone: "✓",
-    },
-    atencao: {
-      borda: "border-warning/30",
-      fundo: "bg-warning/5",
-      titulo: "text-warning",
-      icone: "▲",
-    },
-    critico: {
-      borda: "border-alert/30",
-      fundo: "bg-alert/5",
-      titulo: "text-alert",
-      icone: "✕",
-    },
-  };
+const estilos: Record<
+  AlertaTom,
+  { borda: string; bordaLateral: string; fundo: string; titulo: string; icone: string }
+> = {
+  informativo: {
+    borda: "border-line",
+    bordaLateral: "border-l-info",
+    fundo: "bg-info-tint",
+    titulo: "text-info font-semibold",
+    icone: "ℹ",
+  },
+  sucesso: {
+    borda: "border-line",
+    bordaLateral: "border-l-success",
+    fundo: "bg-success-tint",
+    titulo: "text-success font-semibold",
+    icone: "✓",
+  },
+  atencao: {
+    borda: "border-line",
+    bordaLateral: "border-l-warning",
+    fundo: "bg-warning-tint",
+    titulo: "text-warning font-semibold",
+    icone: "▲",
+  },
+  critico: {
+    borda: "border-line",
+    bordaLateral: "border-l-danger",
+    fundo: "bg-danger-tint",
+    titulo: "text-danger font-semibold",
+    icone: "✕",
+  },
+};
 
 export function Alerta({
   tom = "informativo",
@@ -55,20 +58,17 @@ export function Alerta({
   return (
     <div
       role={tom === "critico" ? "alert" : "status"}
-      className={`border-l-2 border-y border-r p-4 text-small transition-colors ${conf.borda} ${conf.fundo} ${className}`}
-      style={{
-        borderLeftColor: `var(--color-${tom === "critico" ? "alert" : tom === "atencao" ? "warning" : tom === "sucesso" ? "success" : "info"})`,
-      }}
+      className={`border border-l-4 p-4 text-small transition-colors ${conf.borda} ${conf.bordaLateral} ${conf.fundo} ${className}`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           {titulo && (
-            <div className={`flex items-center gap-2 font-medium ${conf.titulo}`}>
-              <span className="font-mono text-xs opacity-80">{conf.icone}</span>
+            <div className={`flex items-center gap-2 ${conf.titulo}`}>
+              <span className="font-mono text-xs select-none">{conf.icone}</span>
               <span>{titulo}</span>
             </div>
           )}
-          <div className="text-ink-muted leading-relaxed">{children}</div>
+          <div className="text-ink leading-relaxed">{children}</div>
         </div>
         {acao && <div className="shrink-0">{acao}</div>}
       </div>

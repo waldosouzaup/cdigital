@@ -7,15 +7,22 @@
  */
 "use server";
 
+import { PDFDocument } from "pdf-lib";
+import { randomBytes, createHash } from "node:crypto";
+import { garantirPdfCompleto } from "@/lib/contratos/documento";
+import { listarPessoasAptasSemContratoAtivo } from "./dados";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { obterContextoUsuario } from "@/lib/supabase/contexto-usuario";
 import { registerContractWrite } from "@/lib/auditoria/registrar";
 import { criarUrlAssinada } from "@/lib/documentos/url-assinada";
 import { canTransition, type ContractStatus } from "@/lib/contratos/maquina-estados";
-import { substituirMarcadores } from "@/lib/contratos/marcadores";
-import { gerarPdfContrato, htmlParaTexto } from "@/lib/contratos/gerar-pdf";
+import { gerarPdfContrato } from "@/lib/contratos/gerar-pdf";
 import { amountInWords } from "@/lib/contratos/valor-extenso";
+import {
+  calcularProporcionalDistrato,
+  montarTextoTermoDistrato,
+} from "@/lib/contratos/distrato";
 import { renderizarEmailContratoEnviado } from "@/emails/contrato-enviado";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
@@ -53,6 +60,7 @@ interface DadosParaEmissao {
   nomeCompleto: string;
   cpf: string;
   endereco: string | null;
+  chavePix: string | null;
 }
 
 interface TemplateParaEmissao {
@@ -81,7 +89,7 @@ async function emitirContratoParaPessoa(
   supabase: Awaited<ReturnType<typeof createClient>>,
   organizationId: string,
   userId: string | null,
-  pessoa: DadosParaEmissao,
+  _pessoa: DadosParaEmissao,
   params: ParametrosEmissaoIndividual,
 ): Promise<{ ok: boolean; contractId?: string; mensagem?: string }> {
   const valorExtenso = amountInWords(params.valor);
@@ -105,36 +113,14 @@ async function emitirContratoParaPessoa(
     return { ok: false, mensagem: "Não foi possível criar o contrato." };
   }
 
-  // Nunca digitado (Fase 2, item 8: "valor_extenso vem da biblioteca extenso, nunca
-  // de digitação") — já veio de amountInWords() acima, aqui só monta o PDF.
-  const corpoComDados = substituirMarcadores(params.template.corpoHtml, {
-    nome: pessoa.nomeCompleto,
-    cpf: pessoa.cpf,
-    endereco: pessoa.endereco ?? "não informado",
-    objeto: params.template.objeto,
-    valor: formatarValorBRL(params.valor),
-    valorExtenso,
-    vigenciaInicio: formatarDataBR(params.vigenciaInicio),
-    vigenciaFim: formatarDataBR(params.vigenciaFim),
-  });
-
-  const pdfBytes = await gerarPdfContrato({
-    titulo: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS — ${params.template.objeto.toUpperCase()}`,
-    corpo: htmlParaTexto(corpoComDados),
-  });
-
-  const pdfPath = `${organizationId}/${params.pessoaId}/contrato_${contrato.id}.pdf`;
-  const { error: erroUpload } = await supabase.storage
-    .from("contratos")
-    .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: false });
-
-  if (erroUpload) {
-    // O contrato fica em "rascunho" sem PDF — recuperável (delete e tenta de novo),
-    // melhor que marcar "emitido" com um PDF que não existe.
-    return { ok: false, mensagem: "Contrato criado, mas o PDF não pôde ser gerado." };
+  try {
+    await garantirPdfCompleto(supabase, contrato.id);
+  } catch (erro) {
+    return {
+      ok: false,
+      mensagem: erro instanceof Error ? erro.message : "Não foi possível gerar o PDF.",
+    };
   }
-
-  await supabase.from("contratos").update({ caminho_pdf: pdfPath }).eq("id", contrato.id);
 
   const { error: erroTransicao } = await supabase.rpc("gravar_transicao_contrato", {
     p_contrato_id: contrato.id,
@@ -189,17 +175,32 @@ export async function emitirContrato(
 
   if (!pessoaId) return { status: "erro", mensagem: "Selecione a pessoa." };
 
-  const camposComuns = validarCamposComunsDeEmissao({ templateId, vigenciaInicio, vigenciaFim, valorTexto });
+  const camposComuns = validarCamposComunsDeEmissao({
+    templateId,
+    vigenciaInicio,
+    vigenciaFim,
+    valorTexto,
+  });
   if (!camposComuns.ok) return { status: "erro", mensagem: camposComuns.mensagem };
 
   const supabase = await createClient();
   const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
-  if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
-  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { status: "erro", mensagem: RECUSA_PAPEL_CONTRATO };
+  if (!organizationId)
+    return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? ""))
+    return { status: "erro", mensagem: RECUSA_PAPEL_CONTRATO };
 
   const [{ data: pessoa }, { data: template }] = await Promise.all([
-    supabase.from("pessoas").select("nome_completo, cpf, endereco").eq("id", pessoaId).maybeSingle(),
-    supabase.from("templates_contrato").select("objeto, corpo_html").eq("id", templateId).maybeSingle(),
+    supabase
+      .from("pessoas")
+      .select("nome_completo, cpf, endereco, chave_pix")
+      .eq("id", pessoaId)
+      .maybeSingle(),
+    supabase
+      .from("templates_contrato")
+      .select("objeto, corpo_html")
+      .eq("id", templateId)
+      .maybeSingle(),
   ]);
 
   if (!pessoa) return { status: "erro", mensagem: "Pessoa não encontrada." };
@@ -209,7 +210,12 @@ export async function emitirContrato(
     supabase,
     organizationId,
     userId,
-    { nomeCompleto: pessoa.nome_completo, cpf: pessoa.cpf, endereco: pessoa.endereco },
+    {
+      nomeCompleto: pessoa.nome_completo,
+      cpf: pessoa.cpf,
+      endereco: pessoa.endereco,
+      chavePix: pessoa.chave_pix,
+    },
     {
       pessoaId,
       templateId,
@@ -221,7 +227,10 @@ export async function emitirContrato(
   );
 
   if (!resultado.ok) {
-    return { status: "erro", mensagem: resultado.mensagem ?? "Não foi possível emitir o contrato." };
+    return {
+      status: "erro",
+      mensagem: resultado.mensagem ?? "Não foi possível emitir o contrato.",
+    };
   }
 
   revalidatePath("/contratos");
@@ -246,13 +255,20 @@ export async function emitirContratosEmLote(
     return { status: "erro", mensagem: "Selecione ao menos uma pessoa." };
   }
 
-  const camposComuns = validarCamposComunsDeEmissao({ templateId, vigenciaInicio, vigenciaFim, valorTexto });
+  const camposComuns = validarCamposComunsDeEmissao({
+    templateId,
+    vigenciaInicio,
+    vigenciaFim,
+    valorTexto,
+  });
   if (!camposComuns.ok) return { status: "erro", mensagem: camposComuns.mensagem };
 
   const supabase = await createClient();
   const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
-  if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
-  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { status: "erro", mensagem: RECUSA_PAPEL_CONTRATO };
+  if (!organizationId)
+    return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? ""))
+    return { status: "erro", mensagem: RECUSA_PAPEL_CONTRATO };
 
   const { data: template } = await supabase
     .from("templates_contrato")
@@ -263,7 +279,7 @@ export async function emitirContratosEmLote(
 
   const { data: pessoas } = await supabase
     .from("pessoas")
-    .select("id, nome_completo, cpf, endereco")
+    .select("id, nome_completo, cpf, endereco, chave_pix")
     .in("id", pessoaIds);
   const pessoaPorId = new Map((pessoas ?? []).map((p) => [p.id, p]));
 
@@ -286,7 +302,12 @@ export async function emitirContratosEmLote(
       supabase,
       organizationId,
       userId,
-      { nomeCompleto: pessoa.nome_completo, cpf: pessoa.cpf, endereco: pessoa.endereco },
+      {
+        nomeCompleto: pessoa.nome_completo,
+        cpf: pessoa.cpf,
+        endereco: pessoa.endereco,
+        chavePix: pessoa.chave_pix,
+      },
       {
         pessoaId,
         templateId,
@@ -300,7 +321,10 @@ export async function emitirContratosEmLote(
     if (resultado.ok) {
       sucessos++;
     } else {
-      falhas.push({ pessoaNome: pessoa.nome_completo, motivo: resultado.mensagem ?? "Falha desconhecida." });
+      falhas.push({
+        pessoaNome: pessoa.nome_completo,
+        motivo: resultado.mensagem ?? "Falha desconhecida.",
+      });
     }
   }
 
@@ -345,7 +369,10 @@ async function transicionarContrato(params: {
   });
 
   if (error) {
-    return { ok: false, mensagem: "Não foi possível concluir — o status pode ter mudado. Recarregue a página." };
+    return {
+      ok: false,
+      mensagem: "Não foi possível concluir — o status pode ter mudado. Recarregue a página.",
+    };
   }
 
   await registerContractWrite({
@@ -374,22 +401,52 @@ export async function enviarContrato(
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
   if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL_CONTRATO };
 
-  await supabase
+  if (canal === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destinatario)) {
+    return { ok: false, mensagem: "Informe um e-mail válido." };
+  }
+  const link = await prepararLinkAssinatura(contractId);
+  if (!link.ok || !link.url) return link;
+  const { error: metadataError } = await supabase
     .from("contratos")
     .update({ canal_envio: canal, enviado_para: destinatario })
     .eq("id", contractId);
-
-  const resultado = await transicionarContrato({
-    contractId,
-    de: "emitido",
-    para: "enviado",
-    observacao: `Enviado por ${canal} para ${destinatario}.`,
-  });
-  if (!resultado.ok) return resultado;
-
-  await dispararContratoEnviado({ supabase, organizationId, contractId });
-
-  return resultado;
+  if (metadataError) return { ok: false, mensagem: "Não foi possível registrar o destinatário." };
+  if (canal !== "email")
+    return {
+      ok: true,
+      mensagem:
+        "Link preparado. Use o botão Link de assinatura para copiar e compartilhar com o colaborador.",
+    };
+  const baseUrl = process.env.APP_URL;
+  if (!baseUrl)
+    return {
+      ok: false,
+      mensagem:
+        "Link preparado. Configure APP_URL com o endereço público do sistema para enviar por e-mail. Enquanto isso, copie o link de assinatura.",
+    };
+  try {
+    const envio = await dispararContratoEnviado({
+      supabase,
+      organizationId,
+      contractId,
+      destinatario,
+      urlAssinatura: new URL(link.url, baseUrl).href,
+    });
+    return envio?.sent
+      ? { ok: true, mensagem: "Link de assinatura enviado por e-mail." }
+      : {
+          ok: false,
+          mensagem:
+            envio?.reason === "duplicate"
+              ? "Este envio já foi registrado. Consulte o histórico de notificações."
+              : "O envio do e-mail falhou. Você pode copiar o link de assinatura e compartilhá-lo.",
+        };
+  } catch {
+    return {
+      ok: false,
+      mensagem: "Link preparado, mas não foi possível enviar o e-mail. Copie o link de assinatura.",
+    };
+  }
 }
 
 export async function marcarContratoAssinado(contractId: string): Promise<ResultadoAcaoContrato> {
@@ -408,6 +465,7 @@ export async function marcarContratoAssinado(contractId: string): Promise<Result
 export async function distratarContrato(
   contractId: string,
   motivo: string,
+  dataDistrato?: string,
 ): Promise<ResultadoAcaoContrato> {
   const motivoLimpo = motivo.trim();
   if (!motivoLimpo) return { ok: false, mensagem: "Informe o motivo do distrato." };
@@ -421,7 +479,9 @@ export async function distratarContrato(
 
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("pessoa_id, objeto, valor, valor_extenso, vigencia_inicio, vigencia_fim, pessoas ( nome_completo, cpf )")
+    .select(
+      "pessoa_id, objeto, valor, valor_extenso, vigencia_inicio, vigencia_fim, pessoas ( nome_completo, cpf, endereco )",
+    )
     .eq("id", contractId)
     .maybeSingle<{
       pessoa_id: string;
@@ -430,25 +490,38 @@ export async function distratarContrato(
       valor_extenso: string;
       vigencia_inicio: string;
       vigencia_fim: string;
-      pessoas: { nome_completo: string; cpf: string } | null;
+      pessoas: { nome_completo: string; cpf: string; endereco: string | null } | null;
     }>();
 
   if (!contrato) return { ok: false, mensagem: "Contrato não encontrado." };
 
-  const corpoTermo = [
-    `CONTRATADO(A): ${contrato.pessoas?.nome_completo ?? "—"}, CPF ${contrato.pessoas?.cpf ?? "—"}.`,
-    "",
-    `Fica distratado, a partir desta data, o contrato de ${contrato.objeto}, com vigência original de ` +
-      `${formatarDataBR(contrato.vigencia_inicio)} a ${formatarDataBR(contrato.vigencia_fim)} e valor de ` +
-      `${formatarValorBRL(Number(contrato.valor))} (${contrato.valor_extenso}).`,
-    "",
-    `MOTIVO: ${motivoLimpo}`,
-    "",
-    "O contrato original permanece arquivado, sem alteração, para fins de prestação de contas.",
-  ].join("\n\n");
+  const dataDistratoEfetiva =
+    dataDistrato?.trim() || new Date().toISOString().split("T")[0];
+
+  if (dataDistratoEfetiva < contrato.vigencia_inicio) {
+    return {
+      ok: false,
+      mensagem: `A data do distrato (${formatarDataBR(dataDistratoEfetiva)}) não pode ser anterior ao início da vigência (${formatarDataBR(contrato.vigencia_inicio)}).`,
+    };
+  }
+
+  const calculo = calcularProporcionalDistrato({
+    vigenciaInicio: contrato.vigencia_inicio,
+    vigenciaFim: contrato.vigencia_fim,
+    dataDistrato: dataDistratoEfetiva,
+    valor: Number(contrato.valor),
+  });
+
+  const corpoTermo = montarTextoTermoDistrato({
+    contratadoNome: contrato.pessoas?.nome_completo ?? "—",
+    contratadoCpf: contrato.pessoas?.cpf ?? "—",
+    contratadoEndereco: contrato.pessoas?.endereco ?? null,
+    motivo: motivoLimpo,
+    calculo,
+  });
 
   const pdfBytes = await gerarPdfContrato({
-    titulo: "TERMO DE DISTRATO",
+    titulo: "RESCISÃO DE CONTRATO DE PRESTAÇÃO DE SERVIÇOS",
     corpo: corpoTermo,
   });
 
@@ -461,13 +534,17 @@ export async function distratarContrato(
     return { ok: false, mensagem: "Não foi possível gerar o termo de distrato. Tente de novo." };
   }
 
-  await supabase.from("contratos").update({ caminho_termo_distrato: caminhoTermo }).eq("id", contractId);
+  await supabase
+    .from("contratos")
+    .update({ caminho_termo_distrato: caminhoTermo })
+    .eq("id", contractId);
 
+  const valorFormatado = formatarValorBRL(calculo.valorProporcional);
   return transicionarContrato({
     contractId,
     de: "assinado",
     para: "distratado",
-    observacao: `Distrato registrado pela coordenação. Motivo: ${motivoLimpo}`,
+    observacao: `Distrato registrado pela coordenação. Período trabalhado: ${calculo.vigenciaInicioFormatada} a ${calculo.dataDistratoFormatada} (${calculo.diasTrabalhados}/${calculo.diasTotais} dias). Valor proporcional: ${valorFormatado}. Motivo: ${motivoLimpo}`,
   });
 }
 
@@ -487,6 +564,8 @@ async function dispararContratoEnviado(params: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   organizationId: string;
   contractId: string;
+  destinatario: string;
+  urlAssinatura: string;
 }) {
   const { supabase, organizationId, contractId } = params;
 
@@ -494,9 +573,12 @@ async function dispararContratoEnviado(params: {
     .from("contratos")
     .select("objeto, pessoas ( nome_completo, email )")
     .eq("id", contractId)
-    .maybeSingle<{ objeto: string; pessoas: { nome_completo: string; email: string | null } | null }>();
+    .maybeSingle<{
+      objeto: string;
+      pessoas: { nome_completo: string; email: string | null } | null;
+    }>();
 
-  if (!contrato?.pessoas?.email) return;
+  if (!contrato?.pessoas) return;
 
   const baseUrl = process.env.APP_URL || "http://localhost:3000";
   const primeiroNome = contrato.pessoas.nome_completo.split(" ")[0];
@@ -504,6 +586,7 @@ async function dispararContratoEnviado(params: {
     primeiroNome,
     objeto: contrato.objeto,
     urlContato: baseUrl,
+    urlAssinatura: params.urlAssinatura,
   });
 
   // Chave determinística por contrato (Seção 6, regra 1) — "disparar contrato_enviado
@@ -511,15 +594,15 @@ async function dispararContratoEnviado(params: {
   // botão de envio já é bloqueado pela trava otimista da RPC (o contrato não está
   // mais em "emitido"), e mesmo que chegasse aqui, o índice único de
   // chave_idempotencia recusaria o segundo insert.
-  await sendNotification({
+  return sendNotification({
     supabase,
     transport: transporteEmailPadrao(),
     organizationId,
     type: "contrato_enviado",
-    recipientEmail: contrato.pessoas.email,
+    recipientEmail: params.destinatario,
     entity: "contratos",
     entityId: contractId,
-    idempotencyKey: idempotencyKey("contrato_enviado", contractId),
+    idempotencyKey: `${idempotencyKey("contrato_enviado", contractId)}:${createHash("sha256").update(params.urlAssinatura).digest("hex").slice(0, 16)}`,
     subject,
     html,
     text,
@@ -529,11 +612,21 @@ async function dispararContratoEnviado(params: {
 export async function gerarUrlPdfContrato(
   contractId: string,
   versao: "gerado" | "assinado" | "distrato" = "gerado",
-): Promise<{ ok: boolean; url?: string; mensagem?: string }> {
+): Promise<{ ok: boolean; url?: string; texto?: string; mensagem?: string }> {
   const supabase = await createClient();
   const { organizationId, userId } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
 
+  if (versao === "gerado") {
+    try {
+      await garantirPdfCompleto(supabase, contractId);
+    } catch (erro) {
+      return {
+        ok: false,
+        mensagem: erro instanceof Error ? erro.message : "Não foi possível gerar o termo.",
+      };
+    }
+  }
   const { data: contrato } = await supabase
     .from("contratos")
     .select("caminho_pdf, caminho_pdf_assinado, caminho_termo_distrato")
@@ -565,8 +658,114 @@ export async function gerarUrlPdfContrato(
       organizationId,
       userId,
     });
-    return { ok: true, url };
+    let texto: string | undefined;
+    if (versao === "gerado") {
+      const { data: arquivo } = await supabase.storage.from("contratos").download(caminho);
+      if (arquivo) texto = (await PDFDocument.load(await arquivo.arrayBuffer())).getSubject();
+    }
+    return { ok: true, url, texto };
   } catch {
     return { ok: false, mensagem: "Não foi possível gerar o link de acesso ao PDF." };
   }
 }
+
+export async function carregarPessoasParaEmissao() {
+  try {
+    return { ok: true as const, pessoas: await listarPessoasAptasSemContratoAtivo() };
+  } catch {
+    return { ok: false as const, mensagem: "Não foi possível carregar as pessoas aptas." };
+  }
+}
+
+export async function prepararLinkAssinatura(
+  contractId: string,
+): Promise<{ ok: boolean; url?: string; mensagem?: string }> {
+  const supabase = await createClient();
+  const { organizationId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId || !PAPEIS_CONTRATO.includes(papel ?? ""))
+    return { ok: false, mensagem: RECUSA_PAPEL_CONTRATO };
+  const { data: c } = await supabase
+    .from("contratos")
+    .select("status,token_assinatura,assinatura_expira_em")
+    .eq("id", contractId)
+    .single();
+  if (!c || !["emitido", "enviado"].includes(c.status))
+    return { ok: false, mensagem: "O contrato precisa estar emitido ou enviado." };
+  try {
+    await garantirPdfCompleto(supabase, contractId);
+  } catch (erro) {
+    return {
+      ok: false,
+      mensagem: erro instanceof Error ? erro.message : "Não foi possível preparar o PDF.",
+    };
+  }
+  let token = c.token_assinatura as string | null;
+  if (
+    !token ||
+    !c.assinatura_expira_em ||
+    new Date(c.assinatura_expira_em).getTime() <= Date.now()
+  ) {
+    token = randomBytes(24).toString("hex");
+    let update = supabase
+      .from("contratos")
+      .update({
+        token_assinatura: token,
+        assinatura_expira_em: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .eq("id", contractId)
+      .in("status", ["emitido", "enviado"]);
+    update = c.token_assinatura
+      ? update.eq("token_assinatura", c.token_assinatura)
+      : update.is("token_assinatura", null);
+    const { data: gravado, error } = await update.select("id").maybeSingle();
+    if (error || !gravado)
+      return { ok: false, mensagem: "O contrato mudou. Tente preparar o link novamente." };
+  }
+  if (c.status === "emitido") {
+    const transicao = await transicionarContrato({
+      contractId,
+      de: "emitido",
+      para: "enviado",
+      observacao: "Link de assinatura preparado para compartilhamento.",
+    });
+    if (!transicao.ok) return transicao;
+  }
+  revalidatePath("/contratos");
+  return { ok: true, url: `/assinar/${token}` };
+}
+
+/**
+ * Exclui o contrato do painel, apagando o registro das listas ativas/distratos
+ * para não confundir o administrador, e arquiva o snapshot integral do contrato,
+ * pessoa e eventos na tabela DadosExcluidos (dados_excluidos) com nome e login
+ * de quem executou a exclusão.
+ */
+export async function excluirContrato(
+  contractId: string,
+  motivo?: string,
+): Promise<ResultadoAcaoContrato> {
+  const supabase = await createClient();
+  const { organizationId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_CONTRATO.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL_CONTRATO };
+
+  const { error } = await supabase.rpc("excluir_contrato", {
+    p_contrato_id: contractId,
+    p_motivo: motivo?.trim() || null,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      mensagem: error.message || "Não foi possível excluir o contratado.",
+    };
+  }
+
+  revalidatePath("/contratos");
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    mensagem: "Contratado excluído do painel e arquivado em DadosExcluidos com sucesso.",
+  };
+}
+

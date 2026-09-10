@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computarFunil, computarMatrizObjetoStatus } from "@/lib/dashboard/agregacoes";
+import {
+  computarFunil,
+  computarMatrizObjetoStatus,
+  computarResumoRegional,
+} from "@/lib/dashboard/agregacoes";
 
 /**
  * Fase 3, item 1: "Painel consolidado reproduzindo a matriz categoria × status...
@@ -83,5 +87,50 @@ describe("computarFunil", () => {
 
   it("sem nenhuma pessoa: todos os estágios zerados", () => {
     expect(computarFunil([])).toEqual({ cadastrado: 0, apto: 0, emitido: 0, enviado: 0, assinado: 0 });
+  });
+});
+
+describe("computarResumoRegional", () => {
+  it("conta PESSOAS distintas e o % de conclusão pelo contrato mais recente", () => {
+    const r = computarResumoRegional([
+      { apta: true, statusContrato: "assinado" },
+      { apta: true, statusContrato: "assinado" },
+      { apta: true, statusContrato: "enviado" },
+      { apta: false, statusContrato: null },
+    ]);
+    expect(r.totalPessoas).toBe(4);
+    expect(r.pessoasAptas).toBe(3);
+    expect(r.pessoasComContratoAtivo).toBe(3); // 2 assinado + 1 enviado
+    expect(r.pessoasComContratoAssinado).toBe(2);
+    expect(r.conclusaoPct).toBe(50); // 2/4
+  });
+
+  it("100% aptas mas contrato não assinado NÃO é 100% de conclusão", () => {
+    const r = computarResumoRegional([
+      { apta: true, statusContrato: "emitido" },
+      { apta: true, statusContrato: "enviado" },
+    ]);
+    expect(r.pessoasAptas).toBe(2);
+    expect(r.pessoasComContratoAssinado).toBe(0);
+    expect(r.conclusaoPct).toBe(0);
+  });
+
+  it("contrato distratado (mais recente) não conta como assinado", () => {
+    const r = computarResumoRegional([
+      { apta: true, statusContrato: "distratado" },
+      { apta: true, statusContrato: "assinado" },
+    ]);
+    expect(r.pessoasComContratoAssinado).toBe(1);
+    expect(r.conclusaoPct).toBe(50);
+  });
+
+  it("região sem ninguém: conclusaoPct é null, não 0 (Seção 11)", () => {
+    expect(computarResumoRegional([])).toEqual({
+      totalPessoas: 0,
+      pessoasAptas: 0,
+      pessoasComContratoAtivo: 0,
+      pessoasComContratoAssinado: 0,
+      conclusaoPct: null,
+    });
   });
 });
