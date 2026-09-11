@@ -27,7 +27,18 @@ const ROTAS_PUBLICAS = [
 // o service worker, o manifesto, os ícones e a página de fallback offline. Sem
 // isso o middleware responde 307 → /login e o app não fica instalável nem abre
 // offline.
-const RECURSOS_PWA = ["/sw.js", "/manifest.webmanifest", "/offline", "/icons/"];
+const RECURSOS_PWA = [
+  "/sw.js",
+  "/manifest.webmanifest",
+  "/offline",
+  "/icons/",
+  "/favicon.ico",
+  "/favicon.svg",
+  "/icon",
+  "/icon.png",
+  "/apple-icon",
+  "/apple-icon.png",
+];
 
 // A landing (`/`) é pública, mas com correspondência exata — `startsWith("/")` pegaria
 // o site inteiro.

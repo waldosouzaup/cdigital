@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="primary-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3ED18C" />
+      <stop offset="100%" stop-color="#2FBF83" />
+    </linearGradient>
+    <linearGradient id="lime-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D6E85F" />
+      <stop offset="100%" stop-color="#C4D830" />
+    </linearGradient>
+    <radialGradient id="emblem-glow" cx="45%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#2FBF83" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="#2FBF83" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Fundo dark emerald (ink-900 oficial) -->
+  <rect width="512" height="512" rx="112" fill="#0C1512" />
+  
+  
+  <!-- Brilho radial sutil -->
+  <circle cx="256" cy="256" r="230" fill="url(#emblem-glow)" />
+  <!-- Borda de destaque sutil -->
+  <rect x="7" y="7" width="498" height="498" rx="105" fill="none" stroke="#2FBF83" stroke-width="7" stroke-opacity="0.25" />
+  
+
+  <!-- Marca oficial: cd + • -->
+  <g >
+    <text x="96" y="352"
+      font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Liberation Sans', 'Helvetica Neue', Arial, sans-serif"
+      font-weight="900"
+      font-size="246"
+      letter-spacing="-14"
+      fill="url(#primary-grad)">cd</text>
+    <circle cx="398" cy="324" r="26" fill="url(#lime-grad)" />
+  </g>
+</svg>
