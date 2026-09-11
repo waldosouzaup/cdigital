@@ -6,8 +6,10 @@
 import { createResendTransport, type EmailTransport } from "./transporte";
 
 export function transporteEmailPadrao(): EmailTransport {
-  return createResendTransport(
-    process.env.RESEND_API_KEY ?? "",
-    process.env.RESEND_FROM ?? "Comitê Digital <nao-responda@exemplo.invalid>",
-  );
+  const apiKey = process.env.RESEND_API_KEY ?? "";
+  const from =
+    (process.env.RESEND_FROM || "").trim() ||
+    "Comitê Digital <contato@tripfriends.com.br>";
+
+  return createResendTransport(apiKey, from);
 }

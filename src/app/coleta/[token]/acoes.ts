@@ -75,6 +75,9 @@ export async function enviarDadosColeta(
     p_ip: ip,
     p_geolocalizacao: geolocalizacao,
     p_user_agent: userAgent,
+    p_banco: bancoInformado,
+    p_agencia: agenciaInformada,
+    p_conta: contaInformada,
   });
 
   if (error) {

@@ -3,6 +3,7 @@
  * Nenhum dado sensível (CPF, endereço, valor) entra no corpo — Regra 7 e NFR de
  * e-mail (Seção 10).
  */
+import * as React from "react";
 import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
 
 interface LinkColetaEmailProps {

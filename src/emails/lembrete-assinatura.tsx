@@ -3,6 +3,7 @@
  * Contratado, com cópia ao coordenador | Lembrete." Regra 7: nada além do
  * primeiro nome e do objeto; o dado fica no painel, atrás de autenticação.
  */
+import * as React from "react";
 import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
 
 interface LembreteAssinaturaEmailProps {

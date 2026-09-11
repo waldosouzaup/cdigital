@@ -27,12 +27,28 @@ export function createResendTransport(apiKey: string, from: string): EmailTransp
     };
   }
 
+  // Remove aspas envolventes caso o ambiente preserve aspas literais
+  const remetenteLimpo = from.trim().replace(/^["']|["']$/g, "").trim();
+  if (!remetenteLimpo) {
+    return {
+      async send() {
+        return { ok: false, error: "resend_from_ausente" };
+      },
+    };
+  }
+
   const resend = new Resend(apiKey);
 
   return {
     async send({ to, subject, html, text }) {
       try {
-        const { data, error } = await resend.emails.send({ from, to, subject, html, text });
+        const { data, error } = await resend.emails.send({
+          from: remetenteLimpo,
+          to,
+          subject,
+          html,
+          text,
+        });
 
         if (error || !data) {
           const detalhe = error?.message

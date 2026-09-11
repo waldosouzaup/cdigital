@@ -3,6 +3,7 @@
  * Gestor | O que mudou em 24 h e pendências críticas." Regra 7: só números
  * agregados e link para o painel — nenhum nome, CPF ou valor.
  */
+import * as React from "react";
 import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
 
 export interface ResumoDiarioNumeros {

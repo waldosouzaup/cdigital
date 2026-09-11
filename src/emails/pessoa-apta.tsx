@@ -4,6 +4,7 @@
  * contratado — por isso o conteúdo pode nomear a pessoa (não é dado sensível dela
  * mesma sendo enviado a ela).
  */
+import * as React from "react";
 import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
 
 interface PessoaAptaEmailProps {

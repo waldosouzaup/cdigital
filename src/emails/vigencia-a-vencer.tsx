@@ -3,6 +3,7 @@
  * coord. do comitê | Quantidade e link para a lista." Regra 7: sem valor de
  * contrato, sem dado da pessoa — só objeto, prazo e link para a lista no painel.
  */
+import * as React from "react";
 import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
 
 interface VigenciaAVencerEmailProps {

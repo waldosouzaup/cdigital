@@ -84,6 +84,43 @@ export function ColetaCliente({
     ESTADO_INICIAL_ENVIAR_DADOS,
   );
 
+  function validarCamposEtapa1(): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null {
+    if (!formRef.current) return null;
+    const camposObrigatorios = formRef.current.querySelectorAll<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >("#rg, #dataNascimento, #cep, #endereco, #email, #telefone, #chavePix");
+
+    for (const campo of camposObrigatorios) {
+      if (!campo.checkValidity()) {
+        return campo;
+      }
+    }
+    return null;
+  }
+
+  function avancarParaEtapa2() {
+    const campoInvalido = validarCamposEtapa1();
+    if (campoInvalido) {
+      campoInvalido.reportValidity();
+      campoInvalido.focus();
+      return;
+    }
+    setEtapa(2);
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    const campoInvalido = validarCamposEtapa1();
+    if (campoInvalido) {
+      e.preventDefault();
+      setEtapa(1);
+      setTimeout(() => {
+        campoInvalido.reportValidity();
+        campoInvalido.focus();
+      }, 50);
+      return;
+    }
+  }
+
   if (estado.status === "sucesso") {
     return (
       <TelaSucesso
@@ -273,6 +310,8 @@ export function ColetaCliente({
         <form
           ref={formRef}
           action={formAction}
+          onSubmit={handleSubmit}
+          noValidate
           className="space-y-6"
           onFocusCapture={registrarInicioPreenchimento}
           onChangeCapture={registrarInicioPreenchimento}
@@ -391,11 +430,10 @@ export function ColetaCliente({
                   rotulo="Banco"
                   id="banco"
                   name="banco"
-                  required
                   value={banco}
                   onChange={(e) => setBanco(e.target.value)}
                   placeholder="Ex: 001 - Banco do Brasil, 260 - Nubank, Caixa, Itaú"
-                  auxiliar="Nome ou número do banco onde você possui conta."
+                  auxiliar="Opcional. Preencha se desejar receber por transferência bancária tradicional."
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -403,19 +441,19 @@ export function ColetaCliente({
                     rotulo="Agência"
                     id="agencia"
                     name="agencia"
-                    required
                     value={agencia}
                     onChange={(e) => setAgencia(e.target.value)}
                     placeholder="Ex: 0001 ou 1234-5"
+                    auxiliar="Opcional."
                   />
                   <Campo
                     rotulo="Conta Corrente (com dígito)"
                     id="conta"
                     name="conta"
-                    required
                     value={conta}
                     onChange={(e) => setConta(e.target.value)}
                     placeholder="Ex: 12345-6"
+                    auxiliar="Opcional."
                   />
                 </div>
 
@@ -438,7 +476,7 @@ export function ColetaCliente({
                 type="button"
                 voz="selo"
                 className="w-full py-3.5 text-base"
-                onClick={() => setEtapa(2)}
+                onClick={avancarParaEtapa2}
               >
                 Continuar para documentação →
               </Selo>

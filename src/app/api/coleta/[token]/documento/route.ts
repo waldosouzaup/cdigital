@@ -20,7 +20,7 @@ import {
 import { renderizarEmailDocumentoRejeitado } from "@/emails/documento-rejeitado";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
-import { createResendTransport } from "@/lib/notificacoes/transporte";
+import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
 
 export const runtime = "nodejs";
 
@@ -172,10 +172,7 @@ async function dispararDocumentoRejeitado(params: {
     urlReenvio: `${baseUrl}/coleta/${params.token}`,
   });
 
-  const transporte = createResendTransport(
-    process.env.RESEND_API_KEY ?? "",
-    process.env.RESEND_FROM ?? "Comitê Digital <nao-responda@exemplo.invalid>",
-  );
+  const transporte = transporteEmailPadrao();
 
   await sendNotification({
     supabase: params.supabase,

@@ -3,6 +3,7 @@
  * simples e link para reenviar". Mesmo cuidado do link_coleta: nada sensível no
  * corpo (Regra 7).
  */
+import * as React from "react";
 import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
 
 interface DocumentoRejeitadoEmailProps {
