@@ -43,10 +43,20 @@ describe("substituirMarcadores", () => {
     );
   });
 
-  it("nunca deixa um marcador sem substituir quando todos os dados estão presentes", () => {
+  it("substitui os campos de contato e pagamento (email, telefone, banco, agencia, conta)", () => {
     const corpo =
-      "{{nome}} {{cpf}} {{endereco}} {{chave_pix}} {{objeto}} {{valor}} {{valor_extenso}} {{vigencia_inicio}} {{vigencia_fim}}";
-    const resultado = substituirMarcadores(corpo, dados);
-    expect(resultado).not.toMatch(/\{\{.*\}\}/);
+      "E-mail: {{email}} | Telefone: {{telefone}} | Banco: {{banco}} | Agência: {{agencia}} | Conta: {{conta}} | Pix: {{chave_pix}}";
+    const resultado = substituirMarcadores(corpo, {
+      ...dados,
+      email: "contato@exemplo.com",
+      telefone: "(61) 98888-7777",
+      banco: "001 - Banco do Brasil",
+      agencia: "1234-5",
+      conta: "98765-4",
+    });
+
+    expect(resultado).toBe(
+      "E-mail: contato@exemplo.com | Telefone: (61) 98888-7777 | Banco: 001 - Banco do Brasil | Agência: 1234-5 | Conta: 98765-4 | Pix: ana.fagundes@exemplo.invalid",
+    );
   });
 });

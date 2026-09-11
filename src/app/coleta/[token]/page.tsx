@@ -47,12 +47,43 @@ export default async function ColetaPublicaPage({
     );
   }
 
+  let dadosIniciais:
+    | {
+        email?: string;
+        telefone?: string;
+        banco?: string;
+        agencia?: string;
+        conta?: string;
+        chavePix?: string;
+      }
+    | undefined = undefined;
+
+  if (data.pessoa_id) {
+    const { data: pessoa } = await supabase
+      .from("pessoas")
+      .select("telefone, email, banco, agencia, conta, chave_pix")
+      .eq("id", data.pessoa_id)
+      .maybeSingle();
+
+    if (pessoa) {
+      dadosIniciais = {
+        email: pessoa.email ?? data.pessoa_email ?? undefined,
+        telefone: pessoa.telefone ?? undefined,
+        banco: pessoa.banco ?? undefined,
+        agencia: pessoa.agencia ?? undefined,
+        conta: pessoa.conta ?? undefined,
+        chavePix: pessoa.chave_pix ?? undefined,
+      };
+    }
+  }
+
   return (
     <ColetaCliente
       token={token}
       primeiroNome={data.primeiro_nome}
       organizacaoNome={data.organizacao_nome}
       emailInicial={data.pessoa_email ?? undefined}
+      dadosIniciais={dadosIniciais}
     />
   );
 }

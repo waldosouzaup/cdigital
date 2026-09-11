@@ -100,7 +100,7 @@ export async function aprovarDocumentoEGerarContrato(
   // 3. Busca dados cadastrais completos da pessoa
   const { data: pessoa } = await supabase
     .from("pessoas")
-    .select("id, nome_completo, cpf, endereco, chave_pix, funcao, email, regiao_id")
+    .select("id, nome_completo, cpf, endereco, chave_pix, funcao, email, telefone, banco, agencia, conta, regiao_id")
     .eq("id", documento.pessoa_id)
     .single();
 
@@ -188,6 +188,11 @@ export async function aprovarDocumentoEGerarContrato(
       cpf: pessoa.cpf,
       endereco: pessoa.endereco ?? "não informado",
       chavePix: pessoa.chave_pix ?? "não informada",
+      email: pessoa.email ?? "não informado",
+      telefone: pessoa.telefone ?? "não informado",
+      banco: pessoa.banco ?? "não informado",
+      agencia: pessoa.agencia ?? "não informada",
+      conta: pessoa.conta ?? "não informada",
       objeto: templateEscolhido.objeto,
       valor: formatarValorBRL(valor),
       valorExtenso,

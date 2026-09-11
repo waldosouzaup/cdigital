@@ -25,11 +25,20 @@ export function ColetaCliente({
   primeiroNome,
   organizacaoNome,
   emailInicial,
+  dadosIniciais,
 }: {
   token: string;
   primeiroNome: string;
   organizacaoNome: string;
   emailInicial?: string;
+  dadosIniciais?: {
+    email?: string;
+    telefone?: string;
+    banco?: string;
+    agencia?: string;
+    conta?: string;
+    chavePix?: string;
+  };
 }) {
   const { geolocalizacao, registrarInicioPreenchimento } = useAuditoriaColeta({
     token,
@@ -38,6 +47,14 @@ export function ColetaCliente({
   const [etapa, setEtapa] = useState<1 | 2 | 3>(1);
   const [consentimento, setConsentimento] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Etapa 1 — Contato e Pagamento
+  const [email, setEmail] = useState(dadosIniciais?.email ?? emailInicial ?? "");
+  const [telefone, setTelefone] = useState(dadosIniciais?.telefone ?? "");
+  const [banco, setBanco] = useState(dadosIniciais?.banco ?? "");
+  const [agencia, setAgencia] = useState(dadosIniciais?.agencia ?? "");
+  const [conta, setConta] = useState(dadosIniciais?.conta ?? "");
+  const [chavePix, setChavePix] = useState(dadosIniciais?.chavePix ?? "");
 
   // Etapa 1 — Endereço e CEP (autocompletar via ViaCEP)
   const [cep, setCep] = useState("");
@@ -333,25 +350,87 @@ export function ColetaCliente({
                     : "Rua/Avenida, número, complemento e bairro."
                 }
               />
-              <Campo
-                rotulo="E-mail para confirmação e contrato"
-                id="email"
-                name="email"
-                type="email"
-                required
-                defaultValue={emailInicial}
-                placeholder="seu.email@exemplo.com"
-                auxiliar="Enviaremos a confirmação do cadastro, protocolo e o contrato para este e-mail."
-              />
-              <Campo
-                rotulo="Chave PIX para pagamento"
-                id="chavePix"
-                name="chavePix"
-                required
-                maxLength={140}
-                placeholder="CPF, e-mail, telefone ou chave aleatória"
-                auxiliar="Os pagamentos são feitos por PIX nesta chave."
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Campo
+                  rotulo="E-mail para confirmação e contrato"
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu.email@exemplo.com"
+                  auxiliar="Enviaremos a confirmação e o contrato para este e-mail."
+                />
+                <Campo
+                  rotulo="Telefone (WhatsApp)"
+                  id="telefone"
+                  name="telefone"
+                  type="tel"
+                  required
+                  inputMode="tel"
+                  value={telefone}
+                  onChange={(e) => setTelefone(e.target.value)}
+                  placeholder="(61) 90000-0000"
+                  auxiliar="Número de celular para contato oficial da campanha."
+                />
+              </div>
+
+              {/* DADOS BANCÁRIOS E PAGAMENTO */}
+              <div className="pt-3 border-t border-line/70 space-y-4">
+                <div className="space-y-0.5">
+                  <h3 className="text-small font-semibold text-ink">
+                    Dados para Pagamento (Transferência ou PIX)
+                  </h3>
+                  <p className="text-xs text-ink-muted">
+                    Conforme exigência da Justiça Eleitoral, os pagamentos são feitos exclusivamente em conta de titularidade do contratado.
+                  </p>
+                </div>
+
+                <Campo
+                  rotulo="Banco"
+                  id="banco"
+                  name="banco"
+                  required
+                  value={banco}
+                  onChange={(e) => setBanco(e.target.value)}
+                  placeholder="Ex: 001 - Banco do Brasil, 260 - Nubank, Caixa, Itaú"
+                  auxiliar="Nome ou número do banco onde você possui conta."
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Campo
+                    rotulo="Agência"
+                    id="agencia"
+                    name="agencia"
+                    required
+                    value={agencia}
+                    onChange={(e) => setAgencia(e.target.value)}
+                    placeholder="Ex: 0001 ou 1234-5"
+                  />
+                  <Campo
+                    rotulo="Conta Corrente (com dígito)"
+                    id="conta"
+                    name="conta"
+                    required
+                    value={conta}
+                    onChange={(e) => setConta(e.target.value)}
+                    placeholder="Ex: 12345-6"
+                  />
+                </div>
+
+                <Campo
+                  rotulo="Chave PIX para pagamento"
+                  id="chavePix"
+                  name="chavePix"
+                  required
+                  maxLength={140}
+                  value={chavePix}
+                  onChange={(e) => setChavePix(e.target.value)}
+                  placeholder="CPF, e-mail, telefone ou chave aleatória"
+                  auxiliar="Chave vinculada à sua conta corrente para pagamentos instantâneos."
+                />
+              </div>
             </div>
 
             <div className="pt-2">
@@ -578,6 +657,42 @@ export function ColetaCliente({
                 Confira se os dados e os documentos anexados nas etapas anteriores estão corretos antes de
                 concluir o envio.
               </p>
+            </div>
+
+            {/* Resumo dos Dados de Contato e Pagamento */}
+            <div className="border border-line bg-surface/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[0.7rem] uppercase tracking-wider text-ink-muted">
+                  Dados de Contato e Pagamento
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEtapa(1)}
+                  className="text-xs text-seal hover:underline cursor-pointer"
+                >
+                  Editar dados
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-ink-muted block text-[0.7rem]">E-mail:</span>
+                  <span className="text-ink font-medium break-all">{email || "não informado"}</span>
+                </div>
+                <div>
+                  <span className="text-ink-muted block text-[0.7rem]">Telefone:</span>
+                  <span className="text-ink font-medium">{telefone || "não informado"}</span>
+                </div>
+                <div>
+                  <span className="text-ink-muted block text-[0.7rem]">Banco / Agência / Conta:</span>
+                  <span className="text-ink font-medium">
+                    {banco ? `${banco} · Ag: ${agencia || "—"} · CC: ${conta || "—"}` : "não informado"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-ink-muted block text-[0.7rem]">Chave Pix:</span>
+                  <span className="text-ink font-medium font-mono break-all">{chavePix || "não informada"}</span>
+                </div>
+              </div>
             </div>
 
             {/* Resumo dos documentos anexados */}

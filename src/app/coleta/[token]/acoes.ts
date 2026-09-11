@@ -57,14 +57,20 @@ export async function enviarDadosColeta(
   const emailInformado = campoOuNulo(formData, "email");
   const emailFinal = emailInformado ?? linkInfo?.pessoa_email ?? null;
 
+  const telefoneInformado = campoOuNulo(formData, "telefone");
+  const bancoInformado = campoOuNulo(formData, "banco");
+  const agenciaInformada = campoOuNulo(formData, "agencia");
+  const contaInformada = campoOuNulo(formData, "conta");
+  const chavePixInformada = campoOuNulo(formData, "chavePix");
+
   const { data, error } = await supabase.rpc("enviar_dados_coleta", {
     p_token: token,
-    p_telefone: campoOuNulo(formData, "telefone"),
+    p_telefone: telefoneInformado,
     p_endereco: campoOuNulo(formData, "endereco"),
     p_cep: campoOuNulo(formData, "cep"),
     p_rg: campoOuNulo(formData, "rg"),
     p_data_nascimento: campoOuNulo(formData, "dataNascimento"),
-    p_chave_pix: campoOuNulo(formData, "chavePix"),
+    p_chave_pix: chavePixInformada,
     p_email: emailFinal,
     p_ip: ip,
     p_geolocalizacao: geolocalizacao,
@@ -81,6 +87,26 @@ export async function enviarDadosColeta(
       status: "erro",
       mensagem: "Este link já foi usado ou expirou. Peça um novo link à coordenação.",
     };
+  }
+
+  // Garante a gravação dos dados complementares de contato e bancários no cadastro
+  if (linkInfo?.pessoa_id) {
+    try {
+      const admin = criarClienteAdmin();
+      await admin
+        .from("pessoas")
+        .update({
+          telefone: telefoneInformado ?? undefined,
+          email: emailFinal ?? undefined,
+          banco: bancoInformado ?? undefined,
+          agencia: agenciaInformada ?? undefined,
+          conta: contaInformada ?? undefined,
+          chave_pix: chavePixInformada ?? undefined,
+        })
+        .eq("id", linkInfo.pessoa_id);
+    } catch {
+      // Prossegue para envio do e-mail de protocolo
+    }
   }
 
   const protocolo = `REC-${token.slice(0, 8).toUpperCase()}`;

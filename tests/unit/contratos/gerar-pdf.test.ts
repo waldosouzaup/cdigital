@@ -49,4 +49,35 @@ describe("gerarPdfContrato", () => {
     const bytesUmaPagina = await gerarPdfContrato({ titulo: "CURTO", corpo: "Texto curto." });
     expect(bytes.length).toBeGreaterThan(bytesUmaPagina.length);
   });
+
+  it("diagrama o modelo padrão com exatamente 2 páginas e blocos profissionais", async () => {
+    const { MODELO_REFERENCIA_MICHELLE } = await import("@/lib/contratos/modelo-referencia");
+    const { substituirMarcadores } = await import("@/lib/contratos/marcadores");
+    const { PDFDocument } = await import("pdf-lib");
+
+    const preenchido = substituirMarcadores(MODELO_REFERENCIA_MICHELLE, {
+      nome: "Guilherme Ribeiro",
+      cpf: "03597602100",
+      endereco: "Rua Alexandre Salgado, nº 10, Setor Tradicional (Planaltina), Brasília - DF",
+      chavePix: "31988447394",
+      email: "guilherme@exemplo.com",
+      telefone: "(61) 99116-1800",
+      banco: "001 - Banco do Brasil",
+      agencia: "1234-5",
+      conta: "98765-4",
+      objeto: "Administrativo Homeoffice",
+      valor: "R$ 2.200,00",
+      valorExtenso: "dois mil e duzentos reais",
+      vigenciaInicio: "01/09/2026",
+      vigenciaFim: "03/10/2026",
+    });
+
+    const bytes = await gerarPdfContrato({
+      titulo: "CONTRATO DE PRESTAÇÃO DE SERVIÇOS — ADMINISTRATIVO HOMEOFFICE",
+      corpo: htmlParaTexto(preenchido),
+    });
+
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(2);
+  });
 });

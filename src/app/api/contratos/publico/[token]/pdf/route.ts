@@ -60,6 +60,10 @@ export async function GET(
       },
     );
   }
+  const nomeArquivo = nomeArquivoContrato(contrato.nome_completo, contrato.contrato_id);
+  const querDownload = request.nextUrl.searchParams.has("download");
+  const dispositionType = querDownload ? "attachment" : "inline";
+
   return new Response(buffer, {
     status: 200,
     headers: {
@@ -67,7 +71,7 @@ export async function GET(
       "X-Documento-SHA256": sha256(new Uint8Array(buffer)),
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
-      "Content-Disposition": `inline; filename="${nomeArquivoContrato(contrato.nome_completo, contrato.contrato_id)}"`,
+      "Content-Disposition": `${dispositionType}; filename="${nomeArquivo}"; filename*=UTF-8''${encodeURIComponent(nomeArquivo)}`,
       "Cache-Control": "private, no-cache, no-store, must-revalidate",
     },
   });
