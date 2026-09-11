@@ -106,6 +106,7 @@ export function CapturaFoto({
   dica,
   numero = 1,
   etiqueta = "Identificação facial",
+  imagemOrientacao,
 }: {
   aoAlterar: (arquivo: Blob | null) => void;
   desabilitado: boolean;
@@ -114,6 +115,7 @@ export function CapturaFoto({
   dica?: string;
   numero?: number;
   etiqueta?: string;
+  imagemOrientacao?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -228,6 +230,27 @@ export function CapturaFoto({
       {dica && (
         <div className="text-xs text-seal bg-surface border-l-2 border-seal pl-2.5 py-1 leading-normal">
           <strong>Atenção:</strong> {dica}
+        </div>
+      )}
+
+      {imagemOrientacao && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5 p-3.5 bg-surface rounded-lg border border-line">
+          <div className="relative w-28 h-28 shrink-0 rounded-md border border-line overflow-hidden bg-white shadow-sm">
+            <Image
+              src={imagemOrientacao}
+              alt="Exemplo de orientação para a foto"
+              fill
+              className="object-contain"
+            />
+          </div>
+          <div className="space-y-1 text-xs text-ink-muted">
+            <strong className="text-ink font-semibold flex items-center gap-1.5">
+              <span>📌 Modelo de Orientação</span>
+            </strong>
+            <p className="leading-relaxed">
+              Posicione seu documento oficial ao lado do rosto, na mesma altura. Verifique se o seu rosto e todos os dados impressos no documento permanecem 100% legíveis e sem reflexos.
+            </p>
+          </div>
         </div>
       )}
 

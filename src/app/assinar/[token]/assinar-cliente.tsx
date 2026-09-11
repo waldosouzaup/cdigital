@@ -365,6 +365,7 @@ export function AssinarCliente({
                     etiqueta="Prova de Titularidade"
                     descricao="Tire uma foto segurando seu documento oficial (RG ou CNH aberto) ao lado do seu rosto. O rosto e os dados do documento devem estar nítidos."
                     dica="Desta forma o sistema comprova que é você mesmo assinando e que a documentação apresentada é autêntica."
+                    imagemOrientacao="/images/orientacao-foto-documento.png"
                     aoAlterar={setFotoDocumento}
                     desabilitado={processando}
                   />

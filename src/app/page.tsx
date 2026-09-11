@@ -79,8 +79,11 @@ export default function Home() {
             <Link href="#fluxo" className="hover:text-primary transition-colors">
               Como Funciona
             </Link>
-            <Link href="/coleta/demonstracao" className="hover:text-primary transition-colors">
-              Coleta Móvel
+            <Link
+              href="/inscricao/candidado-eleicao-2026"
+              className="hover:text-primary transition-colors"
+            >
+              Coletar Dados →
             </Link>
           </nav>
 
@@ -339,8 +342,11 @@ export default function Home() {
             <Link href="#fluxo" className="hover:text-primary transition-colors">
               Como Funciona
             </Link>
-            <Link href="/coleta/demonstracao" className="hover:text-primary transition-colors">
-              Coleta Móvel
+            <Link
+              href="/inscricao/candidado-eleicao-2026"
+              className="hover:text-primary transition-colors"
+            >
+              Coletar Dados →
             </Link>
             <Link href="/login" className="text-primary hover:underline">
               Painel do Gestor
