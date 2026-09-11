@@ -36,12 +36,12 @@ export const metadata: Metadata = {
 const temaScript = `(function() {
   try {
     var salvo = localStorage.getItem('cd-theme');
-    if (salvo === 'dark') {
-      document.documentElement.dataset.theme = 'dark';
-      document.documentElement.classList.add('dark');
-    } else {
+    if (salvo === 'light') {
       document.documentElement.dataset.theme = 'light';
       document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.dataset.theme = 'dark';
+      document.documentElement.classList.add('dark');
     }
   } catch (e) {}
 })();`;
@@ -54,8 +54,8 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${inter.variable} ${plexMono.variable} ${inter.className}`}
-      data-theme="light"
+      className={`${inter.variable} ${plexMono.variable} ${inter.className} dark`}
+      data-theme="dark"
       suppressHydrationWarning
     >
       <head>

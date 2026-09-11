@@ -3,24 +3,25 @@
 import { useEffect, useState } from "react";
 
 export function SeletorTema({ className = "" }: { className?: string }) {
-  const [tema, setTema] = useState<"light" | "dark">("light");
+  const [tema, setTema] = useState<"light" | "dark">("dark");
   const [montado, setMontado] = useState(false);
 
   useEffect(() => {
     setMontado(true);
     const salvo = localStorage.getItem("cd-theme");
-    if (salvo === "dark" || salvo === "light") {
-      setTema(salvo);
-      document.documentElement.dataset.theme = salvo;
-      document.documentElement.classList.toggle("dark", salvo === "dark");
+    if (salvo === "light") {
+      setTema("light");
+      document.documentElement.dataset.theme = "light";
+      document.documentElement.classList.remove("dark");
     } else {
-      const temaAtual = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-      setTema(temaAtual);
+      setTema("dark");
+      document.documentElement.dataset.theme = "dark";
+      document.documentElement.classList.add("dark");
     }
   }, []);
 
   function alternarTema() {
-    const proximoTema = tema === "light" ? "dark" : "light";
+    const proximoTema = tema === "dark" ? "light" : "dark";
     setTema(proximoTema);
     document.documentElement.dataset.theme = proximoTema;
     document.documentElement.classList.toggle("dark", proximoTema === "dark");

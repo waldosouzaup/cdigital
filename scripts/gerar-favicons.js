@@ -2,6 +2,9 @@
  * Gerador de Favicons e Ícones Oficiais do Comitê Digital
  * Identidade visual: cd (verde green-500 #2FBF83) + • (lime-400 #C4D830)
  * Baseado no docs/DESIGN-SYSTEM.md (§7.9) e src/components/marca.tsx.
+ *
+ * Utiliza vetores <path> reais extraídos da tipografia oficial Inter 900,
+ * garantindo renderização nítida e independente de fontes externas em qualquer navegador.
  */
 
 const fs = require('fs');
@@ -10,9 +13,17 @@ const sharp = require('sharp');
 
 const rootDir = path.resolve(__dirname, '..');
 
+// Vetores exatos das letras 'c' e 'd' da tipografia oficial Inter Black (peso 900)
+// Calculados para caixa de 512x512 com kerning óptico e alinhamento centrado
+const PATH_C =
+  'M171 347.34Q149.67 347.34 134.50 338.85Q119.32 330.35 111.29 315.18Q103.27 300 103.27 279.84Q103.27 259.69 111.29 244.51Q119.32 229.34 134.50 220.84Q149.67 212.34 171 212.34Q184.59 212.34 195.61 215.86Q206.63 219.38 214.77 225.88Q222.91 232.38 227.72 241.58Q232.52 250.78 233.70 262.15L190.45 268.59Q189.63 263.44 188.05 259.51Q186.47 255.59 184.13 252.89Q181.78 250.20 178.68 248.85Q175.57 247.50 171.70 247.50Q165.49 247.50 160.92 251.02Q156.35 254.53 153.83 261.68Q151.31 268.83 151.31 279.61Q151.31 290.27 153.83 297.54Q156.35 304.80 160.92 308.50Q165.49 312.19 171.70 312.19Q175.57 312.19 178.68 310.78Q181.78 309.38 184.18 306.62Q186.59 303.87 188.17 299.77Q189.75 295.66 190.45 290.39L233.70 296.72Q232.52 308.44 227.72 317.75Q222.91 327.07 214.83 333.69Q206.74 340.31 195.67 343.83Q184.59 347.34 171 347.34Z';
+
+const PATH_D =
+  'M285.55 346.64Q271.61 346.64 259.83 339.32Q248.05 331.99 241.02 317.11Q233.99 302.23 233.99 279.61Q233.99 255.82 241.38 241Q248.76 226.17 260.48 219.26Q272.20 212.34 285.09 212.34Q294.81 212.34 302.14 215.68Q309.46 219.02 314.44 224.65Q319.42 230.27 321.88 236.95L322.59 236.95L322.59 170.39L369.70 170.39L369.70 345L323.05 345L323.05 323.44L321.88 323.44Q319.19 330.12 314.15 335.33Q309.11 340.55 301.96 343.59Q294.81 346.64 285.55 346.64M302.90 310.55Q309.34 310.55 314.03 306.74Q318.72 302.93 321.24 296.02Q323.76 289.10 323.76 279.61Q323.76 269.88 321.24 262.91Q318.72 255.94 314.03 252.19Q309.34 248.44 302.90 248.44Q296.45 248.44 291.88 252.19Q287.31 255.94 284.91 262.91Q282.51 269.88 282.51 279.61Q282.51 289.22 284.91 296.19Q287.31 303.16 291.88 306.86Q296.45 310.55 302.90 310.55Z';
+
 function buildSvg({ maskable = false } = {}) {
-  const rx = maskable ? 0 : 112; // 22% rounded corner for squircle
-  const strokeW = maskable ? 0 : 7;
+  const rx = maskable ? 0 : 112; // Cantos arredondados squircle (22%)
+  const strokeW = maskable ? 0 : 14;
   const transform = maskable ? 'transform="translate(51, 51) scale(0.8)"' : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -34,70 +45,126 @@ function buildSvg({ maskable = false } = {}) {
 
   <!-- Fundo dark emerald (ink-900 oficial) -->
   <rect width="512" height="512" rx="${rx}" fill="#0C1512" />
-  
-  ${!maskable ? `
+
+  ${
+    !maskable
+      ? `
   <!-- Brilho radial sutil -->
   <circle cx="256" cy="256" r="230" fill="url(#emblem-glow)" />
-  <!-- Borda de destaque sutil -->
-  <rect x="${strokeW}" y="${strokeW}" width="${512 - strokeW * 2}" height="${512 - strokeW * 2}" rx="${rx - strokeW}" fill="none" stroke="#2FBF83" stroke-width="${strokeW}" stroke-opacity="0.25" />
-  ` : ''}
+  <!-- Borda de destaque visível no tema escuro do navegador -->
+  <rect x="7" y="7" width="498" height="498" rx="105" fill="none" stroke="#2FBF83" stroke-width="${strokeW}" stroke-opacity="0.4" />
+  `
+      : ''
+  }
 
-  <!-- Marca oficial: cd + • -->
+  <!-- Marca oficial: cd + • (vetores puros) -->
   <g ${transform}>
-    <text x="96" y="352"
-      font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Liberation Sans', 'Helvetica Neue', Arial, sans-serif"
-      font-weight="900"
-      font-size="246"
-      letter-spacing="-14"
-      fill="url(#primary-grad)">cd</text>
-    <circle cx="398" cy="324" r="26" fill="url(#lime-grad)" />
+    <path d="${PATH_C}" fill="url(#primary-grad)" />
+    <path d="${PATH_D}" fill="url(#primary-grad)" />
+    <circle cx="398" cy="320" r="26" fill="url(#lime-grad)" />
   </g>
 </svg>`;
 }
 
-function createIco(pngBuffers) {
-  const count = pngBuffers.length;
+/**
+ * Converte um buffer PNG em DIB (Device Independent Bitmap) BMP padrão ICO 32bpp.
+ * Garante compatibilidade universal com Chrome, Firefox, Safari, Edge e Windows/Linux.
+ */
+async function pngToDib(pngBuf, width, height) {
+  const raw = await sharp(pngBuf).raw().toBuffer(); // RGBA, top-down
+  const bpp = 32;
+  const dibHeaderSize = 40;
+  const xorSize = width * height * 4;
+  const andRowBytes = Math.ceil(width / 32) * 4;
+  const andSize = andRowBytes * height;
+  const totalSize = dibHeaderSize + xorSize + andSize;
+
+  const buf = Buffer.alloc(totalSize);
+
+  // BITMAPINFOHEADER
+  buf.writeUInt32LE(dibHeaderSize, 0); // biSize
+  buf.writeInt32LE(width, 4); // biWidth
+  buf.writeInt32LE(height * 2, 8); // biHeight (dobrado para XOR + AND)
+  buf.writeUInt16LE(1, 12); // biPlanes
+  buf.writeUInt16LE(bpp, 14); // biBitCount
+  buf.writeUInt32LE(0, 16); // biCompression (BI_RGB)
+  buf.writeUInt32LE(xorSize + andSize, 20); // biSizeImage
+  buf.writeInt32LE(0, 24); // biXPelsPerMeter
+  buf.writeInt32LE(0, 28); // biYPelsPerMeter
+  buf.writeUInt32LE(0, 32); // biClrUsed
+  buf.writeUInt32LE(0, 36); // biClrImportant
+
+  // Bitmap XOR: BGRA, bottom-up
+  let offset = dibHeaderSize;
+  for (let y = height - 1; y >= 0; y--) {
+    for (let x = 0; x < width; x++) {
+      const srcIdx = (y * width + x) * 4;
+      buf[offset++] = raw[srcIdx + 2]; // B
+      buf[offset++] = raw[srcIdx + 1]; // G
+      buf[offset++] = raw[srcIdx]; // R
+      buf[offset++] = raw[srcIdx + 3]; // A
+    }
+  }
+
+  // Máscara AND: 1 bit por pixel, bottom-up, alinhada em 32 bits
+  for (let y = height - 1; y >= 0; y--) {
+    const rowStart = offset;
+    for (let x = 0; x < width; x++) {
+      const srcIdx = (y * width + x) * 4;
+      const a = raw[srcIdx + 3];
+      if (a === 0) {
+        const byteOffset = rowStart + Math.floor(x / 8);
+        const bitOffset = 7 - (x % 8);
+        buf[byteOffset] |= 1 << bitOffset;
+      }
+    }
+    offset += andRowBytes;
+  }
+
+  return buf;
+}
+
+/**
+ * Cria arquivo ICO multi-resolução padrão contendo imagens DIB Bitmap
+ */
+async function createIco(images) {
+  const dibs = [];
+  for (const img of images) {
+    const dib = await pngToDib(img.buf, img.width, img.height);
+    dibs.push({ width: img.width, height: img.height, dib });
+  }
+
+  const count = dibs.length;
   const headerSize = 6;
   const dirEntrySize = 16;
   const dirSize = headerSize + count * dirEntrySize;
-  
+
+  let totalLength = dirSize;
+  for (const d of dibs) totalLength += d.dib.length;
+
+  const out = Buffer.alloc(totalLength);
+  out.writeUInt16LE(0, 0); // reserved
+  out.writeUInt16LE(1, 2); // 1 = ICO
+  out.writeUInt16LE(count, 4); // quantidade de imagens
+
   let currentOffset = dirSize;
-  const entries = [];
-  
-  for (const item of pngBuffers) {
-    entries.push({
-      width: item.width >= 256 ? 0 : item.width,
-      height: item.height >= 256 ? 0 : item.height,
-      colorCount: 0,
-      reserved: 0,
-      planes: 1,
-      bitCount: 32,
-      bytesInRes: item.buffer.length,
-      imageOffset: currentOffset,
-      buffer: item.buffer
-    });
-    currentOffset += item.buffer.length;
-  }
-  
-  const out = Buffer.alloc(currentOffset);
-  out.writeUInt16LE(0, 0);
-  out.writeUInt16LE(1, 2);
-  out.writeUInt16LE(count, 4);
-  
   let entryPos = headerSize;
-  for (const entry of entries) {
-    out.writeUInt8(entry.width, entryPos + 0);
-    out.writeUInt8(entry.height, entryPos + 1);
-    out.writeUInt8(entry.colorCount, entryPos + 2);
-    out.writeUInt8(entry.reserved, entryPos + 3);
-    out.writeUInt16LE(entry.planes, entryPos + 4);
-    out.writeUInt16LE(entry.bitCount, entryPos + 6);
-    out.writeUInt32LE(entry.bytesInRes, entryPos + 8);
-    out.writeUInt32LE(entry.imageOffset, entryPos + 12);
+
+  for (const d of dibs) {
+    out.writeUInt8(d.width >= 256 ? 0 : d.width, entryPos + 0);
+    out.writeUInt8(d.height >= 256 ? 0 : d.height, entryPos + 1);
+    out.writeUInt8(0, entryPos + 2); // color count
+    out.writeUInt8(0, entryPos + 3); // reserved
+    out.writeUInt16LE(1, entryPos + 4); // planes
+    out.writeUInt16LE(32, entryPos + 6); // bit count
+    out.writeUInt32LE(d.dib.length, entryPos + 8);
+    out.writeUInt32LE(currentOffset, entryPos + 12);
+
+    d.dib.copy(out, currentOffset);
+    currentOffset += d.dib.length;
     entryPos += dirEntrySize;
-    entry.buffer.copy(out, entry.imageOffset);
   }
-  
+
   return out;
 }
 
@@ -105,9 +172,9 @@ async function main() {
   const standardSvg = buildSvg({ maskable: false });
   const maskableSvg = buildSvg({ maskable: true });
 
-  // 1. Salvar public/favicon.svg
+  // 1. Salvar SVG vetorial em public/
   fs.writeFileSync(path.join(rootDir, 'public', 'favicon.svg'), standardSvg, 'utf8');
-  console.log('✔ public/favicon.svg gerado');
+  console.log('✔ public/favicon.svg gerado com vetores reais');
 
   // 2. Renderizar PNGs em múltiplos tamanhos
   const buf16 = await sharp(Buffer.from(standardSvg)).resize(16, 16).png().toBuffer();
@@ -118,21 +185,21 @@ async function main() {
   const buf512 = await sharp(Buffer.from(standardSvg)).resize(512, 512).png().toBuffer();
   const bufMaskable = await sharp(Buffer.from(maskableSvg)).resize(512, 512).png().toBuffer();
 
-  // 3. Criar ICO multi-resolução
-  const icoBuffer = createIco([
-    { width: 16, height: 16, buffer: buf16 },
-    { width: 32, height: 32, buffer: buf32 },
-    { width: 48, height: 48, buffer: buf48 },
+  // 3. Criar ICO multi-resolução (16x16, 32x32, 48x48) em formato DIB BMP padrão
+  const icoBuffer = await createIco([
+    { width: 16, height: 16, buf: buf16 },
+    { width: 32, height: 32, buf: buf32 },
+    { width: 48, height: 48, buf: buf48 },
   ]);
 
-  // 4. Salvar favicon.ico em src/app/ (Next.js App Router)
-  fs.writeFileSync(path.join(rootDir, 'src', 'app', 'favicon.ico'), icoBuffer);
-  console.log('✔ src/app/favicon.ico gerado');
+  // 4. Salvar favicon.ico em public/ (estático direto)
+  fs.writeFileSync(path.join(rootDir, 'public', 'favicon.ico'), icoBuffer);
+  console.log('✔ public/favicon.ico gerado');
 
-  // 5. Salvar icon.png e apple-icon.png no src/app/ para o Next.js App Router
-  fs.writeFileSync(path.join(rootDir, 'src', 'app', 'icon.png'), buf32);
-  fs.writeFileSync(path.join(rootDir, 'src', 'app', 'apple-icon.png'), buf180);
-  console.log('✔ src/app/icon.png e src/app/apple-icon.png gerados');
+  // 5. Salvar icon.png e apple-icon.png em public/
+  fs.writeFileSync(path.join(rootDir, 'public', 'icon.png'), buf32);
+  fs.writeFileSync(path.join(rootDir, 'public', 'apple-icon.png'), buf180);
+  console.log('✔ public/icon.png e public/apple-icon.png gerados');
 
   // 6. Atualizar ícones do PWA em public/icons/
   const iconsDir = path.join(rootDir, 'public', 'icons');

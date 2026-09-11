@@ -9,7 +9,7 @@
  *
  * Nunca faz cache de /api/* nem de respostas não-GET.
  */
-const CACHE = "comite-campo-v2";
+const CACHE = "comite-campo-v3";
 const CASCA = ["/atividades", "/offline", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
