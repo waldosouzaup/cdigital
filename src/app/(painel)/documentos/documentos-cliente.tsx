@@ -225,13 +225,22 @@ export function DocumentosCliente({
       return;
     }
 
-    mostrarFeedback(
-      "Documento Aprovado & Contrato Emitido",
-      resultado.mensagem ??
-        `Documento de ${doc.pessoaNome} aprovado com sucesso e contrato gerado em PDF.`,
-      "sucesso",
-      resultado.urlAssinatura,
-    );
+    if (resultado.pessoaFicouApta) {
+      mostrarFeedback(
+        "Documentação Aprovada & Contrato Emitido",
+        resultado.mensagem ??
+          `Todos os documentos de ${doc.pessoaNome} foram conferidos e aprovados. O contrato foi gerado e enviado para assinatura.`,
+        "sucesso",
+        resultado.urlAssinatura,
+      );
+    } else {
+      mostrarFeedback(
+        "Documento Aprovado",
+        resultado.mensagem ??
+          `Documento aprovado com sucesso. O contrato NÃO foi gerado pois aguarda a aprovação de ambos os documentos obrigatórios (Identidade e Comprovante de Residência).`,
+        "info",
+      );
+    }
     router.refresh();
   }
 

@@ -109,6 +109,24 @@ export async function aprovarDocumentoEGerarContrato(
     return { ok: true, pessoaFicouApta, mensagem: "Documento aprovado." };
   }
 
+  // REGRA FUNDAMENTAL DE NEGÓCIO:
+  // Um contrato só pode ser gerado e mudar para o status 'enviado' após a conferência e aprovação de AMBOS os documentos:
+  // 1. Documento de Identificação (RG/CNH)
+  // 2. Comprovante de Residência
+  // Se apenas um documento for aprovado e o outro não (pendente, rejeitado ou ausente),
+  // o sistema NUNCA gera nem envia o contrato, pois ambas as condições precisam ser verdadeiras.
+  if (!pessoaFicouApta) {
+    revalidatePath("/documentos");
+    revalidatePath("/pessoas");
+    return {
+      ok: true,
+      pessoaFicouApta: false,
+      pessoaNome: pessoa.nome_completo,
+      mensagem:
+        "Documento aprovado com sucesso. O contrato NÃO foi gerado nem enviado pois aguarda a conferência e aprovação de ambos os documentos obrigatórios (Identidade e Comprovante de Residência).",
+    };
+  }
+
   // 4. Seleciona o modelo de contrato correspondente à função ou template ativo padrão
   const { data: templates } = await supabase
     .from("templates_contrato")

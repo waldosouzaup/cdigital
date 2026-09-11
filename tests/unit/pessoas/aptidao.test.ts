@@ -42,4 +42,35 @@ describe("pessoaEstaApta", () => {
     ];
     expect(pessoaEstaApta(documentos)).toBe(true);
   });
+
+  it("não está apta se documento de identidade está aprovado mas comprovante de residência está pendente", () => {
+    const documentos = [
+      { tipo: "documento_identidade", status: "aprovado" as const },
+      { tipo: "comprovante_endereco", status: "pendente" as const },
+    ];
+    expect(pessoaEstaApta(documentos)).toBe(false);
+  });
+
+  it("não está apta se documento de identidade está aprovado mas comprovante de residência foi rejeitado", () => {
+    const documentos = [
+      { tipo: "documento_identidade", status: "aprovado" as const },
+      { tipo: "comprovante_endereco", status: "rejeitado" as const },
+    ];
+    expect(pessoaEstaApta(documentos)).toBe(false);
+  });
+
+  it("não está apta se documento de identidade está aprovado mas comprovante de residência não foi enviado", () => {
+    const documentos = [
+      { tipo: "documento_identidade", status: "aprovado" as const },
+    ];
+    expect(pessoaEstaApta(documentos)).toBe(false);
+  });
+
+  it("está apta somente quando AMBOS identidade e comprovante de residência estão aprovados", () => {
+    const documentos = [
+      { tipo: "documento_identidade", status: "aprovado" as const },
+      { tipo: "comprovante_endereco", status: "aprovado" as const },
+    ];
+    expect(pessoaEstaApta(documentos)).toBe(true);
+  });
 });

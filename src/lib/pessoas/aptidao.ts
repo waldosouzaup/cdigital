@@ -7,10 +7,10 @@
  * virarem vários.
  */
 
-/** Mesmo valor de `TIPO_DOCUMENTO_PADRAO` no Route Handler de upload — um único tipo
- * nesta primeira versão (RG/CNH/comprovante juntos). Adicionar um novo tipo aqui é
- * o único passo para exigi-lo também. */
-export const DOCUMENTOS_OBRIGATORIOS = ["documento_identidade"] as const;
+export const DOCUMENTOS_OBRIGATORIOS = [
+  "documento_identidade",
+  "comprovante_endereco",
+] as const;
 
 export interface DocumentoParaAptidao {
   tipo: string;

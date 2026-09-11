@@ -196,7 +196,7 @@ export async function emitirContrato(
   const [{ data: pessoa }, { data: template }] = await Promise.all([
     supabase
       .from("pessoas")
-      .select("nome_completo, cpf, endereco, chave_pix")
+      .select("nome_completo, cpf, endereco, chave_pix, apta")
       .eq("id", pessoaId)
       .maybeSingle(),
     supabase
@@ -208,6 +208,14 @@ export async function emitirContrato(
 
   if (!pessoa) return { status: "erro", mensagem: "Pessoa não encontrada." };
   if (!template) return { status: "erro", mensagem: "Modelo de contrato não encontrado." };
+
+  if (!pessoa.apta) {
+    return {
+      status: "erro",
+      mensagem:
+        "O contrato só pode ser gerado e enviado após o gestor conferir e aprovar ambos os documentos obrigatórios (Identidade e Comprovante de Residência).",
+    };
+  }
 
   const resultado = await emitirContratoParaPessoa(
     supabase,
@@ -282,7 +290,7 @@ export async function emitirContratosEmLote(
 
   const { data: pessoas } = await supabase
     .from("pessoas")
-    .select("id, nome_completo, cpf, endereco, chave_pix")
+    .select("id, nome_completo, cpf, endereco, chave_pix, apta")
     .in("id", pessoaIds);
   const pessoaPorId = new Map((pessoas ?? []).map((p) => [p.id, p]));
 
@@ -298,6 +306,15 @@ export async function emitirContratosEmLote(
     const pessoa = pessoaPorId.get(pessoaId);
     if (!pessoa) {
       falhas.push({ pessoaNome: pessoaId, motivo: "Pessoa não encontrada." });
+      continue;
+    }
+
+    if (!pessoa.apta) {
+      falhas.push({
+        pessoaNome: pessoa.nome_completo,
+        motivo:
+          "Colaborador sem ambos os documentos obrigatórios aprovados (Identidade e Comprovante de Residência).",
+      });
       continue;
     }
 
@@ -880,11 +897,20 @@ export async function prepararLinkAssinatura(
     return { ok: false, mensagem: RECUSA_PAPEL_CONTRATO };
   const { data: c } = await supabase
     .from("contratos")
-    .select("status,token_assinatura,assinatura_expira_em")
+    .select("status,token_assinatura,assinatura_expira_em,pessoa_id,pessoas(apta)")
     .eq("id", contractId)
     .single();
   if (!c || !["emitido", "enviado"].includes(c.status))
     return { ok: false, mensagem: "O contrato precisa estar emitido ou enviado." };
+
+  const pessoaContrato = Array.isArray(c.pessoas) ? c.pessoas[0] : c.pessoas;
+  if (!pessoaContrato?.apta) {
+    return {
+      ok: false,
+      mensagem:
+        "O contrato não pode mudar para 'enviado' pois o colaborador ainda não possui ambos os documentos (Identidade e Residência) aprovados.",
+    };
+  }
   try {
     await garantirPdfCompleto(supabase, contractId);
   } catch (erro) {

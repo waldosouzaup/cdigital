@@ -39,7 +39,10 @@ describe("calcularPendencias — documentação", () => {
 
   it("documento aprovado: nenhuma pendência de documentação", () => {
     const pendencias = calcularPendencias({
-      documentos: [{ tipo: "documento_identidade", status: "aprovado" }],
+      documentos: [
+        { tipo: "documento_identidade", status: "aprovado" },
+        { tipo: "comprovante_endereco", status: "aprovado" },
+      ],
       apta: true,
       contratoStatus: null,
     });
@@ -51,6 +54,7 @@ describe("calcularPendencias — documentação", () => {
       documentos: [
         { tipo: "documento_identidade", status: "rejeitado", versao: 1 },
         { tipo: "documento_identidade", status: "aprovado", versao: 2 },
+        { tipo: "comprovante_endereco", status: "aprovado", versao: 1 },
       ],
       apta: true,
       contratoStatus: null,
@@ -62,7 +66,10 @@ describe("calcularPendencias — documentação", () => {
 describe("calcularPendencias — contrato", () => {
   it("pessoa apta sem nenhum contrato: pendência de atenção", () => {
     const pendencias = calcularPendencias({
-      documentos: [{ tipo: "documento_identidade", status: "aprovado" }],
+      documentos: [
+        { tipo: "documento_identidade", status: "aprovado" },
+        { tipo: "comprovante_endereco", status: "aprovado" },
+      ],
       apta: true,
       contratoStatus: null,
     });
@@ -76,7 +83,10 @@ describe("calcularPendencias — contrato", () => {
 
   it("contrato emitido mas não enviado: pendência de atenção", () => {
     const pendencias = calcularPendencias({
-      documentos: [{ tipo: "documento_identidade", status: "aprovado" }],
+      documentos: [
+        { tipo: "documento_identidade", status: "aprovado" },
+        { tipo: "comprovante_endereco", status: "aprovado" },
+      ],
       apta: true,
       contratoStatus: "emitido",
     });
@@ -85,7 +95,10 @@ describe("calcularPendencias — contrato", () => {
 
   it("contrato enviado mas não assinado: pendência de atenção", () => {
     const pendencias = calcularPendencias({
-      documentos: [{ tipo: "documento_identidade", status: "aprovado" }],
+      documentos: [
+        { tipo: "documento_identidade", status: "aprovado" },
+        { tipo: "comprovante_endereco", status: "aprovado" },
+      ],
       apta: true,
       contratoStatus: "enviado",
     });
@@ -94,7 +107,10 @@ describe("calcularPendencias — contrato", () => {
 
   it("contrato assinado: nenhuma pendência", () => {
     const pendencias = calcularPendencias({
-      documentos: [{ tipo: "documento_identidade", status: "aprovado" }],
+      documentos: [
+        { tipo: "documento_identidade", status: "aprovado" },
+        { tipo: "comprovante_endereco", status: "aprovado" },
+      ],
       apta: true,
       contratoStatus: "assinado",
     });
