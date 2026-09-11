@@ -43,9 +43,17 @@ self.addEventListener("fetch", (event) => {
   // Navegação: tenta a rede; se cair, entrega a casca de /atividades (ou /offline).
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req).catch(() =>
-        caches.match("/atividades").then((r) => r || caches.match("/offline")),
-      ),
+      fetch(req).catch(async () => {
+        const ativ = await caches.match("/atividades");
+        if (ativ) return ativ;
+        const off = await caches.match("/offline");
+        if (off) return off;
+        return new Response("Offline", {
+          status: 503,
+          statusText: "Offline",
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      }),
     );
     return;
   }
@@ -62,7 +70,9 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(() => cacheado);
+        .catch(() => {
+          return new Response(null, { status: 404, statusText: "Not Found" });
+        });
     }),
   );
 });
