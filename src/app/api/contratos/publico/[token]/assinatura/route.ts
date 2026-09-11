@@ -80,15 +80,25 @@ export async function POST(
         409,
       );
     const desenho = form.get("assinatura"),
-      selfie = form.get("foto");
+      selfie = form.get("foto"),
+      selfieDoc = form.get("foto_documento");
     if (!(desenho instanceof File) || !(selfie instanceof File))
-      return resposta("A assinatura e a foto são obrigatórias.", 400);
-    let assinatura: Buffer, foto: Buffer;
+      return resposta("A assinatura e a foto de identificação são obrigatórias.", 400);
+    let assinatura: Buffer, foto: Buffer, fotoDocumento: Buffer | undefined;
     try {
-      [assinatura, foto] = await Promise.all([
+      const validacoes: Promise<Buffer>[] = [
         validarImagemAssinatura(Buffer.from(await desenho.arrayBuffer()), "assinatura"),
         validarImagemAssinatura(Buffer.from(await selfie.arrayBuffer()), "foto"),
-      ]);
+      ];
+      if (selfieDoc instanceof File) {
+        validacoes.push(
+          validarImagemAssinatura(Buffer.from(await selfieDoc.arrayBuffer()), "foto"),
+        );
+      }
+      const resultados = await Promise.all(validacoes);
+      assinatura = resultados[0];
+      foto = resultados[1];
+      fotoDocumento = resultados[2];
     } catch (erro) {
       return resposta(erro instanceof Error ? erro.message : "Imagens inválidas.", 400);
     }
@@ -113,6 +123,7 @@ export async function POST(
       original: bytes,
       assinatura,
       foto,
+      fotoDocumento,
       nome: pessoa.nome_completo,
       cpf: pessoa.cpf,
       contratoId: contrato.id,
@@ -124,7 +135,7 @@ export async function POST(
       .upload(caminho, pdf, { contentType: "application/pdf" });
     if (uploadError)
       return resposta("Não foi possível guardar o PDF assinado. Tente novamente.", 503);
-    const evidencias = {
+    const evidencias: Record<string, unknown> = {
       consentimento: true,
       registrado_em: registradoEm,
       assinatura_sha256: sha256(assinatura),
@@ -133,6 +144,9 @@ export async function POST(
       pdf_original_sha256: contrato.pdf_sha256,
       user_agent: request.headers.get("user-agent")?.slice(0, 500) ?? null,
     };
+    if (fotoDocumento) {
+      evidencias.foto_documento_sha256 = sha256(fotoDocumento);
+    }
     const { data: salvo, error: saveError } = await admin.rpc(
       "concluir_assinatura_com_evidencias",
       {

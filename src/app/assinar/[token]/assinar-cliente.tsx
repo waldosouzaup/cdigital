@@ -59,7 +59,8 @@ export function AssinarCliente({
   const [erro, setErro] = useState<string | null>(null);
 
   const [assinatura, setAssinatura] = useState<Blob | null>(null);
-  const [foto, setFoto] = useState<Blob | null>(null);
+  const [fotoRosto, setFotoRosto] = useState<Blob | null>(null);
+  const [fotoDocumento, setFotoDocumento] = useState<Blob | null>(null);
   const [documentoHash, setDocumentoHash] = useState("");
   const [textoContrato, setTextoContrato] = useState<string | null>(null);
   const [documentoPronto, setDocumentoPronto] = useState(false);
@@ -87,8 +88,8 @@ export function AssinarCliente({
   }, [pdfUrl, statusAtual]);
 
   async function handleAssinar() {
-    if (!concordou || !assinatura || !foto || !documentoHash) {
-      setErro("Confira o contrato, desenhe sua assinatura, tire a foto e confirme o aceite.");
+    if (!concordou || !assinatura || !fotoRosto || !fotoDocumento || !documentoHash) {
+      setErro("Confira o contrato, desenhe sua assinatura, capture as 2 fotos (rosto e segurando documento) e confirme o aceite.");
       return;
     }
     setErro(null);
@@ -96,7 +97,8 @@ export function AssinarCliente({
     try {
       const form = new FormData();
       form.append("assinatura", assinatura, "assinatura.png");
-      form.append("foto", foto, "foto.jpg");
+      form.append("foto", fotoRosto, "foto_rosto.jpg");
+      form.append("foto_documento", fotoDocumento, "foto_documento.jpg");
       form.append("consentimento", "true");
       form.append("documentoHash", documentoHash);
       const resposta = await fetch(`/api/contratos/publico/${token}/assinatura`, {
@@ -111,7 +113,7 @@ export function AssinarCliente({
       setStatusAtual("assinado");
       setAssinadoEm(resultado.assinadoEm);
     } catch {
-      setErro("Falha de conexão. Sua assinatura e foto continuam nesta tela; tente novamente.");
+      setErro("Falha de conexão. Sua assinatura e fotos continuam nesta tela; tente novamente.");
     } finally {
       setProcessando(false);
     }
@@ -157,8 +159,8 @@ export function AssinarCliente({
             </h1>
             <p className="text-small text-ink-muted leading-relaxed">
               {jaAssinado
-                ? "Sua assinatura e foto foram registradas. O PDF completo foi arquivado e está disponível abaixo."
-                : `Confira os termos e cláusulas do seu contrato de prestação de serviços com ${contrato.organizacaoNome} e assine na tela e tire uma foto do rosto abaixo.`}
+                ? "Sua assinatura e fotos foram registradas. O PDF completo foi arquivado e está disponível abaixo."
+                : `Confira os termos e cláusulas do seu contrato de prestação de serviços com ${contrato.organizacaoNome}, assine na tela e capture as 2 fotos de identificação abaixo.`}
             </p>
           </div>
 
@@ -333,7 +335,40 @@ export function AssinarCliente({
 
               <div className="bg-surface border border-line p-5 space-y-6">
                 <CapturaAssinatura aoAlterar={setAssinatura} desabilitado={processando} />
-                <CapturaFoto aoAlterar={setFoto} desabilitado={processando} />
+
+                <div className="border-t border-line pt-6 space-y-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-ink flex items-center gap-2">
+                      <span>Evidências Fotográficas &amp; Prova de Vida</span>
+                      <span className="text-[0.6875rem] font-mono uppercase text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                        2 Fotos Obrigatórias
+                      </span>
+                    </h2>
+                    <p className="text-xs text-ink-muted mt-1 leading-relaxed">
+                      Para comprovar a autoria da assinatura e a autenticidade do documento perante a Justiça Eleitoral, capture as 2 fotos a seguir:
+                    </p>
+                  </div>
+
+                  <CapturaFoto
+                    numero={1}
+                    titulo="Foto 1: Rosto para identificação"
+                    etiqueta="Identificação Facial"
+                    descricao="Olhe para a câmera com o rosto totalmente visível e em local bem iluminado."
+                    dica="Mantenha o rosto centralizado e evite acessórios que cubram a face."
+                    aoAlterar={setFotoRosto}
+                    desabilitado={processando}
+                  />
+
+                  <CapturaFoto
+                    numero={2}
+                    titulo="Foto 2: Usuário segurando o documento de identificação ao lado do rosto"
+                    etiqueta="Prova de Titularidade"
+                    descricao="Tire uma foto segurando seu documento oficial (RG ou CNH aberto) ao lado do seu rosto. O rosto e os dados do documento devem estar nítidos."
+                    dica="Desta forma o sistema comprova que é você mesmo assinando e que a documentação apresentada é autêntica."
+                    aoAlterar={setFotoDocumento}
+                    desabilitado={processando}
+                  />
+                </div>
               </div>
               {/* Termo de Concordância & Botão de Assinatura */}
               <div className="bg-surface border border-line p-5 space-y-4">
@@ -348,14 +383,14 @@ export function AssinarCliente({
                     Declaro que li integralmente o contrato em PDF acima, concordo com todas as suas
                     cláusulas, condições e remuneração descritas, e manifesto minha concordância por
                     meio desta <strong>assinatura eletrônica</strong>. Autorizo o registro da
-                    assinatura e da foto do meu rosto junto ao contrato, para documentar este
+                    assinatura e das 2 fotos de identificação (rosto e selfie segurando documento) junto ao contrato, para documentar este
                     aceite.
                   </span>
                 </label>
 
                 <button
                   type="button"
-                  disabled={!concordou || !assinatura || !foto || !documentoHash || processando}
+                  disabled={!concordou || !assinatura || !fotoRosto || !fotoDocumento || !documentoHash || processando}
                   onClick={handleAssinar}
                   className="w-full py-4 bg-seal text-paper hover:opacity-90 font-semibold text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md flex items-center justify-center gap-2"
                 >

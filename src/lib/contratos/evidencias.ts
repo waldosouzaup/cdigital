@@ -33,6 +33,7 @@ export async function anexarEvidenciasPdf(params: {
   original: Uint8Array;
   assinatura: Uint8Array;
   foto: Uint8Array;
+  fotoDocumento?: Uint8Array;
   nome: string;
   cpf: string;
   contratoId: string;
@@ -72,21 +73,48 @@ export async function anexarEvidenciasPdf(params: {
   escrever(`Registro (UTC): ${params.registradoEm}`, 670);
   escrever("Assinatura desenhada na tela", 640);
   const assinatura = await pdf.embedPng(params.assinatura);
-  const a = assinatura.scaleToFit(460, 130);
-  page.drawImage(assinatura, { x: 56, y: 490, width: a.width, height: a.height });
-  escrever("Foto capturada pelo colaborador", 465);
-  const foto = await pdf.embedPng(params.foto);
-  const f = foto.scaleToFit(220, 205);
-  page.drawImage(foto, { x: 56, y: 240, width: f.width, height: f.height });
-  escrever(
-    "Aceite: li e concordo com o contrato e autorizo o registro da assinatura e da foto.",
-    210,
-  );
-  escrever("SHA-256 do PDF apresentado antes da assinatura:", 175, 9);
-  escrever(sha256(params.original), 155, 8);
-  escrever("SHA-256 da assinatura:", 130, 9);
-  escrever(sha256(params.assinatura), 115, 8);
-  escrever("SHA-256 da foto:", 90, 9);
-  escrever(sha256(params.foto), 75, 8);
+  const a = assinatura.scaleToFit(460, 110);
+  page.drawImage(assinatura, { x: 56, y: 515, width: a.width, height: a.height });
+
+  if (params.fotoDocumento) {
+    escrever("Foto 1: Rosto para identificação", 495, 9);
+    const foto1 = await pdf.embedPng(params.foto);
+    const f1 = foto1.scaleToFit(220, 165);
+    page.drawImage(foto1, { x: 56, y: 320, width: f1.width, height: f1.height });
+
+    escrever("Foto 2: Titular segurando documento", 495, 9);
+    const foto2 = await pdf.embedPng(params.fotoDocumento);
+    const f2 = foto2.scaleToFit(220, 165);
+    page.drawImage(foto2, { x: 300, y: 320, width: f2.width, height: f2.height });
+
+    escrever(
+      "Aceite: li e concordo com o contrato e autorizo o registro da assinatura e das 2 fotos de identificação.",
+      295,
+      8.5,
+    );
+    escrever("SHA-256 do PDF apresentado antes da assinatura:", 270, 8);
+    escrever(sha256(params.original), 255, 7);
+    escrever("SHA-256 da assinatura:", 235, 8);
+    escrever(sha256(params.assinatura), 220, 7);
+    escrever("SHA-256 da Foto 1 (Rosto):", 200, 8);
+    escrever(sha256(params.foto), 185, 7);
+    escrever("SHA-256 da Foto 2 (Rosto com documento):", 165, 8);
+    escrever(sha256(params.fotoDocumento), 150, 7);
+  } else {
+    escrever("Foto capturada pelo colaborador", 465);
+    const foto = await pdf.embedPng(params.foto);
+    const f = foto.scaleToFit(220, 205);
+    page.drawImage(foto, { x: 56, y: 240, width: f.width, height: f.height });
+    escrever(
+      "Aceite: li e concordo com o contrato e autorizo o registro da assinatura e da foto.",
+      210,
+    );
+    escrever("SHA-256 do PDF apresentado antes da assinatura:", 175, 9);
+    escrever(sha256(params.original), 155, 8);
+    escrever("SHA-256 da assinatura:", 130, 9);
+    escrever(sha256(params.assinatura), 115, 8);
+    escrever("SHA-256 da foto:", 90, 9);
+    escrever(sha256(params.foto), 75, 8);
+  }
   return pdf.save();
 }

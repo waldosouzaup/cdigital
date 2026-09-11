@@ -114,6 +114,45 @@ export default function LoginPage() {
           )}
         </button>
       </form>
+
+      {/* Acesso para demonstração do projeto */}
+      <div className="mt-6 border border-line bg-surface-raised/60 p-4 rounded-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-ink">
+              Acesso para Demonstração
+            </span>
+          </div>
+          <span className="text-[0.65rem] font-mono text-ink-muted bg-surface px-2 py-0.5 border border-line rounded">
+            Perfil Gestor
+          </span>
+        </div>
+        <p className="text-xs text-ink-muted leading-relaxed">
+          Utilize as credenciais abaixo para acessar o sistema e conhecer o projeto:
+        </p>
+        <div className="bg-canvas border border-line p-2.5 rounded-lg space-y-1.5 font-mono text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-ink-muted">E-mail:</span>
+            <span className="font-semibold text-ink select-all">contato@waldoeller.com</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-muted">Senha:</span>
+            <span className="font-semibold text-ink select-all">Admin@2026</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setEmail("contato@waldoeller.com");
+            setSenha("Admin@2026");
+            setErro(null);
+          }}
+          className="w-full py-2 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition cursor-pointer border border-primary/20 flex items-center justify-center gap-1.5"
+        >
+          <span>⚡ Preencher dados de demonstração</span>
+        </button>
+      </div>
     </div>
   );
 }

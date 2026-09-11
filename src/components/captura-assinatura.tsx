@@ -101,9 +101,19 @@ export function CapturaAssinatura({
 export function CapturaFoto({
   aoAlterar,
   desabilitado,
+  titulo = "Foto do rosto",
+  descricao = "Olhe para a câmera, mantenha o rosto visível e procure um local iluminado.",
+  dica,
+  numero = 1,
+  etiqueta = "Identificação facial",
 }: {
   aoAlterar: (arquivo: Blob | null) => void;
   desabilitado: boolean;
+  titulo?: string;
+  descricao?: string;
+  dica?: string;
+  numero?: number;
+  etiqueta?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -150,7 +160,7 @@ export function CapturaFoto({
       streamRef.current?.getTracks().forEach((t) => t.stop());
       setAtiva(false);
       setErro(
-        "Não foi possível abrir a câmera. Permita o acesso nas configurações do navegador e use o link com HTTPS (ou localhost). Depois, tente novamente.",
+        "Não foi possível abrir a câmera diretamente no navegador. Permita o acesso ou utilize a opção 'Tirar com o celular' abaixo.",
       );
     } finally {
       setIniciando(false);
@@ -175,48 +185,103 @@ export function CapturaFoto({
       0.85,
     );
   }
+
+  function handleArquivoManual(evento: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = evento.target.files?.[0];
+    if (!arquivo) return;
+    setErro("");
+    setAtiva(false);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    aoAlterar(arquivo);
+    setPrevia(URL.createObjectURL(arquivo));
+  }
+
   return (
-    <section className="space-y-3" aria-labelledby="titulo-foto">
-      <h2 id="titulo-foto" className="font-semibold">
-        Foto do rosto
-      </h2>
-      <p className="text-small text-ink-muted">
-        Olhe para a câmera, mantenha o rosto visível e procure um local iluminado. A foto
-        complementará o registro da sua assinatura.
+    <section
+      className="space-y-3 p-4 rounded-lg border border-line bg-surface/40"
+      aria-labelledby={`titulo-foto-${numero}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary font-mono text-xs font-bold">
+            {numero}
+          </span>
+          <h3 id={`titulo-foto-${numero}`} className="font-semibold text-ink text-sm">
+            {titulo}
+          </h3>
+        </div>
+        {previa ? (
+          <span className="text-xs font-mono text-success font-medium flex items-center gap-1">
+            ✓ Foto anexada
+          </span>
+        ) : (
+          <span className="text-[0.65rem] font-mono uppercase text-atencao bg-atencao/10 px-2 py-0.5 rounded border border-atencao/20">
+            {etiqueta}
+          </span>
+        )}
+      </div>
+
+      <p className="text-small text-ink-muted leading-relaxed">
+        {descricao}
       </p>
+
+      {dica && (
+        <div className="text-xs text-seal bg-surface border-l-2 border-seal pl-2.5 py-1 leading-normal">
+          <strong>Atenção:</strong> {dica}
+        </div>
+      )}
+
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className={ativa ? "w-full max-h-80 rounded-md bg-black" : "hidden"}
+        className={ativa ? "w-full max-h-80 rounded-md bg-black border border-line" : "hidden"}
         aria-label="Prévia da câmera"
       />
-      {/* A foto é local e temporária; não passa pelo otimizador remoto de imagens. */}
+
       {previa && (
-        <Image
-          width={960}
-          height={720}
-          unoptimized
-          src={previa}
-          alt="Sua foto para o registro de assinatura"
-          className="max-h-64 w-auto rounded-md object-contain"
-        />
+        <div className="relative inline-block border-2 border-success/60 rounded-md overflow-hidden bg-black/5">
+          <Image
+            width={960}
+            height={720}
+            unoptimized
+            src={previa}
+            alt={titulo}
+            className="max-h-56 w-auto rounded-md object-contain"
+          />
+        </div>
       )}
+
       {erro && (
         <p role="alert" className="text-small text-danger">
           {erro}
         </p>
       )}
-      {ativa ? (
-        <Selo onClick={capturar} disabled={desabilitado}>
-          Tirar foto
-        </Selo>
-      ) : (
-        <Selo voz="neutro" onClick={abrirCamera} disabled={desabilitado || iniciando}>
-          {iniciando ? "Abrindo câmera…" : previa ? "Tirar outra foto" : "Abrir câmera"}
-        </Selo>
-      )}
+
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        {ativa ? (
+          <Selo onClick={capturar} disabled={desabilitado}>
+            📸 Capturar foto agora
+          </Selo>
+        ) : (
+          <Selo voz="neutro" onClick={abrirCamera} disabled={desabilitado || iniciando}>
+            {iniciando ? "Abrindo câmera…" : previa ? "Tirar outra (Câmera ao vivo)" : "📸 Abrir câmera ao vivo"}
+          </Selo>
+        )}
+
+        <label className="cursor-pointer inline-flex items-center text-xs text-ink-muted hover:text-ink font-medium px-3 py-2 border border-line rounded-md bg-surface hover:bg-canvas transition">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            capture="user"
+            className="hidden"
+            disabled={desabilitado}
+            onChange={handleArquivoManual}
+          />
+          <span>📱 {previa ? "Trocar por foto do celular" : "Tirar foto no celular / Anexar"}</span>
+        </label>
+      </div>
     </section>
   );
 }
