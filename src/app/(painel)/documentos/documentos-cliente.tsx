@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, type StatusTipo } from "@/components/badge";
 import { Modal } from "@/components/modal";
@@ -75,6 +76,7 @@ export function DocumentosCliente({
   const [filtroStatus, setFiltroStatus] = useState<"todos" | "pendente" | "aprovado" | "rejeitado">("todos");
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "documento_identidade" | "comprovante_endereco">("todos");
   const [busca, setBusca] = useState("");
+  const [modoVisualizacao, setModoVisualizacao] = useState<"colaborador" | "tabela">("colaborador");
 
   const [processando, setProcessando] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -138,6 +140,35 @@ export function DocumentosCliente({
     });
   }, [documentosIniciais, filtroStatus, filtroTipo, busca]);
 
+  // Agrupamento por colaborador (1 colaborador pode ter até 2 documentos: Identidade e Residência)
+  const gruposPorColaborador = useMemo(() => {
+    const mapa = new Map<
+      string,
+      {
+        pessoaId: string;
+        pessoaNome: string;
+        pessoaCpf: string;
+        documentos: DocumentoListado[];
+      }
+    >();
+
+    for (const doc of docsFiltrados) {
+      const existente = mapa.get(doc.pessoaId);
+      if (existente) {
+        existente.documentos.push(doc);
+      } else {
+        mapa.set(doc.pessoaId, {
+          pessoaId: doc.pessoaId,
+          pessoaNome: doc.pessoaNome,
+          pessoaCpf: doc.pessoaCpf,
+          documentos: [doc],
+        });
+      }
+    }
+
+    return Array.from(mapa.values());
+  }, [docsFiltrados]);
+
   function mostrarFeedback(
     titulo: string,
     mensagem: string,
@@ -194,6 +225,42 @@ export function DocumentosCliente({
       "Documento Reaberto",
       resultado.mensagem ?? "O documento voltou para o estado pendente de conferência.",
       "info",
+    );
+    router.refresh();
+  }
+
+  async function handleAprovarTodosDoColaborador(documentos: DocumentoListado[]) {
+    const pendentes = documentos.filter((d) => d.status === "pendente");
+    if (pendentes.length === 0) return;
+
+    setProcessando(pendentes[0].pessoaId);
+    let ultimoResultado: {
+      ok: boolean;
+      mensagem?: string;
+      urlAssinatura?: string;
+    } = { ok: true };
+
+    for (const doc of pendentes) {
+      const res = await aprovarDocumentoEGerarContrato(doc.id);
+      if (!res.ok) {
+        mostrarFeedback(
+          "Erro na Aprovação",
+          res.mensagem ?? `Erro ao aprovar documento ${doc.tipo}.`,
+          "erro",
+        );
+        setProcessando(null);
+        return;
+      }
+      ultimoResultado = res;
+    }
+
+    setProcessando(null);
+    mostrarFeedback(
+      "Documentos Aprovados",
+      ultimoResultado.mensagem ??
+        `Todos os documentos de ${pendentes[0].pessoaNome} foram aprovados com sucesso.`,
+      "sucesso",
+      ultimoResultado.urlAssinatura,
     );
     router.refresh();
   }
@@ -488,17 +555,262 @@ export function DocumentosCliente({
         </div>
       </div>
 
-      {/* Lista de Documentos */}
-      {docsFiltrados.length > 0 ? (
+      {/* Barra de Esclarecimento e Seletor de Modo de Visualização */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-surface-sunken/60 border border-line rounded-lg text-xs text-ink-muted">
+        <div className="flex items-start sm:items-center gap-2">
+          <span className="text-base shrink-0">💡</span>
+          <span>
+            Cada colaborador preenche o formulário <strong>1 única vez</strong> e anexa até <strong>2 documentos</strong> (Identidade e Comprovante de Residência). Gerencie cadastros no{" "}
+            <Link href="/pessoas" className="font-semibold text-ink underline hover:text-primary">
+              Quadro de Pessoas
+            </Link>
+            .
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1 bg-surface p-1 rounded-md border border-line shrink-0">
+          <button
+            type="button"
+            onClick={() => setModoVisualizacao("colaborador")}
+            className={`px-3 py-1 text-xs font-semibold rounded transition cursor-pointer ${
+              modoVisualizacao === "colaborador"
+                ? "bg-primary-tint text-primary border border-primary/20"
+                : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            👥 Por Colaborador ({gruposPorColaborador.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setModoVisualizacao("tabela")}
+            className={`px-3 py-1 text-xs font-semibold rounded transition cursor-pointer ${
+              modoVisualizacao === "tabela"
+                ? "bg-primary-tint text-primary border border-primary/20"
+                : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            📄 Lista de Documentos ({docsFiltrados.length})
+          </button>
+        </div>
+      </div>
+
+      {docsFiltrados.length === 0 ? (
+        <EstadoVazio
+          titulo="Nenhum documento encontrado"
+          descricao="Não há documentos correspondentes aos filtros e termo de busca informados."
+        />
+      ) : modoVisualizacao === "colaborador" ? (
+        /* =====================================================================
+           VISUALIZAÇÃO 1: AGRUPADO POR COLABORADOR (CARD POR CADASTRO)
+           ===================================================================== */
+        <div className="space-y-4">
+          {gruposPorColaborador.map((grupo) => {
+            const docsPendentes = grupo.documentos.filter((d) => d.status === "pendente");
+            const docsAprovados = grupo.documentos.filter((d) => d.status === "aprovado");
+            const docsRejeitados = grupo.documentos.filter((d) => d.status === "rejeitado");
+            const todosAprovados =
+              grupo.documentos.length > 0 && docsAprovados.length === grupo.documentos.length;
+            const ocupadoGrupo = processando === grupo.pessoaId;
+
+            return (
+              <div
+                key={grupo.pessoaId}
+                className="rounded-xl border border-line bg-surface p-5 space-y-4 shadow-sm"
+              >
+                {/* Cabeçalho do Colaborador */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-tint text-primary font-bold text-sm">
+                      {grupo.pessoaNome.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-bold text-ink text-base">{grupo.pessoaNome}</h3>
+                        <span className="text-xs font-mono text-ink-muted bg-surface-sunken px-2 py-0.5 rounded border border-line">
+                          CPF: {grupo.pessoaCpf}
+                        </span>
+                        <span className="text-[0.68rem] text-primary bg-primary-tint px-2 py-0.5 rounded-full border border-primary/20 font-medium">
+                          1 Cadastro Único
+                        </span>
+                      </div>
+                      <p className="text-xs text-ink-muted mt-0.5">
+                        {grupo.documentos.length} documento(s) anexado(s) neste cadastro
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status e Ação em Lote */}
+                  <div className="flex items-center gap-2">
+                    {todosAprovados ? (
+                      <span className="text-xs font-semibold text-success bg-success/10 px-3 py-1 rounded-full border border-success/20 flex items-center gap-1.5">
+                        <span>✓</span> Documentação Aprovada (Apto)
+                      </span>
+                    ) : docsPendentes.length > 0 ? (
+                      <button
+                        type="button"
+                        disabled={ocupadoGrupo}
+                        onClick={() => handleAprovarTodosDoColaborador(grupo.documentos)}
+                        className="px-3.5 py-1.5 text-xs font-bold bg-primary hover:bg-primary-hover text-white rounded-lg shadow-sm transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>⚡</span>
+                        <span>
+                          {ocupadoGrupo
+                            ? "Aprovando…"
+                            : `Aprovar Todos (${docsPendentes.length})`}
+                        </span>
+                      </button>
+                    ) : docsRejeitados.length > 0 ? (
+                      <span className="text-xs font-semibold text-danger bg-danger/10 px-3 py-1 rounded-full border border-danger/20">
+                        Documento Rejeitado
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Grid dos Documentos deste Colaborador */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {grupo.documentos.map((doc) => {
+                    const baixaResolucao =
+                      doc.larguraPx !== null &&
+                      doc.alturaPx !== null &&
+                      (doc.larguraPx < 800 || doc.alturaPx < 800);
+                    const ocupado = processando === doc.id;
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="rounded-lg border border-line bg-surface-sunken/40 p-4 space-y-3 flex flex-col justify-between"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-xs font-bold text-ink block">
+                                {ROTULO_TIPO[doc.tipo] ?? doc.tipo}
+                              </span>
+                              <span className="text-[0.7rem] font-mono text-ink-muted">
+                                Versão {doc.versao} · {formatarDataBR(doc.criadoEm)}
+                              </span>
+                            </div>
+                            <Badge status={doc.status as StatusTipo} />
+                          </div>
+
+                          {/* Metadados Técnicos */}
+                          <div className="text-[0.75rem] font-mono text-ink-muted bg-surface p-2.5 rounded border border-line space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span
+                                className={baixaResolucao ? "text-alert font-bold" : "text-ink"}
+                              >
+                                📐 {doc.larguraPx ?? "—"} × {doc.alturaPx ?? "—"} px
+                              </span>
+                              <span>
+                                {doc.bytes ? `${(doc.bytes / 1024).toFixed(0)} KB` : "—"}
+                              </span>
+                            </div>
+                            <div className="truncate text-ink-subtle" title={doc.hashSha256}>
+                              Hash: {doc.hashSha256.slice(0, 16)}…
+                            </div>
+                          </div>
+
+                          {doc.motivoRejeicao && (
+                            <p className="text-xs text-alert bg-alert/10 p-2 rounded border border-alert/20">
+                              <strong>Motivo:</strong> {doc.motivoRejeicao}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Ações do Documento */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-line/60">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDocSelecionado(doc);
+                              setModalConferenciaAberto(true);
+                            }}
+                            className="text-xs font-medium text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>🔍</span>
+                            <span>Visualizar</span>
+                          </button>
+
+                          <div className="flex items-center gap-1.5">
+                            {doc.status !== "aprovado" && (
+                              <button
+                                type="button"
+                                disabled={ocupado || ocupadoGrupo}
+                                onClick={() => handleAprovar(doc)}
+                                className="px-2.5 py-1 text-xs font-semibold bg-success/15 text-success hover:bg-success hover:text-white rounded transition disabled:opacity-50 cursor-pointer"
+                              >
+                                Aprovar
+                              </button>
+                            )}
+
+                            {doc.status !== "rejeitado" && (
+                              <button
+                                type="button"
+                                disabled={ocupado || ocupadoGrupo}
+                                onClick={() => abrirModalRejeicao(doc)}
+                                className="px-2.5 py-1 text-xs font-semibold bg-danger/15 text-danger hover:bg-danger hover:text-white rounded transition disabled:opacity-50 cursor-pointer"
+                              >
+                                Rejeitar
+                              </button>
+                            )}
+
+                            {doc.status !== "pendente" && (
+                              <button
+                                type="button"
+                                disabled={ocupado || ocupadoGrupo}
+                                onClick={() => handleMarcarPendente(doc)}
+                                className="px-2.5 py-1 text-xs text-ink-muted hover:text-ink rounded border border-line transition cursor-pointer"
+                              >
+                                Reabrir
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setDocParaEditar(doc)}
+                              className="px-2 py-1 text-xs text-ink-muted hover:text-ink cursor-pointer"
+                              title="Editar metadados"
+                            >
+                              ✎
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={ocupado || ocupadoGrupo}
+                              onClick={() => {
+                                setDocParaExcluir(doc);
+                                setErroExcluir(null);
+                                setMotivoExclusao("");
+                              }}
+                              className="px-2 py-1 text-xs text-danger/80 hover:text-danger cursor-pointer"
+                              title="Excluir documento"
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* =====================================================================
+           VISUALIZAÇÃO 2: TABELA DE DOCUMENTOS INDIVIDUAIS
+           ===================================================================== */
         <div className="overflow-x-auto border border-line bg-surface rounded-md shadow-xs">
           <table className="w-full border-collapse text-left text-small">
             <thead>
               <tr className="border-b border-line bg-paper/60 font-mono text-xs text-ink-muted">
-                <th className="p-3.5">Colaborador / Tipo</th>
+                <th className="p-3.5">Documento &amp; Colaborador</th>
                 <th className="p-3.5">Metadados Técnicos</th>
                 <th className="p-3.5">Nome no Storage</th>
                 <th className="p-3.5 text-center">Situação</th>
-                <th className="p-3.5 text-right">Ações & Conferência</th>
+                <th className="p-3.5 text-right">Ações &amp; Conferência</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -511,13 +823,22 @@ export function DocumentosCliente({
 
                 return (
                   <tr key={doc.id} className="hover:bg-paper/40 transition-colors">
-                    {/* Colaborador & Tipo */}
+                    {/* Documento & Colaborador */}
                     <td className="p-3.5">
-                      <span className="font-medium text-ink block">{doc.pessoaNome}</span>
-                      <span className="text-xs text-seal block font-medium">
-                        {ROTULO_TIPO[doc.tipo] ?? doc.tipo} · v{doc.versao}
-                      </span>
-                      <span className="font-mono text-[0.7rem] text-ink-muted">{doc.pessoaCpf}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-ink text-sm block">
+                          {ROTULO_TIPO[doc.tipo] ?? doc.tipo}
+                        </span>
+                        <span className="text-[0.65rem] font-mono font-semibold uppercase bg-primary-tint text-primary px-1.5 py-0.5 rounded border border-primary/20">
+                          v{doc.versao}
+                        </span>
+                      </div>
+                      <div className="text-xs text-ink-muted flex items-center gap-1.5 mt-0.5">
+                        <span>Colaborador:</span>
+                        <strong className="text-ink font-medium">{doc.pessoaNome}</strong>
+                        <span className="text-ink-subtle">•</span>
+                        <span className="font-mono text-[0.7rem]">{doc.pessoaCpf}</span>
+                      </div>
                     </td>
 
                     {/* Metadados Técnicos */}
@@ -653,11 +974,6 @@ export function DocumentosCliente({
             </tbody>
           </table>
         </div>
-      ) : (
-        <EstadoVazio
-          titulo="Nenhum documento encontrado"
-          descricao="Não há documentos correspondentes aos filtros e termo de busca informados."
-        />
       )}
 
       {/* =====================================================================
