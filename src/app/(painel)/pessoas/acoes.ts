@@ -326,7 +326,35 @@ export async function excluirPessoa(pessoaId: string, motivo?: string): Promise<
     return { ok: false, mensagem: "Colaborador não informado." };
   }
 
-  // 1. Busca todos os dados e dependências do colaborador
+  // 1. Tenta a RPC atômica (SECURITY DEFINER)
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("excluir_pessoa", {
+    p_pessoa_id: pessoaId,
+    p_motivo: motivo?.trim() || null,
+  });
+
+  if (!rpcError && rpcResult && (rpcResult as { ok?: boolean }).ok) {
+    revalidatePath("/pessoas");
+    revalidatePath("/dashboard");
+    const nome = (rpcResult as { pessoa_nome?: string }).pessoa_nome || "selecionado";
+    return {
+      ok: true,
+      mensagem: `Colaborador "${nome}" excluído e arquivado com sucesso.`,
+    };
+  }
+
+  if (rpcError) {
+    // Se foi uma exceção de negócio levantada pela função (ex: contratos ativos), repassa a mensagem
+    const msg = rpcError.message || "";
+    if (
+      msg.includes("contrato") ||
+      msg.includes("Colaborador não encontrado") ||
+      msg.includes("Apenas gestores")
+    ) {
+      return { ok: false, mensagem: msg };
+    }
+  }
+
+  // 2. Fallback: exclusão via clientes RLS
   const { data: pessoa } = await supabase
     .from("pessoas")
     .select("*, contratos ( id, status, criado_em ), documentos ( id, tipo, status, versao )")
@@ -338,7 +366,6 @@ export async function excluirPessoa(pessoaId: string, motivo?: string): Promise<
     return { ok: false, mensagem: "Colaborador não encontrado ou já excluído." };
   }
 
-  // 2. Trava de segurança: impede exclusão se houver contratos em andamento
   const contratosLista = (pessoa.contratos as { id: string; status: string }[]) ?? [];
   const contratosAtivos = contratosLista.filter(
     (c) => !["cancelado", "distrato_assinado"].includes(c.status),
@@ -351,7 +378,6 @@ export async function excluirPessoa(pessoaId: string, motivo?: string): Promise<
     };
   }
 
-  // 3. Captura informações do usuário executor para arquivamento
   const { data: usuario } = await supabase
     .from("usuarios")
     .select("nome, email")
@@ -361,7 +387,6 @@ export async function excluirPessoa(pessoaId: string, motivo?: string): Promise<
   const usuarioNome = usuario?.nome || "Gestor do Comitê";
   const usuarioLogin = usuario?.email || "gestor@sistema";
 
-  // 4. Grava snapshot completo em dados_excluidos (auditoria contábil / LGPD)
   const { error: erroAudit } = await supabase.from("dados_excluidos").insert({
     organizacao_id: organizationId,
     tipo_registro: "pessoa",
@@ -377,18 +402,16 @@ export async function excluirPessoa(pessoaId: string, motivo?: string): Promise<
     console.error("Erro ao arquivar colaborador em dados_excluidos:", erroAudit);
     return {
       ok: false,
-      mensagem: "Não foi possível registrar o arquivamento de auditoria antes da exclusão.",
+      mensagem: `Não foi possível registrar o arquivamento de auditoria antes da exclusão (${erroAudit.message}).`,
     };
   }
 
-  // 5. Remove vínculos auxiliares que impediriam a exclusão
   await supabase.from("links_coleta").delete().eq("pessoa_id", pessoaId);
   if (contratosLista.length === 0) {
     await supabase.from("documentos").delete().eq("pessoa_id", pessoaId);
-    await supabase.from("atividades_campo").delete().eq("pessoa_id", pessoaId);
+    await supabase.from("registros_atividade").delete().eq("pessoa_id", pessoaId);
   }
 
-  // 6. Remove o colaborador
   const { error: erroDelete } = await supabase
     .from("pessoas")
     .delete()
@@ -402,7 +425,6 @@ export async function excluirPessoa(pessoaId: string, motivo?: string): Promise<
     };
   }
 
-  // 7. Registra no log de auditoria
   await registerPersonWrite({
     supabase,
     organizationId,
