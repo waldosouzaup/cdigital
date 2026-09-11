@@ -18,9 +18,17 @@ export interface PessoaListada {
   id: string;
   nomeCompleto: string;
   cpf: string;
+  rg: string | null;
   dataNascimento: string | null;
   idade: number | null;
   telefone: string | null;
+  email: string | null;
+  endereco: string | null;
+  cep: string | null;
+  chavePix: string | null;
+  banco: string | null;
+  agencia: string | null;
+  conta: string | null;
   funcao: string | null;
   regiaoId: string | null;
   regiaoNome: string | null;
@@ -28,24 +36,41 @@ export interface PessoaListada {
   /** "autoinscricao" quando a pessoa veio do link público `/inscricao/[slug]`. */
   origem: string | null;
   statusContrato: string | null;
+  totalContratos: number;
+  criadoEm: string | null;
   /** Fase 2, item 14 — checklist de pendências, já calculado a partir do estado
    * real de documentos/aptidão/contrato desta pessoa. */
   pendencias: Pendencia[];
+  documentosResumo: {
+    id?: string;
+    tipo: string;
+    status: "pendente" | "aprovado" | "rejeitado";
+    versao: number;
+  }[];
 }
 
 interface LinhaPessoa {
   id: string;
   nome_completo: string;
   cpf: string;
+  rg: string | null;
   data_nascimento: string | null;
   telefone: string | null;
+  email: string | null;
+  endereco: string | null;
+  cep: string | null;
+  chave_pix: string | null;
+  banco: string | null;
+  agencia: string | null;
+  conta: string | null;
   funcao: string | null;
   regiao_id: string | null;
   apta: boolean;
   origem: string | null;
+  criado_em: string | null;
   regioes: { nome: string } | null;
-  contratos: { status: string; criado_em: string }[] | null;
-  documentos: { tipo: string; status: "pendente" | "aprovado" | "rejeitado"; versao: number }[] | null;
+  contratos: { id: string; status: string; criado_em: string }[] | null;
+  documentos: { id?: string; tipo: string; status: "pendente" | "aprovado" | "rejeitado"; versao: number }[] | null;
 }
 
 export async function listarRegioes(): Promise<RegiaoOpcao[]> {
@@ -76,8 +101,9 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
   const { data, error } = await supabase
     .from("pessoas")
     .select(
-      "id, nome_completo, cpf, data_nascimento, telefone, funcao, apta, origem, regiao_id, regioes ( nome ), " +
-        "contratos ( status, criado_em ), documentos ( tipo, status, versao )",
+      "id, nome_completo, cpf, rg, data_nascimento, telefone, email, endereco, cep, chave_pix, banco, agencia, conta, " +
+        "funcao, apta, origem, regiao_id, criado_em, regioes ( nome ), " +
+        "contratos ( id, status, criado_em ), documentos ( id, tipo, status, versao )",
     )
     .order("criado_em", { ascending: false })
     .returns<LinhaPessoa[]>();
@@ -87,7 +113,8 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
   return (data ?? []).map((linha) => {
     // "Mais recente" entre os contratos da pessoa — hoje quase sempre 0 ou 1, mas o
     // caso de distrato+recontratação (Seção 7) pode gerar mais de um.
-    const maisRecente = [...(linha.contratos ?? [])].sort(
+    const contratosLista = linha.contratos ?? [];
+    const maisRecente = [...contratosLista].sort(
       (a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime(),
     )[0];
     const statusContrato = (maisRecente?.status ?? null) as ContractStatus | null;
@@ -96,20 +123,40 @@ export async function listarPessoas(): Promise<PessoaListada[]> {
       id: linha.id,
       nomeCompleto: linha.nome_completo,
       cpf: linha.cpf,
+      rg: linha.rg,
       dataNascimento: linha.data_nascimento,
       idade: calcularIdade(linha.data_nascimento),
       telefone: linha.telefone,
+      email: linha.email,
+      endereco: linha.endereco,
+      cep: linha.cep,
+      chavePix: linha.chave_pix,
+      banco: linha.banco,
+      agencia: linha.agencia,
+      conta: linha.conta,
       funcao: linha.funcao,
       regiaoId: linha.regiao_id,
       regiaoNome: linha.regioes?.nome ?? null,
       apta: linha.apta,
       origem: linha.origem,
       statusContrato,
+      totalContratos: contratosLista.length,
+      criadoEm: linha.criado_em,
       pendencias: calcularPendencias({
-        documentos: linha.documentos ?? [],
+        documentos: (linha.documentos ?? []).map((d) => ({
+          tipo: d.tipo,
+          status: d.status,
+          versao: d.versao,
+        })),
         apta: linha.apta,
         contratoStatus: statusContrato,
       }),
+      documentosResumo: (linha.documentos ?? []).map((d) => ({
+        id: d.id,
+        tipo: d.tipo,
+        status: d.status,
+        versao: d.versao,
+      })),
     };
   });
 }

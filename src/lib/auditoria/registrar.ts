@@ -65,7 +65,7 @@ export async function registerPersonWrite(params: {
   organizationId: string;
   userId: string | null;
   personId: string;
-  action: "criacao" | "edicao";
+  action: "criacao" | "edicao" | "exclusao";
 }): Promise<void> {
   await registrarAuditoria({
     supabase: params.supabase,
