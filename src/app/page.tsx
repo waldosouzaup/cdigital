@@ -125,7 +125,7 @@ export default function Home() {
               </Link>
 
               <Link
-                href="/coleta/demonstracao"
+                href="/candidado-eleicao-2026"
                 className="rounded-full border border-line bg-surface px-6 py-3.5 text-xs sm:text-sm font-semibold text-ink hover:bg-surface-sunken transition shadow-sm"
               >
                 Experimentar Coleta Móvel
