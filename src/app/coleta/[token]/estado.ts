@@ -6,6 +6,8 @@
 export interface EstadoEnviarDadosColeta {
   status: "idle" | "sucesso" | "erro";
   mensagem?: string;
+  emailEnviado?: string;
+  protocolo?: string;
 }
 
 export const ESTADO_INICIAL_ENVIAR_DADOS: EstadoEnviarDadosColeta = { status: "idle" };

@@ -10,6 +10,7 @@
 import { PDFDocument } from "pdf-lib";
 import { randomBytes, createHash } from "node:crypto";
 import { garantirPdfCompleto } from "@/lib/contratos/documento";
+import { nomeArquivoContrato } from "@/lib/contratos/nome-arquivo";
 import { listarPessoasAptasSemContratoAtivo } from "./dados";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -800,7 +801,7 @@ export async function enviarDistratoPorEmail(contractId: string): Promise<Result
 export async function gerarUrlPdfContrato(
   contractId: string,
   versao: "gerado" | "assinado" | "distrato" = "gerado",
-): Promise<{ ok: boolean; url?: string; texto?: string; mensagem?: string }> {
+): Promise<{ ok: boolean; url?: string; urlDownload?: string; nomeArquivo?: string; texto?: string; mensagem?: string }> {
   const supabase = await createClient();
   const { organizationId, userId } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
@@ -817,7 +818,7 @@ export async function gerarUrlPdfContrato(
   }
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("caminho_pdf, caminho_pdf_assinado, caminho_termo_distrato")
+    .select("caminho_pdf, caminho_pdf_assinado, caminho_termo_distrato, pessoas(nome_completo)")
     .eq("id", contractId)
     .maybeSingle();
 
@@ -838,6 +839,8 @@ export async function gerarUrlPdfContrato(
   }
 
   try {
+    const pessoa = Array.isArray(contrato?.pessoas) ? contrato.pessoas[0] : contrato?.pessoas;
+    const nomeArquivo = nomeArquivoContrato(pessoa?.nome_completo, contractId, versao);
     const url = await criarUrlAssinada({
       supabase,
       bucket: "contratos",
@@ -846,12 +849,15 @@ export async function gerarUrlPdfContrato(
       organizationId,
       userId,
     });
+    // O visualizador continua inline; só a ação Baixar pede Content-Disposition attachment.
+    const download = new URL(url);
+    download.searchParams.set("download", nomeArquivo);
     let texto: string | undefined;
     if (versao === "gerado") {
       const { data: arquivo } = await supabase.storage.from("contratos").download(caminho);
       if (arquivo) texto = (await PDFDocument.load(await arquivo.arrayBuffer())).getSubject();
     }
-    return { ok: true, url, texto };
+    return { ok: true, url, urlDownload: download.href, nomeArquivo, texto };
   } catch {
     return { ok: false, mensagem: "Não foi possível gerar o link de acesso ao PDF." };
   }
@@ -956,4 +962,3 @@ export async function excluirContrato(
     mensagem: "Contratado excluído do painel e arquivado em DadosExcluidos com sucesso.",
   };
 }
-

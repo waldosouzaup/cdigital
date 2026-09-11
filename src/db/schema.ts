@@ -84,6 +84,7 @@ export const notificationTypeEnum = pgEnum("tipo_notificacao", [
   "distrato_enviado",
   "contrato_assinado",
   "convite_usuario",
+  "cadastro_recebido",
 ]);
 
 // ---------------------------------------------------------------------------

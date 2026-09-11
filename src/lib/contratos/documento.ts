@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { gerarPdfContrato, htmlParaTexto } from "./gerar-pdf";
 import { substituirMarcadores } from "./marcadores";
+import { nomeArquivoContrato } from "./nome-arquivo";
 
 export const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
@@ -57,7 +58,7 @@ export async function garantirPdfCompleto(supabase: SupabaseClient, contratoId: 
     titulo: "CONTRATO DE PRESTAÇÃO DE SERVIÇOS",
     corpo: preenchido,
   });
-  const caminho = `${c.organizacao_id}/${c.pessoa_id}/contrato_${c.id}_${randomUUID()}.pdf`;
+  const caminho = `${c.organizacao_id}/${c.pessoa_id}/${randomUUID()}/${nomeArquivoContrato(p.nome_completo, c.id)}`;
   const hash = sha256(bytes);
   const { error: uploadError } = await supabase.storage
     .from("contratos")

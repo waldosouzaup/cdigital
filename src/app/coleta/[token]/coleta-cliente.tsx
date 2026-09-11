@@ -24,10 +24,12 @@ export function ColetaCliente({
   token,
   primeiroNome,
   organizacaoNome,
+  emailInicial,
 }: {
   token: string;
   primeiroNome: string;
   organizacaoNome: string;
+  emailInicial?: string;
 }) {
   const { geolocalizacao, registrarInicioPreenchimento } = useAuditoriaColeta({
     token,
@@ -73,6 +75,7 @@ export function ColetaCliente({
         token={token}
         identidadeEnviada={identidadeEnviada}
         enderecoEnviado={enderecoEnviado}
+        emailEnviado={estado.emailEnviado ?? emailInicial}
       />
     );
   }
@@ -329,6 +332,16 @@ export function ColetaCliente({
                     ? "Substitua ou complete com o número e complemento da residência."
                     : "Rua/Avenida, número, complemento e bairro."
                 }
+              />
+              <Campo
+                rotulo="E-mail para confirmação e contrato"
+                id="email"
+                name="email"
+                type="email"
+                required
+                defaultValue={emailInicial}
+                placeholder="seu.email@exemplo.com"
+                auxiliar="Enviaremos a confirmação do cadastro, protocolo e o contrato para este e-mail."
               />
               <Campo
                 rotulo="Chave PIX para pagamento"
@@ -656,15 +669,18 @@ function TelaSucesso({
   token,
   identidadeEnviada,
   enderecoEnviado,
+  emailEnviado,
 }: {
   primeiroNome: string;
   organizacaoNome: string;
   token: string;
   identidadeEnviada: boolean;
   enderecoEnviado: boolean;
+  emailEnviado?: string;
 }) {
   const algumDocumentoEnviado = identidadeEnviada || enderecoEnviado;
   const todosDocumentosEnviados = identidadeEnviada && enderecoEnviado;
+  const protocolo = `REC-${token.slice(0, 8).toUpperCase()}`;
 
   return (
     <div className="min-h-screen bg-paper text-ink flex flex-col justify-between">
@@ -682,6 +698,19 @@ function TelaSucesso({
           </p>
         </div>
 
+        {emailEnviado && (
+          <div className="p-3.5 bg-success/10 border border-success/30 rounded text-left space-y-1">
+            <div className="flex items-center gap-1.5 font-medium text-xs text-success">
+              <span>✉</span>
+              <span>Confirmação enviada para seu e-mail</span>
+            </div>
+            <p className="text-xs text-ink-muted leading-relaxed">
+              Enviamos o comprovante de envio e o número de protocolo para{" "}
+              <strong className="text-ink font-semibold">{emailEnviado}</strong>.
+            </p>
+          </div>
+        )}
+
         <div className="p-5 border border-line bg-surface text-left space-y-3">
           <div className="font-mono text-xs text-seal uppercase tracking-wider">
             Comprovante de Envio
@@ -690,7 +719,7 @@ function TelaSucesso({
             <p>
               Protocolo:{" "}
               <span className="font-mono text-ink font-semibold">
-                REC-{token.slice(0, 8).toUpperCase()}
+                {protocolo}
               </span>
             </p>
             <p>

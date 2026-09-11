@@ -322,6 +322,8 @@ export function ContratosCliente({
         return;
       }
       setTermoUrl(resultado.url);
+      setTermoDownloadUrl(resultado.urlDownload ?? resultado.url);
+      setTermoNomeArquivo(resultado.nomeArquivo ?? "contrato.pdf");
       setTermoTexto(resultado.texto ?? null);
       setModalTermoAberto(true);
     } catch {
@@ -333,6 +335,8 @@ export function ContratosCliente({
 
   const [modalTermoAberto, setModalTermoAberto] = useState(false);
   const [termoUrl, setTermoUrl] = useState("");
+  const [termoDownloadUrl, setTermoDownloadUrl] = useState("");
+  const [termoNomeArquivo, setTermoNomeArquivo] = useState("");
   const [termoTexto, setTermoTexto] = useState<string | null>(null);
   const [linkAssinatura, setLinkAssinatura] = useState("");
   async function abrirModalAssinatura(contrato: ContratoListado) {
@@ -1195,14 +1199,15 @@ export function ContratosCliente({
         larguraMaxima="max-w-5xl"
         rotuloSecundario="Fechar"
       >
-        <a
-          href={termoUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-seal underline"
-        >
-          Abrir ou baixar PDF
-        </a>
+        <div className="flex flex-wrap gap-4">
+          <a href={termoUrl} target="_blank" rel="noopener noreferrer" className="text-seal underline">
+            Abrir PDF
+          </a>
+          <a href={termoDownloadUrl} download={termoNomeArquivo} className="text-seal underline">
+            Baixar PDF
+          </a>
+        </div>
+        <p className="mt-2 break-all text-xs text-ink-muted">{termoNomeArquivo}</p>
         {modalTermoAberto &&
           (termoTexto ? (
             <article

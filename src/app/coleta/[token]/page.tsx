@@ -16,6 +16,7 @@ import { ColetaCliente } from "./coleta-cliente";
 interface ResultadoValidarLink {
   pessoa_id: string;
   primeiro_nome: string;
+  pessoa_email: string | null;
   organizacao_nome: string;
   expira_em: string;
 }
@@ -51,6 +52,7 @@ export default async function ColetaPublicaPage({
       token={token}
       primeiroNome={data.primeiro_nome}
       organizacaoNome={data.organizacao_nome}
+      emailInicial={data.pessoa_email ?? undefined}
     />
   );
 }

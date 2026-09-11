@@ -20,6 +20,7 @@ export interface ParametrosUrlAssinada {
   organizationId: string;
   userId: string | null;
   expiraEmSegundos?: number;
+  nomeDownload?: string;
 }
 
 export async function criarUrlAssinada({
@@ -30,6 +31,7 @@ export async function criarUrlAssinada({
   organizationId,
   userId,
   expiraEmSegundos = VALIDADE_MAXIMA_SEGUNDOS,
+  nomeDownload,
 }: ParametrosUrlAssinada): Promise<string> {
   if (expiraEmSegundos > VALIDADE_MAXIMA_SEGUNDOS) {
     throw new Error(
@@ -39,7 +41,7 @@ export async function criarUrlAssinada({
 
   const { data, error } = await supabase.storage
     .from(bucket)
-    .createSignedUrl(caminho, expiraEmSegundos);
+    .createSignedUrl(caminho, expiraEmSegundos, nomeDownload ? { download: nomeDownload } : undefined);
 
   if (error || !data) {
     // Nunca incluir `caminho` na mensagem de erro (Regra 7: nada sensível em log

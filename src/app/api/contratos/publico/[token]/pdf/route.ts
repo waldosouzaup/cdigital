@@ -3,6 +3,7 @@ import { sha256 } from "@/lib/contratos/documento";
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
+import { nomeArquivoContrato } from "@/lib/contratos/nome-arquivo";
 
 export const runtime = "nodejs";
 
@@ -66,7 +67,7 @@ export async function GET(
       "X-Documento-SHA256": sha256(new Uint8Array(buffer)),
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
-      "Content-Disposition": `inline; filename="contrato_${contrato.contrato_id}.pdf"`,
+      "Content-Disposition": `inline; filename="${nomeArquivoContrato(contrato.nome_completo, contrato.contrato_id)}"`,
       "Cache-Control": "private, no-cache, no-store, must-revalidate",
     },
   });

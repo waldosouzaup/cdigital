@@ -20,7 +20,8 @@ export type NotificationType =
   | "pessoa_apta"
   | "distrato_enviado"
   | "contrato_assinado"
-  | "convite_usuario";
+  | "convite_usuario"
+  | "cadastro_recebido";
 
 export function idempotencyKey(
   type: NotificationType,
