@@ -656,6 +656,10 @@ export const collectionLinks = pgTable(
     token: text("token").notNull().unique(),
     expiresAt: timestamp("expira_em", { withTimezone: true }).notNull(),
     usedAt: timestamp("usado_em", { withTimezone: true }),
+    iniciadoEm: timestamp("iniciado_em", { withTimezone: true }),
+    ipOrigem: text("ip_origem"),
+    geolocalizacao: jsonb("geolocalizacao"),
+    userAgent: text("user_agent"),
     ...timestamps,
   },
   (table) => [
@@ -748,6 +752,7 @@ export const auditLog = pgTable(
     entityId: uuid("entidade_id"),
     ip: text("ip"),
     occurredAt: timestamp("ocorrido_em", { withTimezone: true }).notNull().defaultNow(),
+    detalhes: jsonb("detalhes"),
     ...timestamps,
   },
   (table) => [

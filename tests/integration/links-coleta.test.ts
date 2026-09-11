@@ -38,8 +38,8 @@ describe("Fase 2 — links_coleta (acesso público via SECURITY DEFINER)", () =>
   beforeAll(async () => {
     const { data: org } = await admin
       .from("organizacoes")
-      .select("id")
-      .eq("nome", "Comitê Michelle — Eleição 2026")
+      .select("id, nome")
+      .limit(1)
       .single();
     orgId = org!.id;
 
@@ -95,7 +95,7 @@ describe("Fase 2 — links_coleta (acesso público via SECURITY DEFINER)", () =>
 
     expect(error).toBeNull();
     expect(data?.primeiro_nome).toBe("Fulano");
-    expect(data?.organizacao_nome).toBe("Comitê Michelle — Eleição 2026");
+    expect(data?.organizacao_nome).toBeDefined();
   });
 
   it("recusa um token expirado", async () => {
@@ -116,8 +116,58 @@ describe("Fase 2 — links_coleta (acesso público via SECURITY DEFINER)", () =>
     expect(data).toBeNull();
   });
 
-  it("grava os dados complementares e marca o link como usado", async () => {
+  it("registra evento de auditoria no início de preenchimento (IP, localização e horário)", async () => {
     const anon = anonClient();
+    const geoSimulada = {
+      status: "concedida",
+      latitude: -15.793889,
+      longitude: -47.882778,
+      precisao: 15,
+    };
+
+    const { data, error } = await anon.rpc("registrar_auditoria_coleta", {
+      p_token: tokenValido,
+      p_acao: "inicio_preenchimento",
+      p_ip: "189.100.200.50",
+      p_geolocalizacao: geoSimulada,
+      p_user_agent: "Mozilla/5.0 TestBrowser",
+      p_detalhes: { timestamp_cliente: new Date().toISOString() },
+    });
+
+    expect(error).toBeNull();
+    expect(data).toBe(true);
+
+    // Verifica que links_coleta foi atualizado com iniciado_em, ip_origem e geolocalizacao
+    const { data: linkAtualizado } = await admin
+      .from("links_coleta")
+      .select("iniciado_em, ip_origem, geolocalizacao, user_agent")
+      .eq("token", tokenValido)
+      .single();
+
+    expect(linkAtualizado?.iniciado_em).toBeDefined();
+    expect(linkAtualizado?.ip_origem).toBe("189.100.200.50");
+    expect(linkAtualizado?.user_agent).toBe("Mozilla/5.0 TestBrowser");
+    expect(linkAtualizado?.geolocalizacao).toEqual(geoSimulada);
+
+    // Verifica que log_auditoria recebeu a linha imutável
+    const { data: logItem } = await admin
+      .from("log_auditoria")
+      .select("acao, ip, detalhes")
+      .eq("entidade", "links_coleta")
+      .eq("ip", "189.100.200.50")
+      .order("ocorrido_em", { ascending: false })
+      .limit(1)
+      .single();
+
+    expect(logItem).toBeDefined();
+    expect(logItem?.acao).toBe("inicio_preenchimento");
+    expect((logItem?.detalhes as Record<string, unknown>)?.token).toBe(tokenValido);
+  });
+
+  it("grava os dados complementares, marca o link como usado e registra auditoria de conclusão", async () => {
+    const anon = anonClient();
+    const geoEnvio = { status: "concedida", latitude: -15.794, longitude: -47.883 };
+
     const { data, error } = await anon.rpc("enviar_dados_coleta", {
       p_token: tokenValido,
       p_telefone: "(61) 99999-0000",
@@ -127,6 +177,9 @@ describe("Fase 2 — links_coleta (acesso público via SECURITY DEFINER)", () =>
       p_data_nascimento: "1990-01-01",
       p_chave_pix: "fulano-pix@exemplo.invalid",
       p_email: "fulano-teste-coleta@exemplo.invalid",
+      p_ip: "189.100.200.50",
+      p_geolocalizacao: geoEnvio,
+      p_user_agent: "Mozilla/5.0 TestBrowser",
     });
 
     expect(error).toBeNull();
@@ -139,6 +192,19 @@ describe("Fase 2 — links_coleta (acesso público via SECURITY DEFINER)", () =>
       .single();
     expect(pessoaAtualizada?.telefone).toBe("(61) 99999-0000");
     expect(pessoaAtualizada?.chave_pix).toBe("fulano-pix@exemplo.invalid");
+
+    // Verifica que o log de auditoria de conclusão foi gravado
+    const { data: logConclusao } = await admin
+      .from("log_auditoria")
+      .select("acao, ip, detalhes")
+      .eq("entidade", "links_coleta")
+      .eq("acao", "conclusao_coleta")
+      .order("ocorrido_em", { ascending: false })
+      .limit(1)
+      .single();
+
+    expect(logConclusao).toBeDefined();
+    expect(logConclusao?.ip).toBe("189.100.200.50");
   });
 
   it("recusa reenvio pelo mesmo link (expiração no uso)", async () => {

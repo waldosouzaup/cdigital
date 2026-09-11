@@ -7,6 +7,7 @@ import { Campo } from "@/components/campo";
 import { Selo } from "@/components/selo";
 import { Alerta } from "@/components/alerta";
 import { SeletorTema } from "@/components/seletor-tema";
+import { useAuditoriaColeta } from "@/lib/coleta/use-auditoria-coleta";
 import { inscreverCandidato } from "./acoes";
 import { ESTADO_INICIAL_INSCRICAO } from "./estado";
 
@@ -23,6 +24,10 @@ export function InscricaoCliente({
 }) {
   const router = useRouter();
   const [consentimento, setConsentimento] = useState(false);
+  const { geolocalizacao, registrarInicioPreenchimento } = useAuditoriaColeta({
+    slug,
+    tipo: "inscricao",
+  });
   const [estado, formAction, pendente] = useActionState(
     inscreverCandidato.bind(null, slug),
     ESTADO_INICIAL_INSCRICAO,
@@ -66,13 +71,34 @@ export function InscricaoCliente({
           </p>
         </header>
 
+        {/* Indicador de ambiente seguro e auditado */}
+        <div className="mt-4 flex items-center justify-between text-[0.6875rem] font-mono text-ink-muted bg-surface/80 border border-line px-3 py-1.5 rounded">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            <span>Ambiente Seguro &amp; Auditado</span>
+          </div>
+          <span className="text-[0.65rem] text-ink-muted">
+            {geolocalizacao.status === "concedida" ? "✓ Localização capturada" : "IP & Horário Registrados"}
+          </span>
+        </div>
+
         {estado.status === "erro" && estado.mensagem && (
           <div className="mt-4">
             <Alerta tom="critico">{estado.mensagem}</Alerta>
           </div>
         )}
 
-        <form action={formAction} className="mt-6 space-y-5">
+        <form
+          action={formAction}
+          className="mt-6 space-y-5"
+          onFocusCapture={registrarInicioPreenchimento}
+          onChangeCapture={registrarInicioPreenchimento}
+        >
+          <input
+            type="hidden"
+            name="geolocalizacao"
+            value={JSON.stringify(geolocalizacao)}
+          />
           <Campo
             rotulo="Nome completo"
             id="nomeCompleto"

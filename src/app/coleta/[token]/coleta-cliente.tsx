@@ -9,6 +9,7 @@ import { Alerta } from "@/components/alerta";
 import { Badge } from "@/components/badge";
 import { SeletorTema } from "@/components/seletor-tema";
 import { formatarCep, limparCep, buscarEnderecoPorCep } from "@/lib/cep/viacep";
+import { useAuditoriaColeta } from "@/lib/coleta/use-auditoria-coleta";
 import { enviarDadosColeta } from "./acoes";
 import { ESTADO_INICIAL_ENVIAR_DADOS } from "./estado";
 
@@ -28,6 +29,10 @@ export function ColetaCliente({
   primeiroNome: string;
   organizacaoNome: string;
 }) {
+  const { geolocalizacao, registrarInicioPreenchimento } = useAuditoriaColeta({
+    token,
+    tipo: "coleta",
+  });
   const [etapa, setEtapa] = useState<1 | 2 | 3>(1);
   const [consentimento, setConsentimento] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -234,7 +239,29 @@ export function ColetaCliente({
           </div>
         </div>
 
-        <form ref={formRef} action={formAction} className="space-y-6">
+        {/* Indicador de ambiente seguro e auditado */}
+        <div className="mb-4 flex items-center justify-between text-[0.6875rem] font-mono text-ink-muted bg-surface/80 border border-line px-3 py-1.5 rounded">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            <span>Ambiente Auditado TSE &amp; LGPD</span>
+          </div>
+          <span className="text-[0.65rem] text-ink-muted">
+            {geolocalizacao.status === "concedida" ? "✓ Localização capturada" : "IP & Horário Registrados"}
+          </span>
+        </div>
+
+        <form
+          ref={formRef}
+          action={formAction}
+          className="space-y-6"
+          onFocusCapture={registrarInicioPreenchimento}
+          onChangeCapture={registrarInicioPreenchimento}
+        >
+          <input
+            type="hidden"
+            name="geolocalizacao"
+            value={JSON.stringify(geolocalizacao)}
+          />
           {/* ETAPA 1: DADOS COMPLEMENTARES — só aparece/desaparece via CSS, não
               desmonta, para o form manter os valores digitados ao ir e voltar. */}
           <div className={etapa === 1 ? "space-y-6" : "hidden"}>
@@ -681,6 +708,9 @@ function TelaSucesso({
               <span className={enderecoEnviado ? "text-success font-medium" : "text-ink-muted font-medium"}>
                 {enderecoEnviado ? "✓ Recebido" : "Não enviado"}
               </span>
+            </p>
+            <p className="border-t border-line/60 pt-1.5 text-[0.7rem] text-ink-muted flex items-center gap-1">
+              <span className="text-success font-bold">✓</span> Auditoria: IP, data/hora e evidências registradas.
             </p>
           </div>
         </div>

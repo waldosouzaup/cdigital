@@ -7,6 +7,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { extrairMetadadosAuditoria } from "@/lib/auditoria/metadados-requisicao";
 import { gerarTokenColeta } from "@/lib/coleta/token";
 import { validarEntradaInscricao } from "@/lib/inscricao/validacao";
 import type { EstadoInscricao } from "./estado";
@@ -70,6 +71,17 @@ export async function inscreverCandidato(
     return { status: "erro", errors: validacao.errors };
   }
 
+  const { ip, userAgent, geoHeaders } = await extrairMetadadosAuditoria();
+  const geoRaw = campo(formData, "geolocalizacao");
+  let geolocalizacao = null;
+  if (geoRaw) {
+    try {
+      geolocalizacao = JSON.parse(geoRaw);
+    } catch {
+      // Ignora erro de parse
+    }
+  }
+
   const token = gerarTokenColeta();
   const { data: resultado, error } = await supabase
     .rpc("inscrever_candidato", {
@@ -90,6 +102,24 @@ export async function inscreverCandidato(
   }
   if (resultado.erro || !resultado.token) {
     return { status: "erro", mensagem: MENSAGEM_ERRO[resultado.erro ?? ""] ?? "Não foi possível concluir a inscrição." };
+  }
+
+  // Registra auditoria da inscrição com IP e localização
+  try {
+    await supabase.rpc("registrar_auditoria_inscricao", {
+      p_slug: slug,
+      p_acao: "envio_autoinscricao",
+      p_ip: ip,
+      p_geolocalizacao: geolocalizacao,
+      p_user_agent: userAgent,
+      p_detalhes: {
+        token: resultado.token,
+        ja_existia: resultado.ja_existia,
+        headers_geo: geoHeaders,
+      },
+    });
+  } catch {
+    // Auditoria não impede o redirecionamento
   }
 
   return { status: "sucesso", token: resultado.token, jaExistia: resultado.ja_existia };

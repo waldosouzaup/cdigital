@@ -7,6 +7,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { extrairMetadadosAuditoria } from "@/lib/auditoria/metadados-requisicao";
 import type { EstadoEnviarDadosColeta } from "./estado";
 
 function campoOuNulo(formData: FormData, nome: string): string | null {
@@ -20,6 +21,17 @@ export async function enviarDadosColeta(
   formData: FormData,
 ): Promise<EstadoEnviarDadosColeta> {
   const supabase = await createClient();
+  const { ip, userAgent } = await extrairMetadadosAuditoria();
+
+  const geoRaw = campoOuNulo(formData, "geolocalizacao");
+  let geolocalizacao = null;
+  if (geoRaw) {
+    try {
+      geolocalizacao = JSON.parse(geoRaw);
+    } catch {
+      // Ignora erro de parse
+    }
+  }
 
   const { data, error } = await supabase.rpc("enviar_dados_coleta", {
     p_token: token,
@@ -30,6 +42,9 @@ export async function enviarDadosColeta(
     p_data_nascimento: campoOuNulo(formData, "dataNascimento"),
     p_chave_pix: campoOuNulo(formData, "chavePix"),
     p_email: campoOuNulo(formData, "email"),
+    p_ip: ip,
+    p_geolocalizacao: geolocalizacao,
+    p_user_agent: userAgent,
   });
 
   if (error) {
