@@ -1,64 +1,76 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Marca } from "@/components/marca";
 import { SeletorTema } from "@/components/seletor-tema";
+
+export const metadata: Metadata = {
+  title: "Comitê Digital | Equipe, contratos e pendências sob controle",
+  description:
+    "Centralize a gestão da sua campanha: cadastre colaboradores pelo celular, organize documentos e acompanhe contratos e pendências no Painel do Gestor.",
+};
+
+const botaoGestor =
+  "inline-flex min-h-14 w-full items-center justify-center rounded-full bg-primary-hover px-7 py-4 text-sm sm:text-base font-bold text-canvas shadow-elevation transition hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus sm:w-auto";
+const botaoColeta =
+  "inline-flex min-h-14 w-full items-center justify-center rounded-full border-2 border-primary-hover bg-primary-tint px-7 py-4 text-sm sm:text-base font-bold text-ink shadow-card transition hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus sm:w-auto";
 
 const modulos = [
   {
     id: "pessoas",
     icone: "👥",
-    titulo: "Quadro de Pessoas e Equipes",
+    titulo: "Saiba quem está na equipe e onde atua",
     descricao:
-      "Cadastro centralizado com validação de CPF por dígito verificador, distribuição por região e checagem imediata de aptidão jurídica.",
-    destaques: ["Unicidade por CPF", "Vínculo Regional", "Aptidão Documental"],
+      "Reúna os colaboradores em uma única base, evite cadastros duplicados por CPF e organize a equipe por região. Veja quem está com a documentação em dia e quem precisa de atenção.",
+    destaques: ["Cadastro único", "Equipe por região", "Pendências visíveis"],
     link: "/pessoas",
   },
   {
     id: "contratos",
     icone: "📄",
-    titulo: "Gestão de Contratos e Vigor",
+    titulo: "Acompanhe cada contrato até a assinatura",
     descricao:
-      "Emissão automática de minutas em PDF com valores por extenso calculados no servidor, controle de vigência e formalização de distratos.",
-    destaques: ["Extenso Gramatical", "Assinatura Eletrônica", "Controle de Vigência"],
+      "Gere contratos a partir dos dados cadastrados, envie para assinatura eletrônica e acompanhe o status de cada um. Controle vigências e formalize distratos com menos preenchimento manual.",
+    destaques: ["Geração de contratos", "Assinatura eletrônica", "Controle de prazos"],
     link: "/contratos",
   },
   {
     id: "documentos",
     icone: "🔍",
-    titulo: "Conferência Documental",
+    titulo: "Resolva pendências antes de elas se acumularem",
     descricao:
-      "Inspeção técnica em tempo real de fotos e comprovantes. Rejeição imediata de arquivos ilegíveis com menor dimensão inferior a 800 px.",
-    destaques: ["Validação de 800+ px", "Hash SHA-256", "Buckets Privados (15 min)"],
+      "Receba os documentos vinculados a cada colaborador e confira tudo no mesmo lugar. Aprove, rejeite ou solicite correções com um histórico para acompanhar o que falta.",
+    destaques: ["Documentos por pessoa", "Conferência centralizada", "Histórico de revisão"],
     link: "/documentos",
   },
   {
     id: "atividades",
     icone: "📌",
-    titulo: "Atividades de Rua e Prestação",
+    titulo: "Organize as atividades e os registros da operação",
     descricao:
-      "Registro de ações de rua, panfletagem e mobilizações com sincronização em tempo real e relatórios consolidados para prestação de contas.",
-    destaques: ["Apontamento por Região", "Controle de Materiais", "Exportação TSE"],
-    link: "/configuracoes?aba=atividades",
+      "Acompanhe os registros das atividades em campo e consulte os relatórios da campanha. Mantenha as informações reunidas para apoiar a gestão e a preparação da prestação de contas.",
+    destaques: ["Atividades em campo", "Visão da operação", "Relatórios para conferência"],
+    link: "/atividades",
   },
 ];
 
 const etapasFluxo = [
   {
     passo: "01",
-    titulo: "Coleta Móvel em Campo",
+    titulo: "Receba os dados pelo celular",
     descricao:
-      "O colaborador acessa um link individual ou QR Code diretamente pelo celular, preenche os dados e envia as fotos dos documentos sem necessidade de login ou download de aplicativo.",
+      "Compartilhe o link de coleta. O colaborador preenche os dados e envia as fotos dos documentos pelo navegador, sem instalar aplicativo nem criar senha.",
   },
   {
     passo: "02",
-    titulo: "Validação e Formalização",
+    titulo: "Confira e formalize no painel",
     descricao:
-      "O sistema inspeciona a resolução dos arquivos em tempo de upload, valida os dados cadastrais e gera a minuta contratual padronizada com assinatura digital.",
+      "Sua equipe confere os cadastros, resolve pendências e gera os contratos com os dados já recebidos. Depois, acompanha o envio e a assinatura em um único fluxo.",
   },
   {
     passo: "03",
-    titulo: "Gestão e Auditoria Centralizada",
+    titulo: "Enxergue o que precisa da sua decisão",
     descricao:
-      "O gestor acompanha o andamento em tempo real, gerencia pendências por região e mantém uma trilha auditável imutável com carimbo de tempo, IP e hash.",
+      "Acompanhe o avanço por região, identifique documentos pendentes e contratos que aguardam assinatura. Consulte o histórico e exporte relatórios para orientar os próximos passos.",
   },
 ];
 
@@ -67,17 +79,17 @@ export default function Home() {
     <div className="min-h-screen bg-canvas text-ink selection:bg-primary-tint selection:text-primary font-sans">
       {/* 1. NAVEGAÇÃO SUPERIOR CLEAN */}
       <header className="sticky top-0 z-50 border-b border-line bg-surface/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-4">
           <div className="flex items-center gap-3">
             <Marca subtitulo="Sistema de Gestão" />
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-xs font-semibold tracking-wide text-ink-muted">
             <Link href="#modulos" className="hover:text-primary transition-colors">
-              Módulos
+              Recursos
             </Link>
             <Link href="#fluxo" className="hover:text-primary transition-colors">
-              Como Funciona
+              Como funciona
             </Link>
             <Link
               href="/inscricao/candidado-eleicao-2026"
@@ -91,7 +103,7 @@ export default function Home() {
             <SeletorTema />
             <Link
               href="/login"
-              className="bg-primary hover:bg-primary-hover text-white px-5 py-2 text-xs font-semibold flex items-center shadow-sm rounded-full transition"
+              className="bg-primary-hover hover:brightness-90 text-canvas px-5 py-2.5 min-h-11 text-xs font-semibold flex items-center shadow-sm rounded-full transition"
             >
               <span>Acessar Painel</span>
             </Link>
@@ -101,38 +113,40 @@ export default function Home() {
 
       <main className="mx-auto max-w-6xl px-6 py-12 sm:py-16 space-y-24">
         {/* 2. HERO RESPIRÁVEL & SNAPSHOT GERENCIAL */}
-        <section className="space-y-12">
-          <div className="max-w-3xl space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary-tint px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-primary">
-              <span>PLATAFORMA OPERACIONAL</span>
-              <span className="text-primary/40">•</span>
-              <span>CONFORMIDADE ELEITORAL</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-ink-strong leading-tight">
-              Central de comando para equipes, contratos e conformidade.
-            </h1>
-
-            <p className="text-base sm:text-lg text-ink-muted leading-relaxed max-w-2xl font-normal">
-              O Comitê Digital centraliza o cadastro de colaboradores em campo, a emissão automatizada
-              de contratos e a conferência de documentos com rastreabilidade completa para a
-              prestação de contas.
+        <section aria-labelledby="titulo-principal" className="space-y-12">
+          <div className="mx-auto max-w-4xl space-y-6 text-center">
+            <p className="text-sm font-semibold text-ink-muted">
+              Gestão de equipes para campanhas eleitorais
             </p>
 
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Link
-                href="/login"
-                className="bg-primary hover:bg-primary-hover text-white px-6 py-3.5 text-xs sm:text-sm font-semibold flex items-center rounded-full shadow-card transition"
-              >
-                <span>Entrar no Painel do Gestor</span>
-              </Link>
+            <h1
+              id="titulo-principal"
+              className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-ink-strong leading-[1.1] text-balance"
+            >
+              Sua equipe organizada. Sua gestão no controle.
+            </h1>
 
-              <Link
-                href="/candidado-eleicao-2026"
-                className="rounded-full border border-line bg-surface px-6 py-3.5 text-xs sm:text-sm font-semibold text-ink hover:bg-surface-sunken transition shadow-sm"
-              >
-                Experimentar Coleta Móvel
-              </Link>
+            <p className="mx-auto text-base sm:text-lg text-ink-muted leading-relaxed max-w-2xl font-normal text-pretty">
+              Chega de procurar documentos em conversas e conferir contratos em planilhas separadas.
+              Com o Comitê Digital, você reúne equipe, documentos e assinaturas em um só painel e
+              sabe o que precisa de atenção para a campanha avançar.
+            </p>
+
+            <div className="mx-auto grid max-w-2xl grid-cols-1 gap-5 pt-4 sm:grid-cols-2 sm:gap-4">
+              <div className="space-y-2.5">
+                <Link href="/login" className={`${botaoGestor} sm:w-full`}>
+                  Entrar no Painel do Gestor
+                </Link>
+                <p className="text-xs text-ink-muted">Já tem acesso? Gerencie sua operação.</p>
+              </div>
+              <div className="space-y-2.5">
+                <Link href="/candidado-eleicao-2026" className={`${botaoColeta} sm:w-full`}>
+                  Experimentar Coleta Móvel
+                </Link>
+                <p className="text-xs text-ink-muted">
+                  Conheça o formulário que sua equipe recebe.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -140,51 +154,46 @@ export default function Home() {
           <div className="rounded-2xl border border-line bg-surface p-6 sm:p-8 shadow-card">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-5 mb-6">
               <div>
-                <span className="text-xs font-mono uppercase tracking-wider text-ink-muted block">
-                  Visão Operacional Consolidada
-                </span>
+                <span className="text-xs text-ink-muted block">Visão do gestor</span>
                 <span className="text-sm font-bold text-ink">
-                  Demonstração da Central de Comando
+                  Saiba onde agir, sem juntar várias planilhas
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-positive-text animate-pulse" />
-                <span className="text-xs font-mono text-positive-text font-medium">
-                  Sincronizado ao Vivo
-                </span>
-              </div>
+              <span className="self-start rounded-full border border-line bg-surface-sunken px-3 py-1 text-xs text-ink-muted sm:self-auto">
+                Demonstração com dados ilustrativos
+              </span>
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-1">
-                <span className="text-xs font-mono text-ink-muted uppercase">Equipe Ativa</span>
+                <span className="text-xs text-ink-muted">Colaboradores cadastrados</span>
                 <div className="text-2xl sm:text-3xl font-black text-ink font-mono">148</div>
-                <span className="text-[0.72rem] text-positive-text font-medium block">
-                  ● 100% validados por CPF
+                <span className="text-xs text-ink-muted font-medium block">
+                  Equipe reunida em uma única base
                 </span>
               </div>
 
               <div className="space-y-1">
-                <span className="text-xs font-mono text-ink-muted uppercase">Contratos Emitidos</span>
-                <div className="text-2xl sm:text-3xl font-black text-primary font-mono">142</div>
-                <span className="text-[0.72rem] text-ink-muted font-medium block">
-                  134 assinados digitalmente
+                <span className="text-xs text-ink-muted">Contratos emitidos</span>
+                <div className="text-2xl sm:text-3xl font-black text-ink font-mono">142</div>
+                <span className="text-xs text-ink-muted font-medium block">
+                  Formalizações para acompanhar
                 </span>
               </div>
 
               <div className="space-y-1">
-                <span className="text-xs font-mono text-ink-muted uppercase">Validação de Fotos</span>
-                <div className="text-2xl sm:text-3xl font-black text-positive-text font-mono">98.6%</div>
-                <span className="text-[0.72rem] text-ink-muted font-medium block">
-                  Fotos nítidas (800+ px)
+                <span className="text-xs text-ink-muted">Contratos assinados</span>
+                <div className="text-2xl sm:text-3xl font-black text-ink font-mono">134</div>
+                <span className="text-xs text-ink-muted font-medium block">
+                  Assinaturas recebidas e registradas
                 </span>
               </div>
 
               <div className="space-y-1">
-                <span className="text-xs font-mono text-ink-muted uppercase">Auditoria TSE</span>
-                <div className="text-2xl sm:text-3xl font-black text-ink font-mono">100%</div>
-                <span className="text-[0.72rem] text-positive-text font-medium block">
-                  Trilha imutável com SHA-256
+                <span className="text-xs text-ink-muted">Aguardando assinatura</span>
+                <div className="text-2xl sm:text-3xl font-black text-ink font-mono">8</div>
+                <span className="text-xs text-ink-muted font-medium block">
+                  Saiba quem precisa de um lembrete
                 </span>
               </div>
             </div>
@@ -194,15 +203,12 @@ export default function Home() {
         {/* 3. MÓDULOS DO SISTEMA (APRESENTAÇÃO DIRETA DO PRODUTO) */}
         <section id="modulos" className="space-y-8 scroll-mt-24">
           <div className="max-w-2xl space-y-2">
-            <span className="font-mono text-xs uppercase tracking-wider text-primary font-bold">
-              Estrutura Funcional
-            </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-ink-strong tracking-tight">
-              Módulos do Sistema
+              Menos retrabalho em cada etapa da gestão
             </h2>
             <p className="text-xs sm:text-sm text-ink-muted leading-relaxed">
-              Tudo o que o gestor precisa para conduzir a operação com precisão, agilidade e total
-              conformidade jurídica.
+              Do cadastro à assinatura, mantenha as informações conectadas para sua equipe trabalhar
+              com clareza e você decidir com mais segurança.
             </p>
           </div>
 
@@ -215,14 +221,15 @@ export default function Home() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-tint border border-primary/20 text-lg">
-                      {mod.icone}
+                      <span aria-hidden="true">{mod.icone}</span>
                     </span>
                     <Link
                       href={mod.link}
-                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                      aria-label={`Abrir módulo: ${mod.titulo}`}
+                      className="text-xs font-bold text-ink hover:underline flex items-center gap-1"
                     >
                       <span>Abrir módulo</span>
-                      <span>→</span>
+                      <span aria-hidden="true">→</span>
                     </Link>
                   </div>
 
@@ -237,7 +244,7 @@ export default function Home() {
                   {mod.destaques.map((item, idx) => (
                     <span
                       key={idx}
-                      className="rounded-md border border-line bg-surface-sunken px-2.5 py-1 font-mono text-[0.68rem] text-ink-muted"
+                      className="rounded-md border border-line bg-surface-sunken px-2.5 py-1 text-xs text-ink-muted"
                     >
                       {item}
                     </span>
@@ -251,14 +258,11 @@ export default function Home() {
         {/* 4. COMO FUNCIONA NA PRÁTICA (FLUXO EM 3 ETAPAS) */}
         <section id="fluxo" className="space-y-8 scroll-mt-24">
           <div className="max-w-2xl space-y-2">
-            <span className="font-mono text-xs uppercase tracking-wider text-primary font-bold">
-              Processo Operacional
-            </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-ink-strong tracking-tight">
-              Como funciona na prática
+              Do celular da equipe ao seu painel, em três etapas
             </h2>
             <p className="text-xs sm:text-sm text-ink-muted leading-relaxed">
-              Da captação no celular do colaborador à consolidação no painel executivo.
+              Distribua a coleta, centralize a conferência e acompanhe o andamento da operação.
             </p>
           </div>
 
@@ -269,7 +273,7 @@ export default function Home() {
                 className="rounded-2xl border border-line bg-surface p-6 space-y-4 flex flex-col justify-between shadow-sm"
               >
                 <div className="space-y-3">
-                  <span className="font-mono text-xs font-bold text-primary bg-primary-tint px-2.5 py-1 rounded-full border border-primary/20 inline-block">
+                  <span className="font-mono text-xs font-bold text-ink bg-primary-tint px-2.5 py-1 rounded-full border border-primary/20 inline-block">
                     Etapa {item.passo}
                   </span>
                   <h3 className="text-base font-bold text-ink">{item.titulo}</h3>
@@ -284,19 +288,16 @@ export default function Home() {
           {/* Chamada para teste móvel */}
           <div className="rounded-2xl border border-line bg-surface-sunken p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
-              <h4 className="text-sm sm:text-base font-bold text-ink">
-                Coleta móvel sem atrito para o colaborador
-              </h4>
+              <h3 className="text-sm sm:text-base font-bold text-ink">
+                Veja como é simples enviar os dados pelo celular
+              </h3>
               <p className="text-xs text-ink-muted max-w-xl">
-                O colaborador não precisa baixar aplicativo nem criar senha. A validação do documento
-                acontece no próprio navegador.
+                Abra o formulário público e conheça a experiência do colaborador antes de
+                compartilhar com a equipe. Sem instalar aplicativo e sem criar senha.
               </p>
             </div>
-            <Link
-              href="/inscricao/candidado-eleicao-2026"
-              className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 text-xs font-semibold rounded-full whitespace-nowrap shadow-sm transition"
-            >
-              Testar Coleta Pública →
+            <Link href="/candidado-eleicao-2026" className={`${botaoColeta} shrink-0`}>
+              Experimentar Coleta Móvel
             </Link>
           </div>
         </section>
@@ -305,21 +306,20 @@ export default function Home() {
         <section className="rounded-3xl border border-primary/20 bg-surface-tint p-8 sm:p-12 text-center space-y-6 shadow-card">
           <div className="max-w-xl mx-auto space-y-3">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-ink-strong tracking-tight">
-              Sua campanha organizada, auditável e sob controle.
+              Tenha clareza para conduzir sua campanha todos os dias.
             </h2>
             <p className="text-xs sm:text-sm text-ink-muted leading-relaxed">
-              Deixe de depender de controles paralelos e planilhas desconexas. Tenha visibilidade em
-              tempo real de cada colaborador, contrato e atividade.
+              Saiba quem já está cadastrado, quais contratos foram assinados e o que ainda falta
+              resolver. Entre no painel ou conheça a coleta que leva os dados da equipe até você.
             </p>
           </div>
 
-          <div className="pt-2">
-            <Link
-              href="/login"
-              className="bg-primary hover:bg-primary-hover text-white px-8 py-3.5 text-xs sm:text-sm font-bold rounded-full inline-flex items-center gap-2 shadow-sm transition"
-            >
-              <span>Acessar o Painel do Gestor</span>
-              <span className="text-base">→</span>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-4 pt-2">
+            <Link href="/login" className={botaoGestor}>
+              Entrar no Painel do Gestor
+            </Link>
+            <Link href="/candidado-eleicao-2026" className={botaoColeta}>
+              Experimentar Coleta Móvel
             </Link>
           </div>
         </section>
@@ -331,16 +331,17 @@ export default function Home() {
           <div className="space-y-1">
             <Marca subtitulo="Sistema de Gestão" />
             <p className="text-ink-muted text-xs max-w-sm pt-1">
-              Plataforma de gestão operacional e conformidade para campanhas eleitorais.
+              Equipes, documentos e contratos em um só lugar para facilitar a gestão da sua
+              campanha.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-6 text-xs font-semibold text-ink-muted">
             <Link href="#modulos" className="hover:text-primary transition-colors">
-              Módulos
+              Recursos
             </Link>
             <Link href="#fluxo" className="hover:text-primary transition-colors">
-              Como Funciona
+              Como funciona
             </Link>
             <Link
               href="/inscricao/candidado-eleicao-2026"
@@ -348,7 +349,7 @@ export default function Home() {
             >
               Coletar Dados →
             </Link>
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href="/login" className="text-ink hover:underline">
               Painel do Gestor
             </Link>
           </div>
