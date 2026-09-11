@@ -7,6 +7,7 @@ import {
   CRON_VIGENCIA_A_VENCER,
   CRON_LEMBRETE_ASSINATURA,
   CRON_REPROCESSAR_NOTIFICACOES,
+  CRON_MANTER_BANCO_ATIVO,
 } from "@/lib/cron/agenda";
 
 /**
@@ -68,5 +69,17 @@ describe("expressões cron dos 4 jobs da Fase 4", () => {
     ]) {
       expect(sql).toContain(`'${expressao}'`);
     }
+  });
+});
+
+describe("manter o banco ativo (evitar pausa por inatividade do Supabase)", () => {
+  it("uma vez por dia, de madrugada", () => {
+    expect(CRON_MANTER_BANCO_ATIVO).toMatch(/^\d+ \d+ \* \* \*$/);
+    expect(CRON_MANTER_BANCO_ATIVO).toBe("0 7 * * *"); // 04h Brasília
+  });
+
+  it("a migration 0033 agenda exatamente esta expressão (guarda contra drift)", () => {
+    const sql = readFileSync("supabase/migrations/0033_pg_cron_manter_banco_ativo.sql", "utf8");
+    expect(sql).toContain(`'${CRON_MANTER_BANCO_ATIVO}'`);
   });
 });

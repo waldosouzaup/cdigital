@@ -66,8 +66,8 @@ describe("Gate Fase 2 — cadeia completa: pessoa → link → documento → con
       await admin.from("contratos").delete().eq("id", contratoId);
     }
     if (templateId) await admin.from("templates_contrato").delete().eq("id", templateId);
-    if (documentoId) await admin.from("documentos").delete().eq("id", documentoId);
     if (pessoaId) {
+      await admin.from("documentos").delete().eq("pessoa_id", pessoaId);
       await admin.from("notificacoes").delete().eq("entidade_id", pessoaId);
       await admin.from("links_coleta").delete().eq("pessoa_id", pessoaId);
       await admin.from("pessoas").delete().eq("id", pessoaId);
@@ -90,9 +90,11 @@ describe("Gate Fase 2 — cadeia completa: pessoa → link → documento → con
       .single();
     regiaoId = regiao!.id;
 
+    const cpfE2E = generateValidCpf(String(Date.now()).slice(-8));
+
     const entrada = validarEntradaPessoa({
       fullName: "Fulana Gate Completo da Silva",
-      cpf: generateValidCpf("12312312"),
+      cpf: cpfE2E,
       phone: "",
       regionId: regiaoId,
       role: "Militância e Mobilização de Rua",
@@ -211,6 +213,23 @@ describe("Gate Fase 2 — cadeia completa: pessoa → link → documento → con
       .update({ status: "aprovado", motivo_rejeicao: null })
       .eq("id", documentoId);
     expect(erroAprovacao).toBeNull();
+
+    const { error: erroDoc } = await admin
+      .from("documentos")
+      .insert({
+        organizacao_id: orgId,
+        pessoa_id: pessoaId,
+        tipo: "comprovante_endereco",
+        caminho_storage: `${orgId}/coleta/${tokenColeta}/comprovante_endereco_${pessoaId}_v1.jpg`,
+        nome_original: "comprovante_residencia.jpg",
+        hash_sha256: `hash-teste-e2e-endereco-${Date.now()}`,
+        largura_px: 1200,
+        altura_px: 1600,
+        bytes: 50000,
+        versao: 1,
+        status: "aprovado",
+      });
+    expect(erroDoc).toBeNull();
 
     const { data: documentos } = await admin
       .from("documentos")

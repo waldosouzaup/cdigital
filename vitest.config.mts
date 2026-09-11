@@ -1,5 +1,8 @@
 import { defineConfig } from "vitest/config";
+import { loadEnv } from "vite";
 import path from "node:path";
+
+process.env = { ...process.env, ...loadEnv("development", process.cwd(), "") };
 
 export default defineConfig({
   resolve: {

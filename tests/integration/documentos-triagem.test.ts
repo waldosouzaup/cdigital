@@ -91,6 +91,22 @@ describe("Fase 2 — mesa de triagem: aprovação de documento marca pessoa apta
       .single();
     documentoId = documento!.id;
 
+    await admin
+      .from("documentos")
+      .insert({
+        organizacao_id: orgId,
+        pessoa_id: pessoaId,
+        tipo: "comprovante_endereco",
+        caminho_storage: `${orgId}/teste/comprovante_endereco_${pessoaId}_v1.jpg`,
+        nome_original: "endereco.jpg",
+        hash_sha256: "hash-teste-triagem-endereco-0001",
+        largura_px: 1200,
+        altura_px: 1600,
+        bytes: 50000,
+        versao: 1,
+        status: "aprovado",
+      });
+
     // "auditor": um usuário autenticado da organização SEM poder de triagem. Serve
     // para provar que a policy `documentos_mutacao_gestor_coord` (0016) barra a
     // escrita, e que a RLS de `pessoas` continua liberada.
@@ -106,7 +122,7 @@ describe("Fase 2 — mesa de triagem: aprovação de documento marca pessoa apta
   }, 30000);
 
   afterAll(async () => {
-    await admin.from("documentos").delete().eq("id", documentoId);
+    await admin.from("documentos").delete().eq("pessoa_id", pessoaId);
     await admin.from("pessoas").delete().eq("id", pessoaId);
     await admin.from("usuarios").delete().eq("id", userId);
     await admin.auth.admin.deleteUser(userId).catch(() => {});

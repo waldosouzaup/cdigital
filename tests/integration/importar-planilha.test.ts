@@ -36,6 +36,12 @@ beforeAll(async () => {
   orgId = org!.id;
 
   cpfJaCadastrado = generateValidCpf("78978978");
+  await admin
+    .from("pessoas")
+    .delete()
+    .eq("organizacao_id", orgId)
+    .in("cpf", [cpfRepetido.replace(/\D/g, ""), cpfUnico.replace(/\D/g, ""), cpfJaCadastrado.replace(/\D/g, "")]);
+
   const { data: pessoa } = await admin
     .from("pessoas")
     .insert({

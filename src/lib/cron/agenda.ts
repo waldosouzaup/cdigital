@@ -40,3 +40,9 @@ export const CRON_LEMBRETE_ASSINATURA = `15 ${horaBrasiliaParaUtc(7)} * * *`;
 
 // Reprocessamento de notificações que falharam: a cada 15 minutos, o dia todo.
 export const CRON_REPROCESSAR_NOTIFICACOES = "*/15 * * * *";
+
+// Manter o banco ativo (evitar a pausa por inatividade do Supabase): uma vez por
+// dia, de madrugada, antes de todos os outros — só existe para garantir a
+// chamada externa à API do Supabase mesmo se os jobs de negócio acima forem
+// desligados ou não encontrarem nada para fazer num dia (ver migration 0033).
+export const CRON_MANTER_BANCO_ATIVO = `0 ${horaBrasiliaParaUtc(4)} * * *`;

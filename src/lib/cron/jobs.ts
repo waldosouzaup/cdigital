@@ -34,6 +34,35 @@ interface DepsBase {
 }
 
 // ---------------------------------------------------------------------------
+// manter_banco_ativo
+// ---------------------------------------------------------------------------
+
+export interface ResultadoManterBancoAtivo {
+  ok: true;
+  verificadoEm: string;
+}
+
+/**
+ * Não envia nada, não tem regra de negócio — o único propósito deste job é
+ * gerar, todo dia, uma chamada real à API do Supabase vinda de fora do banco
+ * (via `/api/cron/*`, mesmo caminho dos outros jobs). `pg_cron`/`pg_net`
+ * sozinhos, de dentro do Postgres, não contam como "atividade" para o
+ * Supabase decidir não pausar o projeto por inatividade — só uma requisição
+ * externa conta. `head: true` evita trazer qualquer linha: é a consulta mais
+ * barata que ainda é, de fato, uma chamada à API.
+ */
+export async function jobManterBancoAtivo(deps: {
+  supabase: SupabaseClient;
+}): Promise<ResultadoManterBancoAtivo> {
+  const { error } = await deps.supabase
+    .from("organizacoes")
+    .select("id", { count: "exact", head: true });
+  if (error) throw new Error("falha ao pingar o banco");
+
+  return { ok: true, verificadoEm: new Date().toISOString() };
+}
+
+// ---------------------------------------------------------------------------
 // vigencia_a_vencer
 // ---------------------------------------------------------------------------
 
@@ -113,7 +142,13 @@ export async function jobVigenciaAVencer(
     }
   }
 
-  return { referencia: hoje, contratosAVencer: aVencer.length, enviados, duplicados, semDestinatario };
+  return {
+    referencia: hoje,
+    contratosAVencer: aVencer.length,
+    enviados,
+    duplicados,
+    semDestinatario,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -165,9 +200,7 @@ export async function jobLembreteAssinatura(
 
     const pessoaBruta = contrato.pessoas as unknown;
     const pessoa = (Array.isArray(pessoaBruta) ? pessoaBruta[0] : pessoaBruta) as
-      | { nome_completo: string; email: string | null }
-      | null
-      | undefined;
+      { nome_completo: string; email: string | null } | null | undefined;
     const nome = primeiroNome(pessoa?.nome_completo);
 
     if (pessoa?.email) {
@@ -200,8 +233,9 @@ export async function jobLembreteAssinatura(
       .in("papel", ["coord_regiao", "coord_comite"]);
 
     const coord =
-      (coords ?? []).find((u) => u.papel === "coord_regiao" && u.regiao_id === contrato.regiao_id) ??
-      (coords ?? []).find((u) => u.papel === "coord_comite");
+      (coords ?? []).find(
+        (u) => u.papel === "coord_regiao" && u.regiao_id === contrato.regiao_id,
+      ) ?? (coords ?? []).find((u) => u.papel === "coord_comite");
 
     if (coord?.email) {
       const email = await renderizarEmailLembreteAssinatura({
@@ -228,7 +262,13 @@ export async function jobLembreteAssinatura(
     }
   }
 
-  return { referencia: hoje, lembretes: idsParaLembrar.size, enviadosContratado, enviadosCoordenador, duplicados };
+  return {
+    referencia: hoje,
+    lembretes: idsParaLembrar.size,
+    enviadosContratado,
+    enviadosCoordenador,
+    duplicados,
+  };
 }
 
 // ---------------------------------------------------------------------------
