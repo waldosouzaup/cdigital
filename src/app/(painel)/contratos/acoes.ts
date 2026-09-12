@@ -25,6 +25,7 @@ import {
   montarDadosDistrato,
   substituirMarcadoresDistrato,
 } from "@/lib/contratos/template-distrato";
+import { qualificacaoContratante } from "@/lib/contratos/contratante";
 import { buscarTemplateDistrato } from "../configuracoes/dados";
 import { renderizarEmailContratoEnviado } from "@/emails/contrato-enviado";
 import { renderizarEmailContratoAssinado } from "@/emails/contrato-assinado";
@@ -594,9 +595,25 @@ export async function distratarContrato(
   // Sem modelo salvo, `buscarTemplateDistrato` devolve o termo oficial de fábrica,
   // que é o mesmo texto que `montarTextoTermoDistrato` sempre gerou.
   const modeloDistrato = await buscarTemplateDistrato();
+
+  // A CONTRATANTE vem da organização (migration 0037); antes estava escrita
+  // dentro do próprio termo, o que fazia todo comitê distratar em nome de outro.
+  const { data: org } = await supabase
+    .from("organizacoes")
+    .select("nome,cnpj,endereco,representante_nome,representante_cargo,qualificacao_contratante")
+    .eq("id", organizationId)
+    .maybeSingle();
   const corpoTermo = substituirMarcadoresDistrato(
     modeloDistrato.corpoHtml,
     montarDadosDistrato({
+      contratante: qualificacaoContratante({
+        nome: org?.nome ?? "",
+        cnpj: org?.cnpj,
+        endereco: org?.endereco,
+        representanteNome: org?.representante_nome,
+        representanteCargo: org?.representante_cargo,
+        qualificacaoContratante: org?.qualificacao_contratante,
+      }),
       contratadoNome: contrato.pessoas?.nome_completo ?? "—",
       contratadoCpf: contrato.pessoas?.cpf ?? "—",
       contratadoEndereco: contrato.pessoas?.endereco ?? null,

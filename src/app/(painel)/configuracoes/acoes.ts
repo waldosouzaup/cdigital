@@ -204,6 +204,12 @@ export async function salvarIdentidadeComite(
       nome: validacao.valores.nome,
       cnpj: validacao.valores.cnpj,
       slug: validacao.valores.slug,
+      // Migration 0037: qualificação da CONTRATANTE nos contratos. Texto livre,
+      // sem validação de forma — a redação jurídica é do comitê, não nossa.
+      endereco: campoTexto(formData, "endereco") || null,
+      representante_nome: campoTexto(formData, "representanteNome") || null,
+      representante_cargo: campoTexto(formData, "representanteCargo") || null,
+      qualificacao_contratante: campoTexto(formData, "qualificacaoContratante") || null,
     })
     .eq("id", organizationId);
 

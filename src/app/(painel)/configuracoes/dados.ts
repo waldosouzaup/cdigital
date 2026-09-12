@@ -4,6 +4,7 @@
  */
 import { createClient } from "@/lib/supabase/server";
 import { normalizarRemetente } from "@/lib/notificacoes/remetente";
+import { qualificacaoContratante } from "@/lib/contratos/contratante";
 import {
   NOME_TEMPLATE_DISTRATO,
   TEMPLATE_DISTRATO_PADRAO,
@@ -23,6 +24,12 @@ export interface TemplateContrato {
 }
 
 export interface IdentidadeComite {
+  endereco: string | null;
+  representanteNome: string | null;
+  representanteCargo: string | null;
+  qualificacaoContratante: string | null;
+  /** Como a CONTRATANTE sai hoje nos contratos, já composta. */
+  contratantePreview: string;
   nome: string;
   cnpj: string | null;
   /** Slug da URL pública `/inscricao/<slug>` (Feature B). */
@@ -34,11 +41,32 @@ export async function buscarIdentidadeComite(): Promise<IdentidadeComite> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("organizacoes")
-    .select("nome, cnpj, slug")
+    .select(
+      "nome, cnpj, slug, endereco, representante_nome, representante_cargo, qualificacao_contratante",
+    )
     .maybeSingle();
 
   if (error) throw new Error("Não foi possível carregar a identidade do comitê.");
-  return { nome: data?.nome ?? "", cnpj: data?.cnpj ?? null, slug: data?.slug ?? null };
+
+  return {
+    nome: data?.nome ?? "",
+    cnpj: data?.cnpj ?? null,
+    slug: data?.slug ?? null,
+    endereco: data?.endereco ?? null,
+    representanteNome: data?.representante_nome ?? null,
+    representanteCargo: data?.representante_cargo ?? null,
+    qualificacaoContratante: data?.qualificacao_contratante ?? null,
+    // A tela mostra o resultado, não os ingredientes: é este texto que sai
+    // impresso no contrato e no termo de distrato.
+    contratantePreview: qualificacaoContratante({
+      nome: data?.nome ?? "",
+      cnpj: data?.cnpj,
+      endereco: data?.endereco,
+      representanteNome: data?.representante_nome,
+      representanteCargo: data?.representante_cargo,
+      qualificacaoContratante: data?.qualificacao_contratante,
+    }),
+  };
 }
 
 export async function listarTemplates(): Promise<TemplateContrato[]> {

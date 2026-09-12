@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { gerarPdfContrato, htmlParaTexto } from "./gerar-pdf";
 import { substituirMarcadores } from "./marcadores";
+import { qualificacaoContratante } from "./contratante";
 import { nomeArquivoContrato } from "./nome-arquivo";
 
 export const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
@@ -10,7 +11,7 @@ export const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).
 export async function garantirPdfCompleto(supabase: SupabaseClient, contratoId: string) {
   const { data: c, error } = await supabase
     .from("contratos")
-    .select("*, pessoas(*), templates_contrato(corpo_html)")
+    .select("*, pessoas(*), templates_contrato(corpo_html), organizacoes(nome,cnpj,endereco,representante_nome,representante_cargo,qualificacao_contratante)")
     .eq("id", contratoId)
     .single();
   if (error || !c) throw new Error("Contrato não encontrado.");
@@ -29,6 +30,15 @@ export async function garantirPdfCompleto(supabase: SupabaseClient, contratoId: 
     );
   }
   const p = c.pessoas;
+  const org = c.organizacoes ?? { nome: "" };
+  const contratante = qualificacaoContratante({
+    nome: org.nome,
+    cnpj: org.cnpj,
+    endereco: org.endereco,
+    representanteNome: org.representante_nome,
+    representanteCargo: org.representante_cargo,
+    qualificacaoContratante: org.qualificacao_contratante,
+  });
   const dataBR = (v: string) => v.split("-").reverse().join("/");
   const preenchido = substituirMarcadores(htmlParaTexto(corpo), {
     nome: p.nome_completo,
@@ -49,6 +59,10 @@ export async function garantirPdfCompleto(supabase: SupabaseClient, contratoId: 
     banco: p.banco ?? "não informado",
     agencia: p.agencia ?? "não informada",
     conta: p.conta ?? "não informada",
+    contratante,
+    contratanteNome: org.nome ?? "não informado",
+    contratanteCnpj: org.cnpj ?? "não informado",
+    contratanteEndereco: org.endereco ?? "não informado",
   });
   if (/\{\{[^}]+\}\}/.test(preenchido))
     throw new Error(

@@ -26,6 +26,8 @@ import {
 
 /** Contrato fictício da pré-visualização — nenhum dado real de pessoa. */
 const EXEMPLO = {
+  contratante:
+    "CONTRATANTE: (a qualificação configurada em Identificação do Comitê aparece aqui).",
   contratadoNome: "Maria Aparecida da Silva",
   contratadoCpf: "123.456.789-09",
   contratadoEndereco: "Quadra 10, Conjunto B, Casa 5 — Brasília/DF",

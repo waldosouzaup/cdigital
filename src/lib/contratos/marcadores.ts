@@ -24,6 +24,11 @@ export interface DadosContrato {
   banco?: string;
   agencia?: string;
   conta?: string;
+  // Contratante (migration 0037). Antes vinha escrita dentro do próprio modelo.
+  contratante?: string;
+  contratanteNome?: string;
+  contratanteCnpj?: string;
+  contratanteEndereco?: string;
 }
 
 const MARCADOR_POR_CAMPO: Record<keyof DadosContrato, string> = {
@@ -42,6 +47,10 @@ const MARCADOR_POR_CAMPO: Record<keyof DadosContrato, string> = {
   banco: "{{banco}}",
   agencia: "{{agencia}}",
   conta: "{{conta}}",
+  contratante: "{{contratante}}",
+  contratanteNome: "{{contratante_nome}}",
+  contratanteCnpj: "{{contratante_cnpj}}",
+  contratanteEndereco: "{{contratante_endereco}}",
 };
 
 export function substituirMarcadores(corpo: string, dados: DadosContrato): string {

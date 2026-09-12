@@ -23,7 +23,10 @@ const calculo = calcularProporcionalDistrato({
   valor: 3100,
 });
 
+const CONTRATANTE = "CONTRATANTE: Comitê Central, inscrita no CNPJ sob o nº 11.222.333/0001-44.";
+
 const dados = montarDadosDistrato({
+  contratante: CONTRATANTE,
   contratadoNome: "Maria Souza",
   contratadoCpf: "123.456.789-09",
   contratadoEndereco: "Rua A, 10",
@@ -60,6 +63,7 @@ describe("substituirMarcadoresDistrato", () => {
 
   it("não reinterpreta marcador que venha dentro de um valor substituído", () => {
     const comInjecao = montarDadosDistrato({
+      contratante: CONTRATANTE,
       contratadoNome: "{{valor_proporcional}}",
       contratadoCpf: "000",
       contratadoEndereco: null,
@@ -72,6 +76,7 @@ describe("substituirMarcadoresDistrato", () => {
 
   it("usa 'não informado' para endereço ausente e 'desacordo' para motivo vazio", () => {
     const semDados = montarDadosDistrato({
+      contratante: CONTRATANTE,
       contratadoNome: "Maria",
       contratadoCpf: "000",
       contratadoEndereco: null,
@@ -127,9 +132,15 @@ describe("equivalência com a redação oficial", () => {
       calculo,
     };
 
+    // A redação oficial recebe a mesma qualificação que o modelo recebe por
+    // marcador, para que a comparação isole a redação e não a contratante.
     expect(substituirMarcadoresDistrato(
       TEMPLATE_DISTRATO_PADRAO,
-      montarDadosDistrato({ ...entrada, objeto: "Militância e Mobilização de Rua" }),
-    )).toBe(montarTextoTermoDistrato(entrada));
+      montarDadosDistrato({
+        ...entrada,
+        contratante: CONTRATANTE,
+        objeto: "Militância e Mobilização de Rua",
+      }),
+    )).toBe(montarTextoTermoDistrato({ ...entrada, contratanteTexto: CONTRATANTE }));
   });
 });

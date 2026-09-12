@@ -479,6 +479,63 @@ export function ConfiguracoesCliente({
             )}
           </div>
 
+          {/* Qualificação da CONTRATANTE (migration 0037). Antes estava escrita
+              dentro do modelo de contrato, o que fazia todo comitê emitir em
+              nome de outro. */}
+          <div className="sm:col-span-2 border-t border-line pt-5 space-y-4">
+            <div>
+              <h3 className="text-small font-semibold text-ink">Qualificação nos contratos</h3>
+              <p className="mt-1 text-xs text-ink-muted">
+                É assim que a parte CONTRATANTE aparece no contrato e no termo de distrato.
+              </p>
+            </div>
+
+            <Campo
+              rotulo="Endereço da contratante"
+              id="endereco-contratante"
+              name="endereco"
+              defaultValue={identidadeInicial.endereco ?? ""}
+              placeholder="Rua, número, complemento — Cidade/UF"
+              auxiliar="Entra na qualificação quando não há redação própria abaixo."
+            />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Campo
+                rotulo="Representante legal"
+                id="representante-nome"
+                name="representanteNome"
+                defaultValue={identidadeInicial.representanteNome ?? ""}
+                placeholder="Nome de quem assina"
+              />
+              <Campo
+                rotulo="Cargo do representante"
+                id="representante-cargo"
+                name="representanteCargo"
+                defaultValue={identidadeInicial.representanteCargo ?? ""}
+                placeholder="Sócio-administrador, Tesoureiro…"
+              />
+            </div>
+
+            <Campo.Area
+              rotulo="Redação própria (opcional)"
+              id="qualificacao-contratante"
+              name="qualificacaoContratante"
+              rows={3}
+              defaultValue={identidadeInicial.qualificacaoContratante ?? ""}
+              placeholder="CONTRATANTE: RAZÃO SOCIAL, inscrita no CNPJ nº …, neste ato representada por …"
+              auxiliar="Preenchido, substitui a composição automática por inteiro. Use quando a redação jurídica precisa ser exata."
+            />
+
+            <div className="rounded-md border border-line bg-paper p-3">
+              <span className="font-mono text-[0.65rem] uppercase tracking-wider text-ink-muted">
+                Como sai hoje no documento
+              </span>
+              <p className="mt-1.5 text-xs leading-relaxed text-ink">
+                {identidadeInicial.contratantePreview}
+              </p>
+            </div>
+          </div>
+
           <div className="sm:col-span-2 flex items-center gap-3">
             <Selo
               voz="selo"

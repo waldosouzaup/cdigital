@@ -18,6 +18,8 @@ import type { DadosCalculoDistrato } from "./distrato";
 export const NOME_TEMPLATE_DISTRATO = "Termo de Distrato — Rescisão Contratual";
 
 export interface DadosDistrato {
+  /** Qualificação integral da CONTRATANTE (migration 0037). */
+  contratante: string;
   nome: string;
   cpf: string;
   endereco: string;
@@ -43,6 +45,7 @@ export const MARCADORES_DISTRATO: ReadonlyArray<{
   campo: keyof DadosDistrato;
   rotulo: string;
 }> = [
+  { marcador: "{{contratante}}", campo: "contratante", rotulo: "Qualificação da contratante" },
   { marcador: "{{nome}}", campo: "nome", rotulo: "Nome do contratado" },
   { marcador: "{{cpf}}", campo: "cpf", rotulo: "CPF do contratado" },
   { marcador: "{{endereco}}", campo: "endereco", rotulo: "Endereço do contratado" },
@@ -90,6 +93,7 @@ function formatarValorBRL(valor: number): string {
 }
 
 export function montarDadosDistrato(params: {
+  contratante: string;
   contratadoNome: string;
   contratadoCpf: string;
   contratadoEndereco?: string | null;
@@ -100,6 +104,7 @@ export function montarDadosDistrato(params: {
   const { calculo } = params;
 
   return {
+    contratante: params.contratante,
     nome: params.contratadoNome,
     cpf: params.contratadoCpf,
     endereco: params.contratadoEndereco?.trim() || "não informado",
@@ -135,7 +140,7 @@ export function substituirMarcadoresDistrato(corpo: string, dados: DadosDistrato
  * documento de todo comitê que ainda não salvou modelo próprio.
  */
 export const TEMPLATE_DISTRATO_PADRAO = [
-  "CONTRATANTE: ELEIÇÃO 2026 MICHELLE DE PAULA FIRMO REINALDO BOLSONARO, candidata ao cargo de SENADOR, pelo PARTIDO LIBERAL – PL, com endereço na Rua Q – SHIS – QI-15 – Conjunto 7, Casa 23, inscrito no CNPJ sob o nº 68.608.523/0001-59.",
+  "{{contratante}}",
   "CONTRATADO(A): {{nome}}, inscrito(a) no CPF nº {{cpf}}, com endereço em {{endereco}}.",
   "Pelo presente instrumento particular de Termo de Distrato de Contrato de Prestação de Serviços, têm entre si justo e contratado o seguinte, que mutuamente convencionam, outorgam e aceitam:",
   "Cláusula 1. Por este instrumento particular, consignam as partes, em razão de {{motivo}}, distratam, na data {{data_distrato}}, os termos do contrato assinado em {{vigencia_inicio}}, sem qualquer pagamento de multa ou qualquer outra penalidade.",
