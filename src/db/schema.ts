@@ -211,6 +211,12 @@ export const organizations = pgTable(
     // Slug da URL pública de autoinscrição `/inscricao/<slug>` (migration 0017).
     // Único global (não multi-tenant) — o índice parcial abaixo.
     slug: text("slug"),
+    // Qualificação da CONTRATANTE nos contratos (migration 0037) — antes estava
+    // escrita dentro do modelo, o que fazia todo comitê emitir em nome de outro.
+    address: text("endereco"),
+    representativeName: text("representante_nome"),
+    representativeRole: text("representante_cargo"),
+    contractorQualification: text("qualificacao_contratante"),
     ...timestamps,
   },
   (table) => [
@@ -638,6 +644,12 @@ export const activityRecords = pgTable(
     quantity: integer("quantidade").notNull(),
     photoPath: text("foto_caminho"),
     observation: text("observacao"),
+    // Coordenada do registro (migration 0038). Nulável: sinal ruim é o cenário
+    // normal em campo, e a fila offline precisa subir registro sem GPS.
+    latitude: numeric("latitude", { precision: 9, scale: 6 }),
+    longitude: numeric("longitude", { precision: 9, scale: 6 }),
+    accuracyM: numeric("precisao_m", { precision: 8, scale: 2 }),
+    geoCapturedAt: timestamp("geo_capturada_em", { withTimezone: true }),
     syncedAt: timestamp("sincronizado_em", { withTimezone: true }),
     ...timestamps,
   },

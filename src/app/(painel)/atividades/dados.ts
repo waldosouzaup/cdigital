@@ -26,6 +26,10 @@ export interface RegistroAtividadeListado {
   observacao: string | null;
   sincronizadoEm: string | null;
   criadoEm: string;
+  /** Coordenada de onde a atividade foi registrada (migration 0038). */
+  latitude: number | null;
+  longitude: number | null;
+  precisaoM: number | null;
 }
 
 interface LinhaRegistro {
@@ -36,6 +40,9 @@ interface LinhaRegistro {
   observacao: string | null;
   sincronizado_em: string | null;
   criado_em: string;
+  latitude: string | number | null;
+  longitude: string | number | null;
+  precisao_m: string | number | null;
   pessoas: { nome_completo: string } | { nome_completo: string }[] | null;
   regioes: { nome: string } | { nome: string }[] | null;
 }
@@ -43,6 +50,12 @@ interface LinhaRegistro {
 function primeiro<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
   return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+
+function numeroOuNulo(valor: string | number | null): number | null {
+  if (valor === null) return null;
+  const n = typeof valor === "number" ? valor : Number(valor);
+  return Number.isFinite(n) ? n : null;
 }
 
 export async function listarContextoAtividades(): Promise<{
@@ -58,8 +71,7 @@ export async function listarContextoAtividades(): Promise<{
     supabase
       .from("registros_atividade")
       .select(
-        "id, data, tipo, quantidade, observacao, sincronizado_em, criado_em, " +
-          "pessoas ( nome_completo ), regioes ( nome )",
+        "id, data, tipo, quantidade, observacao, sincronizado_em, criado_em, latitude, longitude, precisao_m, pessoas ( nome_completo ), regioes ( nome )",
       )
       .order("criado_em", { ascending: false })
       .limit(30)
@@ -87,6 +99,11 @@ export async function listarContextoAtividades(): Promise<{
       observacao: linha.observacao,
       sincronizadoEm: linha.sincronizado_em,
       criadoEm: linha.criado_em,
+      // O Postgres devolve `numeric` como string; sem converter, a tela
+      // imprimiria a coordenada com a precisão textual do banco.
+      latitude: numeroOuNulo(linha.latitude),
+      longitude: numeroOuNulo(linha.longitude),
+      precisaoM: numeroOuNulo(linha.precisao_m),
     })),
   };
 }

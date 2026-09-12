@@ -28,6 +28,10 @@ describe("validarRegistroAtividade", () => {
         quantidade: 500,
         observacao: "entrada da feira",
         data: HOJE,
+        // Coordenada entrou em 0038 e e opcional: registro sem GPS continua valido.
+        latitude: null,
+        longitude: null,
+        precisaoM: null,
       });
     }
   });
@@ -77,5 +81,89 @@ describe("validarRegistroAtividade", () => {
     const r = validarRegistroAtividade({ ...base, observacao: "x".repeat(501) }, HOJE);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erros.observacao).toBeTruthy();
+  });
+});
+
+/**
+ * Coordenada no registro de campo (migration 0038). Trade marketing precisa da
+ * prova de que a visita aconteceu na loja; campanha não precisava, então o campo
+ * é opcional e nunca impede a gravação — sinal ruim é o normal em campo.
+ *
+ * A validação aqui espelha a restrição do banco, que barra meia coordenada:
+ * latitude sem longitude não localiza nada e ainda passa a impressão de que
+ * localiza.
+ */
+describe("validarRegistroAtividade — coordenada", () => {
+  const base = {
+    pessoaId: "11111111-1111-1111-1111-111111111111",
+    tipo: "Panfletagem",
+    quantidade: "10",
+    data: "2026-09-12",
+  };
+
+  it("aceita registro sem coordenada nenhuma", () => {
+    const r = validarRegistroAtividade(base, "2026-09-12");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.valores.latitude).toBeNull();
+      expect(r.valores.longitude).toBeNull();
+    }
+  });
+
+  it("aceita e normaliza um par válido", () => {
+    const r = validarRegistroAtividade(
+      { ...base, latitude: "-15.7797", longitude: "-47.9297", precisaoM: "12.5" },
+      "2026-09-12",
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.valores.latitude).toBeCloseTo(-15.7797);
+      expect(r.valores.longitude).toBeCloseTo(-47.9297);
+      expect(r.valores.precisaoM).toBeCloseTo(12.5);
+    }
+  });
+
+  it("descarta meia coordenada em vez de gravar posição falsa", () => {
+    for (const parcial of [
+      { latitude: "-15.77" },
+      { longitude: "-47.92" },
+    ]) {
+      const r = validarRegistroAtividade({ ...base, ...parcial }, "2026-09-12");
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.valores.latitude).toBeNull();
+        expect(r.valores.longitude).toBeNull();
+      }
+    }
+  });
+
+  it("descarta coordenada fora de faixa", () => {
+    const r = validarRegistroAtividade(
+      { ...base, latitude: "200", longitude: "-47.92" },
+      "2026-09-12",
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.valores.latitude).toBeNull();
+  });
+
+  it("descarta valor não numérico sem derrubar o registro", () => {
+    const r = validarRegistroAtividade(
+      { ...base, latitude: "abc", longitude: "def" },
+      "2026-09-12",
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.valores.longitude).toBeNull();
+  });
+
+  it("ignora precisão inválida mas mantém a coordenada", () => {
+    const r = validarRegistroAtividade(
+      { ...base, latitude: "-15.77", longitude: "-47.92", precisaoM: "-3" },
+      "2026-09-12",
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.valores.latitude).toBeCloseTo(-15.77);
+      expect(r.valores.precisaoM).toBeNull();
+    }
   });
 });

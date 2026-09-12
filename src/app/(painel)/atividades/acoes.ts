@@ -68,6 +68,10 @@ export async function registrarAtividade(
       tipo: valores.tipo,
       quantidade: valores.quantidade,
       observacao: valores.observacao,
+      latitude: valores.latitude,
+      longitude: valores.longitude,
+      precisao_m: valores.precisaoM,
+      geo_capturada_em: valores.latitude !== null ? new Date().toISOString() : null,
       sincronizado_em: new Date().toISOString(),
     })
     .select("id")

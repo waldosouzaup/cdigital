@@ -15,6 +15,7 @@ import {
 import { sincronizarFila } from "@/lib/atividades/sincronizar-fila";
 import type { EntradaRegistroAtividade } from "@/lib/atividades/registro-rapido";
 import { registrarAtividade } from "./acoes";
+import { rotuloCoordenada, useCoordenadaAtual } from "@/lib/atividades/use-coordenada";
 import type { PessoaOpcao, RegiaoOpcao, RegistroAtividadeListado } from "./dados";
 
 // A coluna `registros_atividade.tipo` é texto livre — esta é uma lista curada de
@@ -79,6 +80,9 @@ export function AtividadesCliente({
     tom: "sucesso" | "critico" | "atencao";
     texto: string;
   } | null>(null);
+  // Coordenada da atividade (migration 0038). Pedida ao abrir a tela, nunca no
+  // envio: o registro rápido não pode esperar o GPS.
+  const coordenada = useCoordenadaAtual();
   const [pendentes, setPendentes] = useState(0);
   const [sincronizando, setSincronizando] = useState(false);
 
@@ -283,6 +287,11 @@ export function AtividadesCliente({
       quantidade,
       observacao,
       data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()),
+      // Vai junto para a fila offline também: o registro guardado sem sinal sobe
+      // depois com a coordenada do momento em que foi feito, não do envio.
+      latitude: coordenada.latitude,
+      longitude: coordenada.longitude,
+      precisaoM: coordenada.precisaoM,
     };
 
     iniciarEnvio(async () => {
@@ -611,6 +620,25 @@ export function AtividadesCliente({
         )}
       </section>
 
+      {/* Status da coordenada. Fica visível sempre, inclusive quando não há
+          local: o coordenador precisa saber que aquele registro vai sem prova
+          de onde aconteceu, antes de gravar — não depois. */}
+      <div className="mt-4 flex items-center gap-2 text-[0.7rem] font-mono text-ink-muted">
+        <span
+          className={`inline-block h-1.5 w-1.5 rounded-full ${
+            coordenada.status === "capturada"
+              ? "bg-success"
+              : coordenada.status === "pendente"
+                ? "bg-warning animate-pulse"
+                : "bg-ink-subtle"
+          }`}
+        />
+        <span>{rotuloCoordenada(coordenada.status)}</span>
+        {coordenada.status === "capturada" && coordenada.precisaoM !== null && (
+          <span className="text-ink-subtle">± {Math.round(coordenada.precisaoM)} m</span>
+        )}
+      </div>
+
       {pendentes > 0 && (
         <div className="mt-5">
           <Alerta
@@ -683,6 +711,17 @@ export function AtividadesCliente({
                   </span>
                   {r.observacao && (
                     <span className="mt-0.5 block text-xs text-ink-muted">{r.observacao}</span>
+                  )}
+                  {r.latitude !== null && r.longitude !== null && (
+                    <a
+                      href={`https://www.openstreetmap.org/?mlat=${r.latitude}&mlon=${r.longitude}#map=17/${r.latitude}/${r.longitude}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-0.5 inline-block font-mono text-[0.7rem] text-primary hover:underline"
+                    >
+                      ◎ {r.latitude.toFixed(5)}, {r.longitude.toFixed(5)}
+                      {r.precisaoM !== null ? ` ± ${Math.round(r.precisaoM)} m` : ""}
+                    </a>
                   )}
                 </div>
                 <div className="shrink-0 text-right">
