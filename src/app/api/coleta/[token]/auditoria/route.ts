@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { extrairMetadadosAuditoria } from "@/lib/auditoria/metadados-requisicao";
+import { normalizarAcaoAuditoria } from "@/lib/auditoria/acoes-publicas";
 
 export const runtime = "nodejs";
 
@@ -21,9 +22,13 @@ export async function POST(
     // Body vazio ou inválido não impede o log de IP
   }
 
-  const acao = typeof body.acao === "string" ? body.acao : "inicio_preenchimento";
+  // Rota pública: a ação vem do corpo da requisição, então passa por lista
+  // fechada antes de virar linha em `log_auditoria`.
+  const acao = normalizarAcaoAuditoria(body.acao);
   const geolocalizacao = body.geolocalizacao ?? null;
   const timestampCliente = typeof body.timestampCliente === "string" ? body.timestampCliente : null;
+  const contexto =
+    body.contexto && typeof body.contexto === "object" ? (body.contexto as object) : null;
   const { ip, userAgent, geoHeaders } = await extrairMetadadosAuditoria(request.headers);
 
   const supabase = await createClient();
@@ -37,6 +42,7 @@ export async function POST(
     p_detalhes: {
       timestamp_cliente: timestampCliente ?? null,
       headers_geo: geoHeaders,
+      contexto_navegador: contexto,
     },
   });
 

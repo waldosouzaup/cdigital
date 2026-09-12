@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AcaoAuditoriaPublica } from "@/lib/auditoria/acoes-publicas";
 
 export interface DadosGeolocalizacao {
   status: "pendente" | "concedida" | "recusada" | "indisponivel";
@@ -16,14 +17,28 @@ interface OpcoesAuditoria {
   tipo: "coleta" | "inscricao";
 }
 
+/** Contexto do navegador que só existe no cliente e ajuda a situar o acesso. */
+function contextoNavegador() {
+  if (typeof window === "undefined") return {};
+  return {
+    referrer: document.referrer || null,
+    // Fuso e idioma dizem muito sobre a origem do acesso e, ao contrário do GPS,
+    // não custam nada nem pedem permissão.
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+    idioma: navigator.language ?? null,
+    resolucao: `${window.screen?.width ?? 0}x${window.screen?.height ?? 0}`,
+  };
+}
+
 export function useAuditoriaColeta({ token, slug, tipo }: OpcoesAuditoria) {
   const [geolocalizacao, setGeolocalizacao] = useState<DadosGeolocalizacao>({
     status: "pendente",
   });
   const rastreioIniciadoRef = useRef(false);
+  const acessoRegistradoRef = useRef(false);
 
   const enviarEventoAuditoria = useCallback(
-    async (geo: DadosGeolocalizacao) => {
+    async (acao: AcaoAuditoriaPublica, geo: DadosGeolocalizacao | null) => {
       try {
         const endpoint =
           tipo === "coleta" && token
@@ -39,9 +54,10 @@ export function useAuditoriaColeta({ token, slug, tipo }: OpcoesAuditoria) {
           headers: { "Content-Type": "application/json" },
           keepalive: true,
           body: JSON.stringify({
-            acao: "inicio_preenchimento",
+            acao,
             geolocalizacao: geo,
             timestampCliente: new Date().toISOString(),
+            contexto: contextoNavegador(),
           }),
         });
       } catch (err) {
@@ -51,6 +67,19 @@ export function useAuditoriaColeta({ token, slug, tipo }: OpcoesAuditoria) {
     },
     [tipo, token, slug],
   );
+
+  /**
+   * Registro de abertura da página. Deliberadamente NÃO toca em
+   * `navigator.geolocation`: um prompt de permissão no instante em que o link
+   * abre costuma ser recusado e afasta candidato legítimo. A localização
+   * aproximada vem do IP, no servidor; o GPS preciso só é pedido quando a pessoa
+   * demonstra intenção de preencher.
+   */
+  useEffect(() => {
+    if (acessoRegistradoRef.current) return;
+    acessoRegistradoRef.current = true;
+    enviarEventoAuditoria("acesso_pagina", null);
+  }, [enviarEventoAuditoria]);
 
   const registrarInicioPreenchimento = useCallback(() => {
     if (rastreioIniciadoRef.current) return;
@@ -64,7 +93,7 @@ export function useAuditoriaColeta({ token, slug, tipo }: OpcoesAuditoria) {
         timestampCliente: agora,
       };
       setGeolocalizacao(geoIndisponivel);
-      enviarEventoAuditoria(geoIndisponivel);
+      enviarEventoAuditoria("inicio_preenchimento", geoIndisponivel);
       return;
     }
 
@@ -78,7 +107,7 @@ export function useAuditoriaColeta({ token, slug, tipo }: OpcoesAuditoria) {
           timestampCliente: new Date(posicao.timestamp).toISOString(),
         };
         setGeolocalizacao(geoConcedida);
-        enviarEventoAuditoria(geoConcedida);
+        enviarEventoAuditoria("inicio_preenchimento", geoConcedida);
       },
       () => {
         const geoRecusada: DadosGeolocalizacao = {
@@ -86,7 +115,7 @@ export function useAuditoriaColeta({ token, slug, tipo }: OpcoesAuditoria) {
           timestampCliente: agora,
         };
         setGeolocalizacao(geoRecusada);
-        enviarEventoAuditoria(geoRecusada);
+        enviarEventoAuditoria("inicio_preenchimento", geoRecusada);
       },
       {
         enableHighAccuracy: true,
