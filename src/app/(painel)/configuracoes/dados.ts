@@ -5,6 +5,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { normalizarRemetente } from "@/lib/notificacoes/remetente";
 import { qualificacaoContratante } from "@/lib/contratos/contratante";
+import { ehVertical, type Vertical } from "@/lib/organizacao/vertical";
 import {
   NOME_TEMPLATE_DISTRATO,
   TEMPLATE_DISTRATO_PADRAO,
@@ -24,6 +25,8 @@ export interface TemplateContrato {
 }
 
 export interface IdentidadeComite {
+  /** Vertical de atuação — define só o vocabulário exibido (migration 0039). */
+  vertical: Vertical;
   endereco: string | null;
   representanteNome: string | null;
   representanteCargo: string | null;
@@ -42,7 +45,7 @@ export async function buscarIdentidadeComite(): Promise<IdentidadeComite> {
   const { data, error } = await supabase
     .from("organizacoes")
     .select(
-      "nome, cnpj, slug, endereco, representante_nome, representante_cargo, qualificacao_contratante",
+      "nome, cnpj, slug, vertical, endereco, representante_nome, representante_cargo, qualificacao_contratante",
     )
     .maybeSingle();
 
@@ -52,6 +55,7 @@ export async function buscarIdentidadeComite(): Promise<IdentidadeComite> {
     nome: data?.nome ?? "",
     cnpj: data?.cnpj ?? null,
     slug: data?.slug ?? null,
+    vertical: ehVertical(data?.vertical) ? data.vertical : "campanha",
     endereco: data?.endereco ?? null,
     representanteNome: data?.representante_nome ?? null,
     representanteCargo: data?.representante_cargo ?? null,

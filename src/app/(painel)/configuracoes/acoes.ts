@@ -18,6 +18,7 @@ import {
   CARENCIA_PADRAO_DIAS,
 } from "@/lib/documentos/elegiveis-expurgo";
 import { validarIdentidadeComite } from "@/lib/organizacao/validacao";
+import { ehVertical } from "@/lib/organizacao/vertical";
 import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
 import { reprocessarNotificacoesFalhas } from "@/lib/notificacoes/reprocessar";
 import {
@@ -206,6 +207,12 @@ export async function salvarIdentidadeComite(
       slug: validacao.valores.slug,
       // Migration 0037: qualificação da CONTRATANTE nos contratos. Texto livre,
       // sem validação de forma — a redação jurídica é do comitê, não nossa.
+      // Vertical define só o vocabulário exibido; valor fora da lista é
+      // ignorado em vez de gravado, porque o CHECK do banco recusaria a linha
+      // inteira e derrubaria o salvamento do resto da identidade junto.
+      ...(ehVertical(campoTexto(formData, "vertical"))
+        ? { vertical: campoTexto(formData, "vertical") }
+        : {}),
       endereco: campoTexto(formData, "endereco") || null,
       representante_nome: campoTexto(formData, "representanteNome") || null,
       representante_cargo: campoTexto(formData, "representanteCargo") || null,

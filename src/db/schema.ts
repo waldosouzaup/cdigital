@@ -213,6 +213,9 @@ export const organizations = pgTable(
     slug: text("slug"),
     // Qualificação da CONTRATANTE nos contratos (migration 0037) — antes estava
     // escrita dentro do modelo, o que fazia todo comitê emitir em nome de outro.
+    // Vertical de atuação (migration 0039). Troca só o vocabulário da interface;
+    // nenhuma regra, permissão ou nome de tabela depende dela.
+    vertical: text("vertical").notNull().default("campanha"),
     address: text("endereco"),
     representativeName: text("representante_nome"),
     representativeRole: text("representante_cargo"),

@@ -21,6 +21,7 @@ import { CampanhasSecao } from "./campanhas-secao";
 import { ComunicacoesSecao } from "./comunicacoes-secao";
 import { DistratoSecao } from "./distrato-secao";
 import { MODELO_REFERENCIA_MICHELLE } from "@/lib/contratos/modelo-referencia";
+import { VERTICAIS, capitalizar, termos } from "@/lib/organizacao/vertical";
 import type {
   CampanhaSuperadmin,
   IdentidadeComite,
@@ -103,6 +104,11 @@ export function ConfiguracoesCliente({
   // Slug da URL pública de autoinscrição (Feature B) — controlado, para o preview
   // reagir enquanto digita.
   const [slug, setSlug] = useState(identidadeInicial.slug ?? "");
+  const [verticalEscolhida, setVerticalEscolhida] = useState(identidadeInicial.vertical);
+  const termosEscolhidos = termos(verticalEscolhida);
+  // Abas usam a vertical JÁ SALVA: trocar o rótulo do menu enquanto a pessoa
+  // apenas experimenta o radio faria a tela mudar sob o cursor.
+  const termosSalvos = termos(identidadeInicial.vertical);
   const [origin, setOrigin] = useState("");
   const [slugCopiado, setSlugCopiado] = useState(false);
   useEffect(() => {
@@ -288,7 +294,7 @@ export function ConfiguracoesCliente({
           }`}
         >
           <span>🗺</span>
-          <span>Regiões de Atuação</span>
+          <span>{capitalizar(termosSalvos.regioes)} de Atuação</span>
           <span className="ml-1 rounded-full bg-surface-sunken border border-line px-1.5 py-0.2 font-mono text-[0.65rem] text-ink-muted">
             {regioesIniciais.length}
           </span>
@@ -304,7 +310,7 @@ export function ConfiguracoesCliente({
           }`}
         >
           <span>📌</span>
-          <span>Atividades de Rua</span>
+          <span>{capitalizar(termosSalvos.atividade)}</span>
           <span className="ml-1 rounded-full bg-surface-sunken border border-line px-1.5 py-0.2 font-mono text-[0.65rem] text-ink-muted">
             {atividadesContexto.registros.length}
           </span>
@@ -320,7 +326,7 @@ export function ConfiguracoesCliente({
           }`}
         >
           <span>🏢</span>
-          <span>Identificação do Comitê</span>
+          <span>Identificação {termosSalvos.organizacao === "comitê" ? "do Comitê" : `da ${capitalizar(termosSalvos.organizacao)}`}</span>
         </button>
 
         <button
@@ -423,7 +429,7 @@ export function ConfiguracoesCliente({
       {abaAtiva === "identidade" && (
       <section className="border border-line bg-surface p-6 space-y-6">
         <div className="regua">
-          <h2 className="text-h2 font-semibold text-ink">Identificação do Comitê Eleitoral</h2>
+          <h2 className="text-h2 font-semibold text-ink">Identificação — {capitalizar(termosSalvos.organizacao)}</h2>
           <p className="text-xs text-ink-muted">
             Nome e CNPJ da campanha (usados nos contratos e relatórios) e o endereço público de
             autoinscrição. Só o gestor edita.
@@ -477,6 +483,56 @@ export function ConfiguracoesCliente({
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Vertical de atuação (migration 0039). Troca só o vocabulário da
+              interface — nenhum dado, regra ou permissão muda com isto. */}
+          <div className="sm:col-span-2 border-t border-line pt-5 space-y-3">
+            <div>
+              <h3 className="text-small font-semibold text-ink">Vertical de atuação</h3>
+              <p className="mt-1 text-xs text-ink-muted">
+                Define o vocabulário das telas. Nenhum dado, regra ou permissão muda.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {VERTICAIS.map((v) => (
+                <label
+                  key={v.id}
+                  className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors ${
+                    verticalEscolhida === v.id
+                      ? "border-primary bg-primary-tint"
+                      : "border-line bg-surface hover:border-line-strong"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="vertical"
+                    id={`vertical-${v.id}`}
+                    value={v.id}
+                    checked={verticalEscolhida === v.id}
+                    onChange={() => setVerticalEscolhida(v.id)}
+                    className="mt-0.5 size-4 shrink-0 accent-primary"
+                  />
+                  <span>
+                    <span className="block text-small font-medium text-ink">{v.rotulo}</span>
+                    <span className="mt-0.5 block text-xs text-ink-muted">{v.descricao}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <div className="rounded-md border border-line bg-paper p-3">
+              <span className="font-mono text-[0.65rem] uppercase tracking-wider text-ink-muted">
+                Vocabulário resultante
+              </span>
+              <p className="mt-1.5 font-mono text-xs leading-relaxed text-ink">
+                {capitalizar(termosEscolhidos.organizacao)} · {capitalizar(termosEscolhidos.projeto)}{" "}
+                · {capitalizar(termosEscolhidos.regioes)} ·{" "}
+                {capitalizar(termosEscolhidos.colaboradores)} ·{" "}
+                {capitalizar(termosEscolhidos.atividade)}
+              </p>
+            </div>
           </div>
 
           {/* Qualificação da CONTRATANTE (migration 0037). Antes estava escrita
