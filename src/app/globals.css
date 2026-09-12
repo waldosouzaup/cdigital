@@ -48,8 +48,13 @@
   --muted-500: #94A3A0;
 
   /* =========================================================================
-     3. Cores — Tokens Semânticos (Light Mode Canônico — Padrão)
+     3. Cores — Tokens Semânticos (Light Mode — alternativa opcional)
+     Dark é o padrão do projeto: o <html> já sai do servidor com data-theme="dark".
+     Este bloco só vale quando o usuário troca no seletor. `color-scheme` fica
+     explícito aqui para que widgets nativos (scrollbar, date picker) voltem ao
+     claro junto — caso contrário herdariam o dark declarado no <meta>.
      ========================================================================= */
+  color-scheme: light;
   --color-canvas: #FFFFFF;
   --color-surface: #FFFFFF;
   --color-surface-sunken: #F8FAF9;

@@ -32,7 +32,7 @@ const configuracoes: Record<StatusTipo, ConfiguracaoStatus> = {
   rascunho: {
     rotulo: "Rascunho",
     icone: "○",
-    classes: "bg-neutral-100 text-ink-muted ring-1 ring-line",
+    classes: "bg-surface-sunken text-ink-muted ring-1 ring-line",
   },
   emitido: {
     rotulo: "Emitido",
@@ -67,7 +67,7 @@ const configuracoes: Record<StatusTipo, ConfiguracaoStatus> = {
   cancelado: {
     rotulo: "Cancelado",
     icone: "✕",
-    classes: "bg-neutral-100 text-ink-muted line-through ring-1 ring-line",
+    classes: "bg-surface-sunken text-ink-muted line-through ring-1 ring-line",
   },
   pendente: {
     rotulo: "Pendente",
@@ -103,7 +103,7 @@ const configuracoes: Record<StatusTipo, ConfiguracaoStatus> = {
   neutro: {
     rotulo: "Neutro",
     icone: "○",
-    classes: "bg-neutral-100 text-ink-muted ring-1 ring-line",
+    classes: "bg-surface-sunken text-ink-muted ring-1 ring-line",
   },
 };
 

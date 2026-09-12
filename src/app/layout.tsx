@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -31,6 +31,15 @@ export const metadata: Metadata = {
       { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
+};
+
+/**
+ * Dark é o padrão do projeto, então a cor da barra do navegador acompanha o
+ * canvas escuro (--color-canvas do bloco dark). Sem isto o topo do Chrome/Safari
+ * no celular continuava claro por cima de uma tela escura.
+ */
+export const viewport: Viewport = {
+  themeColor: "#0A0E11",
 };
 
 const temaScript = `(function() {
