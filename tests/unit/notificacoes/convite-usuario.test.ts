@@ -40,11 +40,12 @@ describe("E-mail de Convite de Usuário com Senha Temporária (convite_usuario)"
     expect(html).toContain("mariana.souza@campanha.org");
     expect(html).toContain("Gestor");
     expect(html).toContain(senhaTeste);
-    expect(html).toContain("Senha Temporária — Troca Imediata Obrigatória");
-    expect(html).toContain("alterá-la imediatamente após autenticar-se");
+    expect(html).toContain("Troca imediata obrigatória");
+    expect(html).toContain("Altere-a assim que entrar na plataforma");
     expect(html).toContain(urlLogin);
-    expect(html).toContain("COMITÊ");
-    expect(html).toContain("DIGITAL");
+    // Marca institucional da casca compartilhada (src/emails/layout.tsx).
+    expect(html).toContain("comitê");
+    expect(html).toContain("digital");
   });
 
   it("renderiza a versão em texto puro contendo a senha e instruções de troca", async () => {
@@ -61,7 +62,7 @@ describe("E-mail de Convite de Usuário com Senha Temporária (convite_usuario)"
     expect(text).toContain("rafael@campanha.org");
     expect(text).toContain("Auditor");
     expect(text).toContain(senhaTeste);
-    expect(text).toContain("Senha Temporária");
+    expect(text).toContain("Senha temporária");
     expect(text).toContain("https://campanha.org/login");
   });
 });

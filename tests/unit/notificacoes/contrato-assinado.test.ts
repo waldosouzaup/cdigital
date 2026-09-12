@@ -30,7 +30,7 @@ describe("E-mail de Confirmação de Contrato Assinado (contrato_assinado)", () 
     expect(html).toContain("Administrativo e Montagem de Material");
     expect(html).toContain("10/09/2026 às 19:40");
     expect(html).toContain(urlContrato);
-    expect(html).toContain("Visualizar e Baixar Cópia do Contrato");
+    expect(html).toContain("Visualizar e baixar o contrato");
     expect(html).toContain("#1FA871");
   });
 

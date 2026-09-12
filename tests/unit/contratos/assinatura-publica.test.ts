@@ -13,7 +13,7 @@ describe("Fluxo de Assinatura Pública de Contrato", () => {
     });
 
     expect(subject).toContain("contrato");
-    expect(html).toContain("Visualizar e Assinar Contrato");
+    expect(html).toContain("Visualizar e assinar contrato");
     expect(html).toContain(urlAssinatura);
     expect(text).toContain(urlAssinatura);
   });

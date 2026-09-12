@@ -2,9 +2,11 @@
  * E-mail de `vigencia_a_vencer` — Seção 6: "7 e 3 dias do término | Gestor e
  * coord. do comitê | Quantidade e link para a lista." Regra 7: sem valor de
  * contrato, sem dado da pessoa — só objeto, prazo e link para a lista no painel.
+ * Moldura institucional em `layout.tsx`.
  */
 import * as React from "react";
-import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
+import { render } from "react-email";
+import { BotaoEmail, CaixaEmail, LayoutEmail, LinhaDado, TextoEmail } from "./layout";
 
 interface VigenciaAVencerEmailProps {
   objeto: string;
@@ -13,27 +15,31 @@ interface VigenciaAVencerEmailProps {
 }
 
 function VigenciaAVencerEmail({ objeto, diasRestantes, urlLista }: VigenciaAVencerEmailProps) {
+  const plural = diasRestantes === 1 ? "" : "s";
   return (
-    <Html lang="pt-BR">
-      <Head />
-      <Preview>Contrato a vencer em {String(diasRestantes)} dias</Preview>
-      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
-            Vigência a vencer
-          </Heading>
-          <Text style={{ color: "#0A0F0D" }}>
-            O contrato de <strong>{objeto}</strong> termina em <strong>{diasRestantes} dias</strong>.
-            Verifique se há renovação, encerramento ou distrato a providenciar.
-          </Text>
-          <Text>
-            <Link href={urlLista} style={{ color: "#157F58", fontWeight: "600" }}>
-              Abrir a lista de contratos →
-            </Link>
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+    <LayoutEmail
+      previa={`Contrato a vencer em ${diasRestantes} dia${plural}`}
+      titulo="Vigência a vencer"
+    >
+      <TextoEmail>
+        Um contrato da campanha está perto do fim da vigência. Verifique se há renovação,
+        encerramento ou distrato a providenciar.
+      </TextoEmail>
+
+      <CaixaEmail tom="atencao" titulo="Contrato a vencer">
+        <LinhaDado rotulo="Objeto" valor={<strong>{objeto}</strong>} />
+        <LinhaDado
+          rotulo="Prazo restante"
+          valor={
+            <strong>
+              {diasRestantes} dia{plural}
+            </strong>
+          }
+        />
+      </CaixaEmail>
+
+      <BotaoEmail href={urlLista}>Abrir a lista de contratos</BotaoEmail>
+    </LayoutEmail>
   );
 }
 

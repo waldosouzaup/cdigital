@@ -2,9 +2,11 @@
  * E-mail de `contrato_enviado` — Seção 6: "Transição emitido → enviado | Contratado
  * | Aviso de que há contrato a assinar + link." Regra 7: nada de CPF/endereço/valor
  * no corpo — só avisa que existe algo a assinar.
+ * Moldura institucional em `layout.tsx`.
  */
 import * as React from "react";
-import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
+import { render } from "react-email";
+import { BotaoEmail, CaixaEmail, LayoutEmail, LinhaDado, TextoEmail, TextoMiudo } from "./layout";
 
 interface ContratoEnviadoEmailProps {
   primeiroNome: string;
@@ -13,58 +15,43 @@ interface ContratoEnviadoEmailProps {
   urlContato?: string;
 }
 
-function ContratoEnviadoEmail({ primeiroNome, objeto, urlAssinatura, urlContato }: ContratoEnviadoEmailProps) {
+function ContratoEnviadoEmail({
+  primeiroNome,
+  objeto,
+  urlAssinatura,
+  urlContato,
+}: ContratoEnviadoEmailProps) {
   return (
-    <Html lang="pt-BR">
-      <Head />
-      <Preview>Seu contrato está pronto para assinatura</Preview>
-      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "520px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D", marginTop: 0 }}>
-            Olá, {primeiroNome}
-          </Heading>
-          <Text style={{ color: "#0A0F0D", lineHeight: "1.5" }}>
-            Seu contrato de <strong>{objeto}</strong> foi emitido com sucesso e está disponível para a sua
-            conferência e assinatura eletrônica.
-          </Text>
+    <LayoutEmail
+      previa="Seu contrato está pronto para assinatura"
+      titulo={`Olá, ${primeiroNome}`}
+      urlPortal={urlContato}
+      rotuloPortal="Saiba mais sobre o Comitê Digital"
+    >
+      <TextoEmail>
+        Seu contrato de prestação de serviços foi emitido e está disponível para conferência e
+        assinatura eletrônica.
+      </TextoEmail>
 
-          {urlAssinatura ? (
-            <div style={{ margin: "24px 0", textAlign: "center" }}>
-              <Link
-                href={urlAssinatura}
-                style={{
-                  backgroundColor: "#1FA871",
-                  color: "#ffffff",
-                  padding: "14px 28px",
-                  display: "inline-block",
-                  textDecoration: "none",
-                  fontWeight: "bold",
-                  borderRadius: "6px",
-                  fontSize: "15px",
-                }}
-              >
-                Visualizar e Assinar Contrato →
-              </Link>
-              <Text style={{ fontSize: "12px", color: "#52605B", marginTop: "12px" }}>
-                Clique no botão acima para ler o contrato em PDF e realizar sua assinatura digital.
-              </Text>
-            </div>
-          ) : (
-            <Text style={{ color: "#0A0F0D", lineHeight: "1.5" }}>
-              A coordenação da sua região entrará em contato com as instruções para a assinatura.
-            </Text>
-          )}
+      <CaixaEmail titulo="Contrato emitido">
+        <LinhaDado rotulo="Objeto" valor={<strong>{objeto}</strong>} />
+        <LinhaDado rotulo="Situação" valor="Aguardando sua assinatura" />
+      </CaixaEmail>
 
-          {urlContato && (
-            <Text style={{ marginTop: "24px", borderTop: "1px solid #E2E8F0", paddingTop: "16px" }}>
-              <Link href={urlContato} style={{ color: "#157F58", fontSize: "13px" }}>
-                Saiba mais sobre o Comitê Digital
-              </Link>
-            </Text>
-          )}
-        </Container>
-      </Body>
-    </Html>
+      {urlAssinatura ? (
+        <>
+          <BotaoEmail href={urlAssinatura}>Visualizar e assinar contrato</BotaoEmail>
+          <TextoMiudo>
+            Leia o contrato em PDF e realize a assinatura digital pelo botão acima. Se ele não
+            funcionar, copie e cole este endereço no navegador: {urlAssinatura}
+          </TextoMiudo>
+        </>
+      ) : (
+        <TextoEmail>
+          A coordenação da sua região entrará em contato com as instruções para a assinatura.
+        </TextoEmail>
+      )}
+    </LayoutEmail>
   );
 }
 

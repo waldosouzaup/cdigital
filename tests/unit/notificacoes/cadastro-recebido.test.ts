@@ -31,11 +31,11 @@ describe("E-mail de Confirmação de Cadastro e Envio de Documentos (cadastro_re
     expect(html).toContain("REC-53C1855D");
     expect(html).toContain("Coordenação Geral");
     expect(html).toContain("11/09/2026 às 11:30");
-    expect(html).toContain("Documento de Identidade");
-    expect(html).toContain("Comprovante de Residência");
+    expect(html).toContain("Documento de identidade");
+    expect(html).toContain("Comprovante de residência");
     expect(html).toContain("✓ Recebido");
-    expect(html).toContain("Conferência Técnica");
-    expect(html).toContain("Emissão do Contrato");
+    expect(html).toContain("Conferência técnica");
+    expect(html).toContain("Emissão do contrato");
   });
 
   it("renderiza a versão em texto simples com o protocolo e comprovante", async () => {

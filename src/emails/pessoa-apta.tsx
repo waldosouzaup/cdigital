@@ -2,10 +2,11 @@
  * E-mail de `pessoa_apta` — Seção 6: "Documentação completa e aprovada | Coordenador
  * responsável | Pessoa liberada para contrato." Vai para o coordenador, não para o
  * contratado — por isso o conteúdo pode nomear a pessoa (não é dado sensível dela
- * mesma sendo enviado a ela).
+ * mesma sendo enviado a ela). Moldura institucional em `layout.tsx`.
  */
 import * as React from "react";
-import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
+import { render } from "react-email";
+import { BotaoEmail, CaixaEmail, LayoutEmail, LinhaDado, TextoEmail } from "./layout";
 
 interface PessoaAptaEmailProps {
   nomePessoa: string;
@@ -14,26 +15,23 @@ interface PessoaAptaEmailProps {
 
 function PessoaAptaEmail({ nomePessoa, urlPainel }: PessoaAptaEmailProps) {
   return (
-    <Html lang="pt-BR">
-      <Head />
-      <Preview>{`${nomePessoa} está com a documentação completa`}</Preview>
-      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
-            Documentação aprovada
-          </Heading>
-          <Text style={{ color: "#0A0F0D" }}>
-            <strong>{nomePessoa}</strong> teve toda a documentação conferida e aprovada. Já está
-            liberado(a) para emissão de contrato.
-          </Text>
-          <Text>
-            <Link href={urlPainel} style={{ color: "#157F58", fontWeight: "600" }}>
-              Ver no painel →
-            </Link>
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+    <LayoutEmail
+      previa={`${nomePessoa} está com a documentação completa`}
+      titulo="Documentação aprovada"
+      urlPortal={urlPainel}
+      rotuloPortal="Abrir o painel de pessoas"
+    >
+      <TextoEmail>
+        A conferência foi concluída: a pessoa abaixo está liberada para emissão de contrato.
+      </TextoEmail>
+
+      <CaixaEmail tom="positivo" titulo="Pessoa liberada">
+        <LinhaDado rotulo="Nome" valor={<strong>{nomePessoa}</strong>} />
+        <LinhaDado rotulo="Situação" valor="Documentação completa e aprovada" />
+      </CaixaEmail>
+
+      <BotaoEmail href={urlPainel}>Ver no painel</BotaoEmail>
+    </LayoutEmail>
   );
 }
 

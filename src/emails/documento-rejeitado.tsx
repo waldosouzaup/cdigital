@@ -1,10 +1,11 @@
 /**
  * E-mail de `documento_rejeitado` — Fase 2, item 3 / Seção 6: "motivo em linguagem
  * simples e link para reenviar". Mesmo cuidado do link_coleta: nada sensível no
- * corpo (Regra 7).
+ * corpo (Regra 7). Moldura institucional em `layout.tsx`.
  */
 import * as React from "react";
-import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
+import { render } from "react-email";
+import { BotaoEmail, CaixaEmail, LayoutEmail, TextoEmail, TextoMiudo } from "./layout";
 
 interface DocumentoRejeitadoEmailProps {
   primeiroNome: string;
@@ -12,27 +13,31 @@ interface DocumentoRejeitadoEmailProps {
   urlReenvio: string;
 }
 
-function DocumentoRejeitadoEmail({ primeiroNome, motivo, urlReenvio }: DocumentoRejeitadoEmailProps) {
+function DocumentoRejeitadoEmail({
+  primeiroNome,
+  motivo,
+  urlReenvio,
+}: DocumentoRejeitadoEmailProps) {
   return (
-    <Html lang="pt-BR">
-      <Head />
-      <Preview>Não foi possível aceitar o documento enviado — tente novamente</Preview>
-      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
-            Olá, {primeiroNome}
-          </Heading>
-          <Text style={{ color: "#0A0F0D" }}>
-            O documento que você enviou não pôde ser aceito. {motivo}
-          </Text>
-          <Text>
-            <Link href={urlReenvio} style={{ color: "#157F58", fontWeight: "600" }}>
-              Clique aqui para enviar novamente →
-            </Link>
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+    <LayoutEmail
+      previa="Não foi possível aceitar o documento enviado — tente novamente"
+      titulo={`Olá, ${primeiroNome}`}
+    >
+      <TextoEmail>
+        O documento que você enviou não pôde ser aceito pela conferência da coordenação. É só
+        reenviar — leva menos de um minuto.
+      </TextoEmail>
+
+      <CaixaEmail tom="critico" titulo="Motivo da recusa">
+        <TextoEmail style={{ margin: 0, fontSize: "14px" }}>{motivo}</TextoEmail>
+      </CaixaEmail>
+
+      <BotaoEmail href={urlReenvio}>Enviar o documento novamente</BotaoEmail>
+
+      <TextoMiudo>
+        Se o botão não funcionar, copie e cole este endereço no navegador: {urlReenvio}
+      </TextoMiudo>
+    </LayoutEmail>
   );
 }
 

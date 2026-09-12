@@ -1,10 +1,12 @@
 /**
- * E-mail de `distrato_enviado` — Notificação de rescisão/distrato contratual do integrante.
- * Regra 7: sem CPF/dados bancários no assunto ou corpo sensível — informa formalização,
- * período trabalhado apurado e valor proporcional nos termos da legislação eleitoral.
+ * E-mail de `distrato_enviado` — rescisão contratual do integrante. Regra 7: sem
+ * CPF ou dado bancário; informa a formalização, o período apurado e o valor
+ * proporcional nos termos da legislação eleitoral.
+ * Moldura institucional em `layout.tsx`.
  */
 import * as React from "react";
-import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
+import { render } from "react-email";
+import { CORES, CaixaEmail, LayoutEmail, LinhaDado, TextoEmail } from "./layout";
 
 export interface DistratoEnviadoEmailProps {
   primeiroNome: string;
@@ -26,81 +28,31 @@ export function DistratoEnviadoEmail({
   urlContato,
 }: DistratoEnviadoEmailProps) {
   return (
-    <Html lang="pt-BR">
-      <Head />
-      <Preview>Formalização do Termo de Distrato Contratual</Preview>
-      <Body
-        style={{
-          fontFamily:
-            "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-          backgroundColor: "#F8FAF9",
-          padding: "24px",
-        }}
-      >
-        <Container
-          style={{
-            backgroundColor: "#ffffff",
-            padding: "28px",
-            maxWidth: "520px",
-            borderRadius: "8px",
-            border: "1px solid #E2E8F0",
-          }}
-        >
-          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D", marginTop: 0 }}>
-            Olá, {primeiroNome}
-          </Heading>
-          <Text style={{ color: "#0A0F0D", lineHeight: "1.5" }}>
-            Informamos que a formalização do <strong>Termo de Distrato / Rescisão</strong> relativo ao contrato de prestação de serviços para <strong>{objeto}</strong> foi registrada no sistema em <strong>{dataDistrato}</strong>.
-          </Text>
+    <LayoutEmail
+      previa="Formalização do Termo de Distrato Contratual"
+      titulo={`Olá, ${primeiroNome}`}
+      urlPortal={urlContato}
+    >
+      <TextoEmail>
+        A formalização do <strong>Termo de Distrato / Rescisão</strong> do contrato de{" "}
+        <strong>{objeto}</strong> foi registrada no sistema em <strong>{dataDistrato}</strong>.
+      </TextoEmail>
 
-          <div
-            style={{
-              backgroundColor: "#F8FAF9",
-              border: "1px solid #E2E8F0",
-              borderRadius: "6px",
-              padding: "16px",
-              margin: "20px 0",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: "13px",
-                fontWeight: "bold",
-                color: "#1FA871",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                margin: "0 0 8px 0",
-              }}
-            >
-              Resumo da Rescisão
-            </Text>
-            <Text style={{ fontSize: "14px", color: "#0A0F0D", margin: "4px 0" }}>
-              <strong>Período apurado:</strong> {periodoTrabalhado}
-            </Text>
-            <Text style={{ fontSize: "14px", color: "#0A0F0D", margin: "4px 0" }}>
-              <strong>Valor proporcional calculado:</strong> {valorProporcional}
-            </Text>
-            {motivo && (
-              <Text style={{ fontSize: "13px", color: "#52605B", margin: "6px 0 0 0" }}>
-                <strong>Motivo informado:</strong> {motivo}
-              </Text>
-            )}
-          </div>
+      <CaixaEmail titulo="Resumo da rescisão">
+        <LinhaDado rotulo="Período apurado" valor={periodoTrabalhado} />
+        <LinhaDado
+          rotulo="Valor proporcional calculado"
+          valor={<strong style={{ color: CORES.primariaEscura }}>{valorProporcional}</strong>}
+        />
+        {motivo && <LinhaDado rotulo="Motivo informado" valor={motivo} />}
+      </CaixaEmail>
 
-          <Text style={{ color: "#52605B", fontSize: "13px", lineHeight: "1.5" }}>
-            O termo formal de rescisão foi anexado e registrado pela coordenação da campanha em conformidade com as exigências de prestação de contas eleitorais. Caso necessite de uma cópia assinada ou esclarecimentos adicionais, entre em contato com a equipe administrativa.
-          </Text>
-
-          {urlContato && (
-            <Text style={{ marginTop: "24px", borderTop: "1px solid #E2E8F0", paddingTop: "16px" }}>
-              <Link href={urlContato} style={{ color: "#157F58", fontSize: "13px" }}>
-                Acessar portal do Comitê Digital
-              </Link>
-            </Text>
-          )}
-        </Container>
-      </Body>
-    </Html>
+      <TextoEmail style={{ fontSize: "13px", color: CORES.tintaSuave }}>
+        O termo formal foi anexado e registrado pela coordenação da campanha em conformidade com as
+        exigências de prestação de contas eleitorais. Se precisar de uma cópia assinada ou de
+        esclarecimentos, fale com a equipe administrativa.
+      </TextoEmail>
+    </LayoutEmail>
   );
 }
 

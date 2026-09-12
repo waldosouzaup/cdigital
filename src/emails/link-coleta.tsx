@@ -1,10 +1,11 @@
 /**
  * E-mail de `link_coleta` — Seção 6: "Link e prazo. Nada além do primeiro nome."
  * Nenhum dado sensível (CPF, endereço, valor) entra no corpo — Regra 7 e NFR de
- * e-mail (Seção 10).
+ * e-mail (Seção 10). Moldura institucional em `layout.tsx`.
  */
 import * as React from "react";
-import { Body, Container, Head, Heading, Html, Link, Preview, Text, render } from "react-email";
+import { render } from "react-email";
+import { BotaoEmail, CaixaEmail, LayoutEmail, TextoEmail, TextoMiudo } from "./layout";
 
 interface LinkColetaEmailProps {
   primeiroNome: string;
@@ -13,31 +14,30 @@ interface LinkColetaEmailProps {
 }
 
 function LinkColetaEmail({ primeiroNome, url, prazoDias }: LinkColetaEmailProps) {
+  const plural = prazoDias === 1 ? "" : "s";
   return (
-    <Html lang="pt-BR">
-      <Head />
-      <Preview>{`Link para enviar seus dados — válido por ${prazoDias} dia${prazoDias === 1 ? "" : "s"}`}</Preview>
-      <Body style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", backgroundColor: "#F8FAF9", padding: "24px" }}>
-        <Container style={{ backgroundColor: "#ffffff", padding: "28px", maxWidth: "480px", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-          <Heading as="h2" style={{ fontSize: "18px", color: "#0A0F0D" }}>
-            Olá, {primeiroNome}
-          </Heading>
-          <Text style={{ color: "#0A0F0D" }}>
-            Use o link abaixo para enviar seus dados de contato e o documento pedidos pela
-            coordenação da campanha. Ele vale por {prazoDias} dia{prazoDias === 1 ? "" : "s"} e só
-            pode ser usado uma vez.
-          </Text>
-          <Text>
-            <Link href={url} style={{ color: "#157F58", fontWeight: "600" }}>
-              {url}
-            </Link>
-          </Text>
-          <Text style={{ fontSize: "12px", color: "#52605B" }}>
-            Se você não esperava este e-mail, é seguro ignorá-lo.
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+    <LayoutEmail
+      previa={`Link para enviar seus dados — válido por ${prazoDias} dia${plural}`}
+      titulo={`Olá, ${primeiroNome}`}
+    >
+      <TextoEmail>
+        A coordenação da campanha precisa dos seus dados de contato e de um documento. Use o botão
+        abaixo para enviá-los com segurança.
+      </TextoEmail>
+
+      <BotaoEmail href={url}>Enviar meus dados</BotaoEmail>
+
+      <CaixaEmail tom="atencao" titulo="Atenção ao prazo">
+        <TextoEmail style={{ margin: 0, fontSize: "14px" }}>
+          Este link vale por <strong>{prazoDias} dia{plural}</strong> e só pode ser usado uma vez.
+        </TextoEmail>
+      </CaixaEmail>
+
+      <TextoMiudo>
+        Se o botão não funcionar, copie e cole este endereço no navegador: {url}
+      </TextoMiudo>
+      <TextoMiudo>Se você não esperava este e-mail, é seguro ignorá-lo.</TextoMiudo>
+    </LayoutEmail>
   );
 }
 
