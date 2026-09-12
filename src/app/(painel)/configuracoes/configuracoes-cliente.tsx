@@ -19,8 +19,15 @@ import { RegioesSecao } from "./regioes-secao";
 import { AtividadesSecao } from "./atividades-secao";
 import { CampanhasSecao } from "./campanhas-secao";
 import { ComunicacoesSecao } from "./comunicacoes-secao";
+import { DistratoSecao } from "./distrato-secao";
 import { MODELO_REFERENCIA_MICHELLE } from "@/lib/contratos/modelo-referencia";
-import type { CampanhaSuperadmin, IdentidadeComite, MetricasComunicacao, TemplateContrato } from "./dados";
+import type {
+  CampanhaSuperadmin,
+  IdentidadeComite,
+  MetricasComunicacao,
+  TemplateContrato,
+  TemplateDistrato,
+} from "./dados";
 import type { MembroEquipe } from "../equipe/dados";
 import type { FuncaoPretendidaListada, RegiaoListada } from "../regioes/dados";
 import type {
@@ -49,6 +56,7 @@ const MARCADORES = [
 
 export function ConfiguracoesCliente({
   templatesIniciais,
+  templateDistratoInicial,
   identidadeInicial,
   membrosIniciais,
   regioesIniciais,
@@ -59,6 +67,7 @@ export function ConfiguracoesCliente({
   usuarioLogado,
 }: {
   templatesIniciais: TemplateContrato[];
+  templateDistratoInicial: TemplateDistrato;
   identidadeInicial: IdentidadeComite;
   membrosIniciais: MembroEquipe[];
   regioesIniciais: RegiaoListada[];
@@ -601,6 +610,9 @@ export function ConfiguracoesCliente({
         </div>
       </section>
       )}
+
+      {/* TERMO DE DISTRATO — modelo próprio, editável (migration 0034) */}
+      {abaAtiva === "modelos" && <DistratoSecao templateInicial={templateDistratoInicial} />}
 
 
       {/* GOVERNANÇA LGPD E SEGURANÇA — cosmético, fora do escopo da Fase 2 */}

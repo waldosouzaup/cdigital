@@ -3,6 +3,7 @@
  * conta real (decisão registrada em CONSULTAS.md: Resend ainda não provisionado).
  */
 import { Resend } from "resend";
+import { normalizarRemetente } from "./remetente";
 
 export interface EmailTransportParams {
   to: string;
@@ -27,12 +28,16 @@ export function createResendTransport(apiKey: string, from: string): EmailTransp
     };
   }
 
-  // Remove aspas envolventes caso o ambiente preserve aspas literais
-  const remetenteLimpo = from.trim().replace(/^["']|["']$/g, "").trim();
-  if (!remetenteLimpo) {
+  // Um remetente malformado era descoberto só no retorno da API, depois que
+  // `sendNotification` já tinha gravado a linha em `notificacoes` — e a chave de
+  // idempotência então bloqueia o reenvio natural. Validar aqui transforma um
+  // `validation_error` opaco do Resend em um motivo nomeado, antes da chamada.
+  const remetente = normalizarRemetente(from);
+  if (!remetente.ok) {
+    const erro = `${remetente.motivo}: ${remetente.mensagem}`;
     return {
       async send() {
-        return { ok: false, error: "resend_from_ausente" };
+        return { ok: false, error: erro };
       },
     };
   }
@@ -43,7 +48,7 @@ export function createResendTransport(apiKey: string, from: string): EmailTransp
     async send({ to, subject, html, text }) {
       try {
         const { data, error } = await resend.emails.send({
-          from: remetenteLimpo,
+          from: remetente.valor,
           to,
           subject,
           html,

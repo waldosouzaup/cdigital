@@ -17,3 +17,10 @@ export interface EstadoIdentidadeComite {
 }
 
 export const ESTADO_INICIAL_IDENTIDADE: EstadoIdentidadeComite = { status: "idle" };
+
+export interface EstadoTemplateDistrato {
+  status: "idle" | "sucesso" | "erro";
+  mensagem?: string;
+}
+
+export const ESTADO_INICIAL_TEMPLATE_DISTRATO: EstadoTemplateDistrato = { status: "idle" };

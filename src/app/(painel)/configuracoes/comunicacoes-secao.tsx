@@ -340,11 +340,11 @@ export function ComunicacoesSecao({
     setEnviandoTeste(false);
   }
 
-  async function handleReprocessar() {
+  async function handleReprocessar(reiniciarTentativas = false) {
     setReprocessando(true);
     setResultadoReprocessamento(null);
 
-    const res = await reprocessarFalhasTransmissao();
+    const res = await reprocessarFalhasTransmissao({ reiniciarTentativas });
     setResultadoReprocessamento({
       ok: res.ok,
       mensagem: res.mensagem,
@@ -386,11 +386,19 @@ export function ComunicacoesSecao({
               )}
             </div>
             <h3 className="mt-3 text-lg font-bold text-ink truncate">
-              {metricas.remetenteConfigurado}
+              {metricas.remetenteEfetivo ?? metricas.remetenteConfigurado}
             </h3>
-            <p className="mt-1 text-xs text-ink-muted">
-              Endereço remetente configurado para mensagens de formalização.
-            </p>
+            {metricas.remetenteErro ? (
+              /* Sem este aviso, uma RESEND_FROM malformada só aparecia depois que
+                 o envio falhava — foi o que deixou 21 notificações em `falhou`. */
+              <p className="mt-1 text-xs text-danger">
+                <strong>Remetente inválido:</strong> {metricas.remetenteErro}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-ink-muted">
+                Endereço remetente configurado para mensagens de formalização.
+              </p>
+            )}
           </div>
           <div className="mt-4 pt-3 border-t border-border/60 text-xs text-ink-muted flex items-center justify-between">
             <span>APP_URL:</span>
@@ -449,12 +457,13 @@ export function ComunicacoesSecao({
               Reprocessamento Manual
             </h4>
             <p className="mt-1 text-xs text-ink-muted">
-              Dispara o reprocessamento imediato de todas as mensagens em estado de falha (até 3 tentativas).
+              Dispara o reprocessamento imediato das mensagens em estado de falha que ainda têm
+              tentativas disponíveis (o teto é 3).
             </p>
           </div>
           <div className="mt-4">
             <button
-              onClick={handleReprocessar}
+              onClick={() => handleReprocessar()}
               disabled={reprocessando || metricas.totalFalhas === 0}
               className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -469,6 +478,16 @@ export function ComunicacoesSecao({
                   Reprocessar Falhas Pendentes
                 </>
               )}
+            </button>
+            {/* Mensagem que esgotou as 3 tentativas contra uma configuração que já
+                foi corrigida não volta pelo botão acima — o filtro não a enxerga.
+                Esta segunda ação zera o contador, e por isso é explícita. */}
+            <button
+              onClick={() => handleReprocessar(true)}
+              disabled={reprocessando || metricas.totalFalhas === 0}
+              className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-ink-muted transition hover:text-ink hover:border-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Forçar reenvio inclusive das esgotadas
             </button>
             {resultadoReprocessamento && (
               <p

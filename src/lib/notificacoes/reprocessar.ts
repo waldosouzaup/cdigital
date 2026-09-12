@@ -19,6 +19,16 @@ export interface ReprocessarParams {
   supabase: SupabaseClient;
   transport: EmailTransport;
   maxTentativas: number;
+  /**
+   * Ignora o teto de tentativas e zera o contador das linhas reenviadas.
+   *
+   * Existe para o caso em que a falha nunca foi da mensagem e sim da
+   * configuração: 21 notificações queimaram as três tentativas contra um
+   * `RESEND_FROM` malformado e ficaram fora do alcance do filtro abaixo mesmo
+   * depois de o remetente ser corrigido. Fica atrás de uma ação explícita do
+   * administrador — no automático, o teto continua valendo.
+   */
+  reiniciarTentativas?: boolean;
 }
 
 export interface ReprocessarResultado {
@@ -30,14 +40,17 @@ export interface ReprocessarResultado {
 export async function reprocessarNotificacoesFalhas(
   params: ReprocessarParams,
 ): Promise<ReprocessarResultado> {
-  const { supabase, transport, maxTentativas } = params;
+  const { supabase, transport, maxTentativas, reiniciarTentativas = false } = params;
 
-  const { data, error } = await supabase
+  const consulta = supabase
     .from("notificacoes")
     .select("id, destinatario_email, tentativas, payload_reenvio")
     .eq("status", "falhou")
-    .lt("tentativas", maxTentativas)
     .not("payload_reenvio", "is", null);
+
+  const { data, error } = await (reiniciarTentativas
+    ? consulta
+    : consulta.lt("tentativas", maxTentativas));
 
   if (error) throw new Error("Não foi possível listar as notificações a reprocessar.");
 
@@ -52,7 +65,9 @@ export async function reprocessarNotificacoesFalhas(
   let aindaFalhando = 0;
 
   for (const linha of linhas) {
-    const tentativas = linha.tentativas + 1;
+    // Reiniciar significa tratar este envio como a primeira tentativa da
+    // configuração nova — senão a linha voltaria a nascer estourada.
+    const tentativas = reiniciarTentativas ? 1 : linha.tentativas + 1;
     const resultado = await transport.send({
       to: linha.destinatario_email,
       subject: linha.payload_reenvio.subject,

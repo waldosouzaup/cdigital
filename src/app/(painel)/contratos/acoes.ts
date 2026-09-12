@@ -20,10 +20,12 @@ import { criarUrlAssinada } from "@/lib/documentos/url-assinada";
 import { canTransition, type ContractStatus } from "@/lib/contratos/maquina-estados";
 import { gerarPdfContrato } from "@/lib/contratos/gerar-pdf";
 import { amountInWords } from "@/lib/contratos/valor-extenso";
+import { calcularProporcionalDistrato } from "@/lib/contratos/distrato";
 import {
-  calcularProporcionalDistrato,
-  montarTextoTermoDistrato,
-} from "@/lib/contratos/distrato";
+  montarDadosDistrato,
+  substituirMarcadoresDistrato,
+} from "@/lib/contratos/template-distrato";
+import { buscarTemplateDistrato } from "../configuracoes/dados";
 import { renderizarEmailContratoEnviado } from "@/emails/contrato-enviado";
 import { renderizarEmailContratoAssinado } from "@/emails/contrato-assinado";
 import { renderizarEmailDistratoEnviado } from "@/emails/distrato-enviado";
@@ -588,13 +590,21 @@ export async function distratarContrato(
     valor: Number(contrato.valor),
   });
 
-  const corpoTermo = montarTextoTermoDistrato({
-    contratadoNome: contrato.pessoas?.nome_completo ?? "—",
-    contratadoCpf: contrato.pessoas?.cpf ?? "—",
-    contratadoEndereco: contrato.pessoas?.endereco ?? null,
-    motivo: motivoLimpo,
-    calculo,
-  });
+  // O termo passou a ser editável em /configuracoes?aba=modelos (migration 0034).
+  // Sem modelo salvo, `buscarTemplateDistrato` devolve o termo oficial de fábrica,
+  // que é o mesmo texto que `montarTextoTermoDistrato` sempre gerou.
+  const modeloDistrato = await buscarTemplateDistrato();
+  const corpoTermo = substituirMarcadoresDistrato(
+    modeloDistrato.corpoHtml,
+    montarDadosDistrato({
+      contratadoNome: contrato.pessoas?.nome_completo ?? "—",
+      contratadoCpf: contrato.pessoas?.cpf ?? "—",
+      contratadoEndereco: contrato.pessoas?.endereco ?? null,
+      objeto: contrato.objeto,
+      motivo: motivoLimpo,
+      calculo,
+    }),
+  );
 
   const pdfBytes = await gerarPdfContrato({
     titulo: "RESCISÃO DE CONTRATO DE PRESTAÇÃO DE SERVIÇOS",

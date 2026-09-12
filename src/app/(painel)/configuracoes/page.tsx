@@ -5,6 +5,7 @@
  */
 import {
   buscarIdentidadeComite,
+  buscarTemplateDistrato,
   listarCampanhasSuperadmin,
   listarTemplates,
   obterMetricasComunicacao,
@@ -29,6 +30,7 @@ export default async function ConfiguracoesPage() {
     contextoAtividades,
     metricas,
     contexto,
+    templateDistrato,
   ] = await Promise.all([
     listarTemplates(),
     buscarIdentidadeComite(),
@@ -38,6 +40,7 @@ export default async function ConfiguracoesPage() {
     listarContextoAtividades(),
     obterMetricasComunicacao(),
     obterContextoUsuario(supabase),
+    buscarTemplateDistrato(),
   ]);
 
   const campanhas = contexto.papel === "superadmin" ? await listarCampanhasSuperadmin() : [];
@@ -45,6 +48,7 @@ export default async function ConfiguracoesPage() {
   return (
     <ConfiguracoesCliente
       templatesIniciais={templates}
+      templateDistratoInicial={templateDistrato}
       identidadeInicial={identidade}
       membrosIniciais={membros}
       regioesIniciais={regioes}

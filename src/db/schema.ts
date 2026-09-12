@@ -457,6 +457,9 @@ export const contractTemplates = pgTable(
       .notNull()
       .references(() => organizations.id),
     name: text("nome").notNull(),
+    // 'contrato' = modelo de minuta da emissão; 'distrato' = termo de rescisão
+    // (migration 0034). Índice parcial no banco limita a um distrato por organização.
+    type: text("tipo").notNull().default("contrato"),
     subject: text("objeto").notNull(),
     bodyHtml: text("corpo_html").notNull(),
     defaultAmount: numeric("valor_padrao", { precision: 12, scale: 2 }),

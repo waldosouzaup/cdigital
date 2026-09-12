@@ -20,7 +20,16 @@ import {
 import { validarIdentidadeComite } from "@/lib/organizacao/validacao";
 import { transporteEmailPadrao } from "@/lib/notificacoes/transporte-padrao";
 import { reprocessarNotificacoesFalhas } from "@/lib/notificacoes/reprocessar";
-import type { EstadoIdentidadeComite, EstadoSalvarTemplate } from "./estado";
+import {
+  MARCADORES_DISTRATO,
+  NOME_TEMPLATE_DISTRATO,
+  TEMPLATE_DISTRATO_PADRAO,
+} from "@/lib/contratos/template-distrato";
+import type {
+  EstadoIdentidadeComite,
+  EstadoSalvarTemplate,
+  EstadoTemplateDistrato,
+} from "./estado";
 
 function campoTexto(formData: FormData, nome: string): string {
   const valor = formData.get(nome);
@@ -70,6 +79,95 @@ export async function salvarTemplate(
   revalidatePath("/configuracoes");
   revalidatePath("/contratos");
   return { status: "sucesso", mensagem: id ? "Modelo atualizado." : "Modelo criado." };
+}
+
+/** Papéis que podem mexer no termo de rescisão — mesma régua do restante da governança. */
+const PAPEIS_TEMPLATE_DISTRATO = ["gestor", "admin", "superadmin"];
+
+/**
+ * Salva o modelo do termo de distrato. Uma linha por organização (índice parcial
+ * da migration 0034), então é sempre upsert sobre a linha `tipo = 'distrato'`.
+ *
+ * Diferente dos modelos de minuta, aqui a validação vai além de presença: um
+ * termo sem `{{valor_proporcional}}` ou sem `{{data_distrato}}` gera um PDF de
+ * rescisão sem o valor devido nem a data — documento que já saiu assinado.
+ */
+export async function salvarTemplateDistrato(
+  _estadoAnterior: EstadoTemplateDistrato,
+  formData: FormData,
+): Promise<EstadoTemplateDistrato> {
+  const corpoHtml = campoTexto(formData, "corpoHtml");
+
+  if (!corpoHtml) {
+    return { status: "erro", mensagem: "O corpo do termo de distrato não pode ficar vazio." };
+  }
+
+  const obrigatorios = ["{{nome}}", "{{cpf}}", "{{valor_proporcional}}", "{{data_distrato}}"];
+  const faltando = obrigatorios.filter((marcador) => !corpoHtml.includes(marcador));
+  if (faltando.length > 0) {
+    return {
+      status: "erro",
+      mensagem: `O termo precisa conter ${faltando.join(", ")} — sem esses marcadores o PDF sai sem identificação do contratado, sem o valor devido ou sem a data da rescisão.`,
+    };
+  }
+
+  const conhecidos = new Set(MARCADORES_DISTRATO.map((m) => m.marcador));
+  const desconhecidos = [...new Set(corpoHtml.match(/\{\{[a-z_]+\}\}/g) ?? [])].filter(
+    (marcador) => !conhecidos.has(marcador),
+  );
+  if (desconhecidos.length > 0) {
+    return {
+      status: "erro",
+      mensagem: `Marcador não reconhecido: ${desconhecidos.join(", ")}. Ele sairia impresso no PDF do jeito que está.`,
+    };
+  }
+
+  const supabase = await createClient();
+  const { organizationId, papel } = await obterContextoUsuario(supabase);
+  if (!organizationId) return { status: "erro", mensagem: "Sessão inválida — faça login novamente." };
+  if (!PAPEIS_TEMPLATE_DISTRATO.includes(papel ?? "")) {
+    return { status: "erro", mensagem: "Apenas administradores podem editar o termo de distrato." };
+  }
+
+  const { data: existente } = await supabase
+    .from("templates_contrato")
+    .select("id")
+    .eq("tipo", "distrato")
+    .maybeSingle();
+
+  const linha = {
+    organizacao_id: organizationId,
+    tipo: "distrato",
+    nome: NOME_TEMPLATE_DISTRATO,
+    // `objeto` é NOT NULL herdado dos modelos de minuta e não tem uso na rescisão.
+    objeto: "Rescisão contratual",
+    corpo_html: corpoHtml,
+    valor_padrao: null,
+    ativo: true,
+  };
+
+  const { error } = existente
+    ? await supabase.from("templates_contrato").update(linha).eq("id", existente.id)
+    : await supabase.from("templates_contrato").insert(linha);
+
+  if (error) {
+    return { status: "erro", mensagem: "Não foi possível salvar o modelo de distrato." };
+  }
+
+  revalidatePath("/configuracoes");
+  revalidatePath("/contratos");
+  return { status: "sucesso", mensagem: "Modelo de distrato atualizado." };
+}
+
+/**
+ * Devolve o termo oficial de fábrica para o editor, sem gravar nada — o
+ * administrador ainda precisa salvar para valer.
+ */
+export async function restaurarTemplateDistratoPadrao(): Promise<{
+  ok: boolean;
+  corpoHtml: string;
+}> {
+  return { ok: true, corpoHtml: TEMPLATE_DISTRATO_PADRAO };
 }
 
 /**
@@ -281,7 +379,9 @@ export async function testarTransmissaoEmail(destinatario: string): Promise<{
   };
 }
 
-export async function reprocessarFalhasTransmissao(): Promise<{
+export async function reprocessarFalhasTransmissao(
+  opcoes?: { reiniciarTentativas?: boolean },
+): Promise<{
   ok: boolean;
   mensagem: string;
   processadas?: number;
@@ -300,6 +400,7 @@ export async function reprocessarFalhasTransmissao(): Promise<{
       supabase,
       transport: transporteEmailPadrao(),
       maxTentativas: 3,
+      reiniciarTentativas: opcoes?.reiniciarTentativas ?? false,
     });
 
     revalidatePath("/configuracoes");

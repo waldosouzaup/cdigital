@@ -16,16 +16,21 @@ function fakeTransport(result: Awaited<ReturnType<EmailTransport["send"]>>): Ema
 
 function fakeSupabase(linhasFalhas: Array<Record<string, unknown>>) {
   const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
+  const filtros: string[] = [];
   const query = {
     select: () => query,
     eq: () => query,
-    lt: () => query,
+    lt: (coluna: string) => {
+      filtros.push(`lt:${coluna}`);
+      return query;
+    },
     not: () => query,
     then: (resolve: (v: { data: unknown; error: null }) => void) =>
       resolve({ data: linhasFalhas, error: null }),
   };
   return {
     updates,
+    filtros,
     from() {
       return {
         select: () => query,
@@ -102,5 +107,48 @@ describe("reprocessarNotificacoesFalhas", () => {
 
     expect(transport.send).not.toHaveBeenCalled();
     expect(res).toMatchObject({ processadas: 0, reenviadas: 0, aindaFalhando: 0 });
+  });
+});
+
+/**
+ * As 21 notificações que falharam por remetente inválido chegaram a
+ * `tentativas = 3` e ficaram fora do alcance do filtro `< maxTentativas` — o
+ * botão de reprocessar não as via mais, mesmo depois de a configuração ter sido
+ * corrigida. `reiniciarTentativas` existe para esse caso: a falha não era da
+ * mensagem, era do ambiente.
+ */
+describe("reprocessarNotificacoesFalhas — reinício de tentativas", () => {
+  it("ignora o teto de tentativas quando reiniciarTentativas está ligado", async () => {
+    const supabase = fakeSupabase([
+      {
+        id: "n1",
+        destinatario_email: "alguem@exemplo.com",
+        tentativas: 3,
+        payload_reenvio: { subject: "s", html: "<p>h</p>", text: "t" },
+      },
+    ]);
+
+    const resultado = await reprocessarNotificacoesFalhas({
+      supabase: supabase as never,
+      transport: fakeTransport({ ok: true, id: "re_1" }),
+      maxTentativas: 3,
+      reiniciarTentativas: true,
+    });
+
+    expect(resultado).toMatchObject({ processadas: 1, reenviadas: 1, aindaFalhando: 0 });
+    expect(supabase.updates[0].patch).toMatchObject({ status: "enviada", tentativas: 1 });
+  });
+
+  it("mantém o teto de tentativas quando reiniciarTentativas não é pedido", async () => {
+    const supabase = fakeSupabase([]);
+
+    await reprocessarNotificacoesFalhas({
+      supabase: supabase as never,
+      transport: fakeTransport({ ok: true, id: "re_1" }),
+      maxTentativas: 3,
+    });
+
+    // O filtro é o que impede reenvio infinito de uma mensagem que falha sozinha.
+    expect(supabase.filtros).toContain("lt:tentativas");
   });
 });

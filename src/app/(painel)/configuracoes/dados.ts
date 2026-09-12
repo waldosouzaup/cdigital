@@ -3,6 +3,15 @@
  * organização vem de graça da policy.
  */
 import { createClient } from "@/lib/supabase/server";
+import { normalizarRemetente } from "@/lib/notificacoes/remetente";
+import {
+  NOME_TEMPLATE_DISTRATO,
+  TEMPLATE_DISTRATO_PADRAO,
+} from "@/lib/contratos/template-distrato";
+import {
+  REMETENTE_PADRAO,
+  remetenteConfigurado,
+} from "@/lib/notificacoes/transporte-padrao";
 
 export interface TemplateContrato {
   id: string;
@@ -37,6 +46,9 @@ export async function listarTemplates(): Promise<TemplateContrato[]> {
   const { data, error } = await supabase
     .from("templates_contrato")
     .select("id, nome, objeto, corpo_html, valor_padrao, ativo")
+    // O termo de distrato mora na mesma tabela (migration 0034) mas não é
+    // opção de emissão: fica fora desta lista e tem tela própria.
+    .eq("tipo", "contrato")
     .order("nome");
 
   if (error) throw new Error("Não foi possível carregar os modelos de contrato.");
@@ -49,6 +61,46 @@ export async function listarTemplates(): Promise<TemplateContrato[]> {
     valorPadrao: t.valor_padrao,
     ativo: t.ativo,
   }));
+}
+
+export interface TemplateDistrato {
+  id: string | null;
+  nome: string;
+  corpoHtml: string;
+  /** true quando ainda não há modelo salvo e o texto exibido é o termo oficial de fábrica. */
+  padrao: boolean;
+}
+
+/**
+ * Modelo do termo de rescisão. Quando o comitê nunca salvou um, devolve o termo
+ * oficial de fábrica — é exatamente o texto que a rescisão já gerava antes de a
+ * edição existir, então a tela nunca abre vazia.
+ */
+export async function buscarTemplateDistrato(): Promise<TemplateDistrato> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("templates_contrato")
+    .select("id, nome, corpo_html")
+    .eq("tipo", "distrato")
+    .maybeSingle();
+
+  if (error) throw new Error("Não foi possível carregar o modelo de distrato.");
+
+  if (!data) {
+    return {
+      id: null,
+      nome: NOME_TEMPLATE_DISTRATO,
+      corpoHtml: TEMPLATE_DISTRATO_PADRAO,
+      padrao: true,
+    };
+  }
+
+  return {
+    id: data.id,
+    nome: data.nome || NOME_TEMPLATE_DISTRATO,
+    corpoHtml: data.corpo_html,
+    padrao: false,
+  };
 }
 
 export interface CampanhaSuperadmin {
@@ -117,6 +169,10 @@ export async function listarCampanhasSuperadmin(): Promise<CampanhaSuperadmin[]>
 export interface MetricasComunicacao {
   apiKeyConfigurada: boolean;
   remetenteConfigurado: string;
+  /** Remetente já normalizado, exatamente como sai para o Resend. */
+  remetenteEfetivo: string | null;
+  /** Motivo em português quando `RESEND_FROM` não é um endereço utilizável. */
+  remetenteErro: string | null;
   appUrl: string;
   totalEnviadas: number;
   totalFalhas: number;
@@ -133,6 +189,7 @@ export interface MetricasComunicacao {
 }
 
 export async function obterMetricasComunicacao(): Promise<MetricasComunicacao> {
+  const remetente = normalizarRemetente(remetenteConfigurado());
   const supabase = await createClient();
 
   const { data: notificacoes } = await supabase
@@ -158,7 +215,11 @@ export async function obterMetricasComunicacao(): Promise<MetricasComunicacao> {
 
   return {
     apiKeyConfigurada: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim()),
-    remetenteConfigurado: process.env.RESEND_FROM || "Não configurado",
+    remetenteConfigurado: process.env.RESEND_FROM || `${REMETENTE_PADRAO} (padrão)`,
+    // Conferido aqui para que uma RESEND_FROM malformada apareça nesta tela em
+    // vez de só virar `notificacoes.erro` depois que o envio já falhou.
+    remetenteEfetivo: remetente.ok ? remetente.valor : null,
+    remetenteErro: remetente.ok ? null : remetente.mensagem,
     appUrl: process.env.APP_URL || "http://localhost:3000",
     totalEnviadas: enviadas ?? 0,
     totalFalhas: falhas ?? 0,
