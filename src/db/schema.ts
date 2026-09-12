@@ -428,7 +428,11 @@ export const people = pgTable(
       .notNull()
       .references(() => organizations.id),
     fullName: text("nome_completo").notNull(),
-    cpf: text("cpf").notNull(),
+    // Migration 0042: física identifica por CPF, jurídica por CNPJ. A restrição
+    // `pessoas_identificacao_coerente` garante que exatamente um esteja preenchido.
+    personType: text("tipo_pessoa").notNull().default("fisica"),
+    cpf: text("cpf"),
+    cnpj: text("cnpj"),
     rg: text("rg"),
     birthDate: date("data_nascimento"),
     address: text("endereco"),
@@ -831,3 +835,42 @@ export const deletedRecords = pgTable(
   ],
 );
 
+
+
+// ---------------------------------------------------------------------------
+// escalas
+// ---------------------------------------------------------------------------
+
+/**
+ * Turnos planejados (migration 0043). Compromisso futuro — o que foi de fato
+ * executado fica em `registros_atividade`.
+ *
+ * `inicio`/`fim` são timestamptz e não data + hora separadas: turno de evento
+ * atravessa a meia-noite com frequência, e colunas `time` exigiriam uma flag
+ * "vira o dia" que todo cálculo teria de lembrar de consultar.
+ *
+ * A ausência de sobreposição por pessoa é garantida no banco por uma restrição
+ * de exclusão GiST, não pela aplicação: importação em lote e duas telas abertas
+ * escapam de qualquer checagem feita aqui.
+ */
+export const shifts = pgTable(
+  "escalas",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organizacao_id")
+      .notNull()
+      .references(() => organizations.id),
+    personId: uuid("pessoa_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    regionId: uuid("regiao_id").references(() => regions.id),
+    contractId: uuid("contrato_id").references(() => contracts.id, { onDelete: "set null" }),
+    start: timestamp("inicio", { withTimezone: true }).notNull(),
+    end: timestamp("fim", { withTimezone: true }).notNull(),
+    role: text("funcao"),
+    place: text("local"),
+    observation: text("observacao"),
+    ...timestamps,
+  },
+  (table) => [organizationPolicy("escalas_organizacao", table.organizationId)],
+);

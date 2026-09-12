@@ -10,6 +10,7 @@ const navegacao = [
   { rotulo: "Painel Geral", href: "/dashboard", icone: "⊞" },
   { rotulo: "Equipe / Pessoas", href: "/pessoas", icone: "👥" },
   { rotulo: "Contratos & Vigor", href: "/contratos", icone: "📄" },
+  { rotulo: "Escala de Turnos", href: "/escalas", icone: "🗓" },
   { rotulo: "Conferência de Documentos", href: "/documentos", icone: "🔍" },
   { rotulo: "Configurações & Governança", href: "/configuracoes", icone: "⚙" },
 ];
