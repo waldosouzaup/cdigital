@@ -82,6 +82,7 @@ export const notificationTypeEnum = pgEnum("tipo_notificacao", [
   "resumo_diario",
   "pessoa_apta",
   "distrato_enviado",
+  "distrato_assinado",
   "contrato_assinado",
   "convite_usuario",
   "cadastro_recebido",
@@ -512,6 +513,14 @@ export const contracts = pgTable(
     signedPdfPath: text("caminho_pdf_assinado"),
     distratoTermPath: text("caminho_termo_distrato"),
     signatureToken: text("token_assinatura").unique(),
+    // Assinatura do termo de distrato (migration 0035) — capacidade separada da
+    // do contrato de entrada, que a esta altura já foi consumida.
+    distratoSignatureToken: text("token_assinatura_distrato").unique(),
+    distratoSignatureExpiresAt: timestamp("assinatura_distrato_expira_em", { withTimezone: true }),
+    distratoSignedAt: timestamp("distrato_assinado_em", { withTimezone: true }),
+    signedDistratoTermPath: text("caminho_termo_distrato_assinado"),
+    distratoSignatureEvidence: jsonb("distrato_assinatura_evidencias"),
+    distratoTermSha256: text("termo_distrato_sha256"),
     signatureExpiresAt: timestamp("assinatura_expira_em", { withTimezone: true }),
     pdfSha256: text("pdf_sha256"),
     signatureEvidence: jsonb("assinatura_evidencias"),

@@ -20,7 +20,11 @@ const ROTAS_PUBLICAS = [
   "/inscricao",
   "/candidado-eleicao-2026",
   // Assinatura eletrônica pública de contrato pelo colaborador — `/assinar/[token]`
+  // e do termo de rescisão — `/assinar-distrato/[token]` (migration 0035).
+  // `startsWith("/assinar")` já cobriria as duas, mas deixar explícito evita que
+  // uma futura restrição em `/assinar` derrube o distrato junto sem querer.
   "/assinar",
+  "/assinar-distrato",
 ];
 
 // Recursos do PWA (Fase 4, item 2) que o navegador busca sem cookie de sessão:

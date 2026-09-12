@@ -19,6 +19,7 @@ export type NotificationType =
   | "resumo_diario"
   | "pessoa_apta"
   | "distrato_enviado"
+  | "distrato_assinado"
   | "contrato_assinado"
   | "convite_usuario"
   | "cadastro_recebido";

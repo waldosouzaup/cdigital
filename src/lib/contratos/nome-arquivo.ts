@@ -7,11 +7,12 @@
  * - Contrato - Guilherme Ribeiro.pdf
  * - Contrato - Guilherme Ribeiro (Assinado).pdf
  * - Distrato - Guilherme Ribeiro.pdf
+ * - Distrato - Guilherme Ribeiro (Assinado).pdf
  */
 export function nomeArquivoContrato(
   nome: string | null | undefined,
   _contratoId?: string,
-  versao: "gerado" | "assinado" | "distrato" = "gerado",
+  versao: "gerado" | "assinado" | "distrato" | "distrato_assinado" = "gerado",
 ): string {
   // Limpa caracteres inválidos para sistemas de arquivos preservando legibilidade e espaços
   const nomeLimpo = (nome ?? "")
@@ -23,6 +24,9 @@ export function nomeArquivoContrato(
 
   const pessoa = nomeLimpo.slice(0, 80).trim() || "Colaborador";
 
+  if (versao === "distrato_assinado") {
+    return `Distrato - ${pessoa} (Assinado).pdf`;
+  }
   if (versao === "distrato") {
     return `Distrato - ${pessoa}.pdf`;
   }

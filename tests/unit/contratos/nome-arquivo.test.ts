@@ -27,3 +27,30 @@ describe("nomeArquivoContrato", () => {
     expect(nomeArquivoContrato("", "123")).toBe("Contrato - Colaborador.pdf");
   });
 });
+
+/**
+ * A rescisão passou a ser assinada eletronicamente (migration 0035), então o
+ * termo existe em duas versões — a emitida e a assinada — e quem baixa precisa
+ * distinguir uma da outra pelo nome do arquivo, sem abrir.
+ */
+describe("nomeArquivoContrato — termo de distrato assinado", () => {
+  it("marca a via assinada do distrato", () => {
+    expect(nomeArquivoContrato("Guilherme Ribeiro", undefined, "distrato_assinado")).toBe(
+      "Distrato - Guilherme Ribeiro (Assinado).pdf",
+    );
+  });
+
+  it("mantém o termo emitido sem a marcação", () => {
+    expect(nomeArquivoContrato("Guilherme Ribeiro", undefined, "distrato")).toBe(
+      "Distrato - Guilherme Ribeiro.pdf",
+    );
+  });
+
+  it("aplica a mesma limpeza de acento e caractere reservado", () => {
+    // Caractere reservado de filesystem e removido, nao trocado por espaco —
+    // comportamento ja existente, aqui so confirmado para a nova versao.
+    expect(nomeArquivoContrato('Ana "Çé" Sá/Lima', undefined, "distrato_assinado")).toBe(
+      "Distrato - Ana Ce SaLima (Assinado).pdf",
+    );
+  });
+});

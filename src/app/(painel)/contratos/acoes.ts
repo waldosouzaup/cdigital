@@ -620,9 +620,22 @@ export async function distratarContrato(
     return { ok: false, mensagem: "Não foi possível gerar o termo de distrato. Tente de novo." };
   }
 
+  // O hash do termo e o token de assinatura nascem junto com o PDF: a rota
+  // pública confere o SHA-256 antes de aceitar a assinatura, para que ninguém
+  // assine uma versão diferente da que leu na tela.
+  const termoSha256 = createHash("sha256").update(pdfBytes).digest("hex");
+  const tokenDistrato = randomBytes(24).toString("hex");
+
   await supabase
     .from("contratos")
-    .update({ caminho_termo_distrato: caminhoTermo })
+    .update({
+      caminho_termo_distrato: caminhoTermo,
+      termo_distrato_sha256: termoSha256,
+      token_assinatura_distrato: tokenDistrato,
+      assinatura_distrato_expira_em: new Date(
+        Date.now() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+    })
     .eq("id", contractId);
 
   const valorFormatado = formatarValorBRL(calculo.valorProporcional);
@@ -647,6 +660,7 @@ export async function distratarContrato(
         periodoTrabalhado: periodoFormatado,
         valorProporcional: valorFormatado,
         motivo: motivoLimpo,
+        tokenAssinatura: tokenDistrato,
       });
     } catch {
       // Disparo de notificação é secundário e não invalida o registro do distrato
@@ -656,9 +670,15 @@ export async function distratarContrato(
   return resultadoTransicao;
 }
 
-/** Fecha a cadeia do distrato (Seção 7: distratado → distrato_assinado) — mesma
- * marcação presencial simples de `marcarContratoAssinado`, sem upload de arquivo
- * novo (o termo em si já foi anexado em `distratarContrato`). */
+/**
+ * Fecha a cadeia do distrato (Seção 7: distratado → distrato_assinado) por
+ * marcação presencial da coordenação.
+ *
+ * Continua existindo como saída de exceção — quem assinou no papel, quem não tem
+ * e-mail. O caminho normal agora é a assinatura eletrônica em
+ * `/assinar-distrato/[token]`, que grava evidências; esta marcação não grava
+ * nenhuma, e por isso o evento registra que foi presencial.
+ */
 export async function marcarDistratoAssinado(contractId: string): Promise<ResultadoAcaoContrato> {
   return transicionarContrato({
     contractId,
@@ -728,6 +748,7 @@ async function dispararDistratoEnviado(params: {
   periodoTrabalhado: string;
   valorProporcional: string;
   motivo?: string;
+  tokenAssinatura?: string | null;
 }) {
   const { supabase, organizationId, contractId } = params;
   const baseUrl = process.env.APP_URL || "http://localhost:3000";
@@ -739,6 +760,9 @@ async function dispararDistratoEnviado(params: {
     periodoTrabalhado: params.periodoTrabalhado,
     valorProporcional: params.valorProporcional,
     motivo: params.motivo,
+    urlAssinatura: params.tokenAssinatura
+      ? `${baseUrl}/assinar-distrato/${params.tokenAssinatura}`
+      : undefined,
     urlContato: baseUrl,
   });
 
@@ -765,7 +789,9 @@ export async function enviarDistratoPorEmail(contractId: string): Promise<Result
 
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("status, objeto, valor, vigencia_inicio, vigencia_fim, pessoas ( nome_completo, email )")
+    .select(
+      "status, objeto, valor, vigencia_inicio, vigencia_fim, token_assinatura_distrato, assinatura_distrato_expira_em, pessoas ( nome_completo, email )",
+    )
     .eq("id", contractId)
     .maybeSingle<{
       status: string;
@@ -773,6 +799,8 @@ export async function enviarDistratoPorEmail(contractId: string): Promise<Result
       valor: string;
       vigencia_inicio: string;
       vigencia_fim: string;
+      token_assinatura_distrato: string | null;
+      assinatura_distrato_expira_em: string | null;
       pessoas: { nome_completo: string; email: string | null } | null;
     }>();
 
@@ -792,6 +820,31 @@ export async function enviarDistratoPorEmail(contractId: string): Promise<Result
     .order("criado_em", { ascending: false })
     .limit(1);
 
+  // Reenvio manual precisa de uma capacidade válida: o token original pode ter
+  // vencido desde o distrato. Sem isto, o segundo e-mail chegaria com um link
+  // morto — pior que chegar sem link nenhum.
+  let tokenAssinatura = contrato.token_assinatura_distrato;
+  const tokenVencido =
+    !contrato.assinatura_distrato_expira_em ||
+    new Date(contrato.assinatura_distrato_expira_em).getTime() <= Date.now();
+
+  if (contrato.status === "distratado" && (!tokenAssinatura || tokenVencido)) {
+    const novoToken = randomBytes(24).toString("hex");
+    const { data: renovado } = await supabase
+      .from("contratos")
+      .update({
+        token_assinatura_distrato: novoToken,
+        assinatura_distrato_expira_em: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+      })
+      .eq("id", contractId)
+      .eq("status", "distratado")
+      .select("id")
+      .maybeSingle();
+    if (renovado) tokenAssinatura = novoToken;
+  }
+
   const observacao = eventos?.[0]?.observacao ?? "";
   const dataDistrato = eventos?.[0]?.criado_em
     ? formatarDataBR(eventos[0].criado_em.split("T")[0])
@@ -809,6 +862,8 @@ export async function enviarDistratoPorEmail(contractId: string): Promise<Result
       periodoTrabalhado: "Conforme apurado no termo de rescisão",
       valorProporcional: "Conforme termo de rescisão",
       motivo: observacao,
+      // Já assinado não recebe pedido de assinatura de novo.
+      tokenAssinatura: contrato.status === "distratado" ? tokenAssinatura : null,
     });
 
     return envio?.sent

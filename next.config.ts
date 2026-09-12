@@ -24,6 +24,23 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Telas de assinatura eletrônica: documento com valor jurídico sendo
+        // aceito por clique. Embarcar isso em iframe de terceiro é clickjacking
+        // com consequência contratual.
+        source: "/assinar/:token*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        ],
+      },
+      {
+        source: "/assinar-distrato/:token*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        ],
+      },
+      {
         source: "/candidado-eleicao-2026",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },

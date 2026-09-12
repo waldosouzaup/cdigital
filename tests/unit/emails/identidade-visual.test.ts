@@ -4,6 +4,7 @@ import { renderizarEmailCadastroRecebido } from "@/emails/cadastro-recebido";
 import { renderizarEmailContratoAssinado } from "@/emails/contrato-assinado";
 import { renderizarEmailContratoEnviado } from "@/emails/contrato-enviado";
 import { renderizarEmailConviteUsuario } from "@/emails/convite-usuario";
+import { renderizarEmailDistratoAssinado } from "@/emails/distrato-assinado";
 import { renderizarEmailDistratoEnviado } from "@/emails/distrato-enviado";
 import { renderizarEmailDocumentoRejeitado } from "@/emails/documento-rejeitado";
 import { renderizarEmailLembreteAssinatura } from "@/emails/lembrete-assinatura";
@@ -13,7 +14,7 @@ import { renderizarEmailResumoDiario } from "@/emails/resumo-diario";
 import { renderizarEmailVigenciaAVencer } from "@/emails/vigencia-a-vencer";
 
 /**
- * Os onze avisos que saem para pessoa de fora do sistema precisam parecer o
+ * Os doze avisos que saem para pessoa de fora do sistema precisam parecer o
  * mesmo remetente. Antes metade era texto cru sem nenhuma marca e a outra metade
  * repetia cabeçalho e cores digitados à mão, já divergentes entre si.
  *
@@ -75,6 +76,20 @@ const TEMPLATES: Array<{ tipo: string; render: () => Promise<{ subject: string; 
         periodoTrabalhado: "01/08 a 12/08 (12/31 dias)",
         valorProporcional: "R$ 580,65",
         motivo: "acordo entre as partes",
+        urlContato: "https://exemplo.com",
+      }),
+  },
+  {
+    tipo: "distrato_assinado",
+    render: () =>
+      renderizarEmailDistratoAssinado({
+        primeiroNome: "Maria",
+        objeto: "Militância",
+        dataAssinatura: "12/08/2026 às 14:22",
+        periodoTrabalhado: "01/08 a 12/08 (12/31 dias)",
+        valorProporcional: "R$ 580,65",
+        urlTermoAssinado: "https://exemplo.com/assinar-distrato/abc",
+        urlDownloadPdf: "https://exemplo.com/p.pdf",
         urlContato: "https://exemplo.com",
       }),
   },
