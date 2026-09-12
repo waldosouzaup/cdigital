@@ -16,6 +16,7 @@ export type NotificationType =
   | "contrato_enviado"
   | "lembrete_assinatura"
   | "vigencia_a_vencer"
+  | "documento_a_vencer"
   | "resumo_diario"
   | "pessoa_apta"
   | "distrato_enviado"

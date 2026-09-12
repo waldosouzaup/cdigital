@@ -99,6 +99,9 @@ export function DocumentosCliente({
   const [colaboradorSelecionado, setColaboradorSelecionado] = useState<ColaboradorAgrupado | null>(null);
   const [docSelecionado, setDocSelecionado] = useState<DocumentoListado | null>(null);
   const [modalConferenciaAberto, setModalConferenciaAberto] = useState(false);
+  // Validade por documento (migration 0040). Mapa por id porque o modal mostra
+  // vários documentos da mesma pessoa ao mesmo tempo.
+  const [validadePorDoc, setValidadePorDoc] = useState<Record<string, string>>({});
   const [carregandoDocId, setCarregandoDocId] = useState<string | null>(null);
 
   // Modal 1: Rejeição
@@ -212,7 +215,10 @@ export function DocumentosCliente({
 
   async function handleAprovar(doc: DocumentoListado) {
     setProcessando(doc.id);
-    const resultado = await aprovarDocumentoEGerarContrato(doc.id);
+    const resultado = await aprovarDocumentoEGerarContrato(
+      doc.id,
+      validadePorDoc[doc.id] || null,
+    );
     setProcessando(null);
     setModalConferenciaAberto(false);
 
@@ -943,7 +949,25 @@ export function DocumentosCliente({
                           <span className="text-seal font-mono text-xs">↗</span>
                         </button>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {doc.status !== "aprovado" && (
+                            <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+                              <span>Vence em</span>
+                              <input
+                                type="date"
+                                id={`validade-${doc.id}`}
+                                value={validadePorDoc[doc.id] ?? ""}
+                                onChange={(e) =>
+                                  setValidadePorDoc((atual) => ({
+                                    ...atual,
+                                    [doc.id]: e.target.value,
+                                  }))
+                                }
+                                className="rounded border border-line bg-canvas px-1.5 py-0.5 font-mono text-xs text-ink"
+                                title="Opcional. Preencha para documento com prazo — NR, ASO, treinamento, credencial."
+                              />
+                            </label>
+                          )}
                           {doc.status !== "aprovado" && (
                             <button
                               type="button"

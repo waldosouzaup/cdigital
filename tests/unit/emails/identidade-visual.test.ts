@@ -6,6 +6,7 @@ import { renderizarEmailContratoEnviado } from "@/emails/contrato-enviado";
 import { renderizarEmailConviteUsuario } from "@/emails/convite-usuario";
 import { renderizarEmailDistratoAssinado } from "@/emails/distrato-assinado";
 import { renderizarEmailDistratoEnviado } from "@/emails/distrato-enviado";
+import { renderizarEmailDocumentoAVencer } from "@/emails/documento-a-vencer";
 import { renderizarEmailDocumentoRejeitado } from "@/emails/documento-rejeitado";
 import { renderizarEmailLembreteAssinatura } from "@/emails/lembrete-assinatura";
 import { renderizarEmailLinkColeta } from "@/emails/link-coleta";
@@ -14,7 +15,7 @@ import { renderizarEmailResumoDiario } from "@/emails/resumo-diario";
 import { renderizarEmailVigenciaAVencer } from "@/emails/vigencia-a-vencer";
 
 /**
- * Os doze avisos que saem para pessoa de fora do sistema precisam parecer o
+ * Os treze avisos que saem para pessoa de fora do sistema precisam parecer o
  * mesmo remetente. Antes metade era texto cru sem nenhuma marca e a outra metade
  * repetia cabeçalho e cores digitados à mão, já divergentes entre si.
  *
@@ -91,6 +92,17 @@ const TEMPLATES: Array<{ tipo: string; render: () => Promise<{ subject: string; 
         urlTermoAssinado: "https://exemplo.com/assinar-distrato/abc",
         urlDownloadPdf: "https://exemplo.com/p.pdf",
         urlContato: "https://exemplo.com",
+      }),
+  },
+  {
+    tipo: "documento_a_vencer",
+    render: () =>
+      renderizarEmailDocumentoAVencer({
+        nomePessoa: "Maria Souza",
+        tipoDocumento: "NR-35 — Trabalho em altura",
+        validoAte: "12/10/2026",
+        diasRestantes: 30,
+        urlDocumentos: "https://exemplo.com/documentos",
       }),
   },
   {

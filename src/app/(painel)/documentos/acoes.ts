@@ -63,16 +63,38 @@ function formatarDataBR(isoDate: string): string {
 
 export async function aprovarDocumentoEGerarContrato(
   documentoId: string,
+  /**
+   * Vencimento do documento no formato ISO (migration 0040). Opcional: a maioria
+   * não vence. Data passada é recusada — aprovar como válido algo já vencido
+   * seria registrar uma conformidade que não existe.
+   */
+  validoAte?: string | null,
 ): Promise<ResultadoAcaoDocumento> {
   const supabase = await createClient();
   const { organizationId, userId, papel } = await obterContextoUsuario(supabase);
   if (!organizationId) return { ok: false, mensagem: "Sessão inválida — faça login novamente." };
   if (!PAPEIS_TRIAGEM.includes(papel ?? "")) return { ok: false, mensagem: RECUSA_PAPEL };
 
+  const validade = (validoAte ?? "").trim();
+  if (validade) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(validade)) {
+      return { ok: false, mensagem: "Data de validade inválida." };
+    }
+    const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(
+      new Date(),
+    );
+    if (validade < hoje) {
+      return {
+        ok: false,
+        mensagem: "A validade informada já passou. Peça um documento dentro do prazo.",
+      };
+    }
+  }
+
   // 1. Aprova o documento
   const { data: documento, error: erroDoc } = await supabase
     .from("documentos")
-    .update({ status: "aprovado", motivo_rejeicao: null })
+    .update({ status: "aprovado", motivo_rejeicao: null, valido_ate: validade || null })
     .eq("id", documentoId)
     .select("id, pessoa_id")
     .single();
@@ -388,8 +410,11 @@ export async function aprovarDocumentoEGerarContrato(
   };
 }
 
-export async function aprovarDocumento(documentoId: string): Promise<ResultadoAcaoDocumento> {
-  return aprovarDocumentoEGerarContrato(documentoId);
+export async function aprovarDocumento(
+  documentoId: string,
+  validoAte?: string | null,
+): Promise<ResultadoAcaoDocumento> {
+  return aprovarDocumentoEGerarContrato(documentoId, validoAte);
 }
 
 export async function rejeitarDocumento(

@@ -79,6 +79,7 @@ export const notificationTypeEnum = pgEnum("tipo_notificacao", [
   "contrato_enviado",
   "lembrete_assinatura",
   "vigencia_a_vencer",
+  "documento_a_vencer",
   "resumo_diario",
   "pessoa_apta",
   "distrato_enviado",
@@ -600,6 +601,9 @@ export const documents = pgTable(
     bytes: bigint("bytes", { mode: "number" }),
     status: documentStatusEnum("status").notNull().default("pendente"),
     rejectionReason: text("motivo_rejeicao"),
+    // Vencimento (migration 0040). Nulo = não vence. Documento aprovado e
+    // vencido deixa de valer como comprovação.
+    validUntil: date("valido_ate"),
     version: integer("versao").notNull().default(1),
     // Fase 4, item 6: marca o documento cujo objeto no Storage já foi apagado
     // pela política de retenção. O registro do expurgo fica em `expurgos`.

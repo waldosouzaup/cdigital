@@ -12,9 +12,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EmailTransport } from "@/lib/notificacoes/transporte";
 import { sendNotification } from "@/lib/notificacoes/enviar";
 import { idempotencyKey } from "@/lib/notificacoes/chave-idempotencia";
-import { contratosAVencer, contratosParaLembrete, ehDiaUtil } from "./selecao";
+import {
+  contratosAVencer,
+  contratosParaLembrete,
+  documentosAVencer,
+  ehDiaUtil,
+  PRAZOS_DOCUMENTO_DIAS,
+} from "./selecao";
 import { baseUrlApp, primeiroNome } from "./rota";
 import { renderizarEmailVigenciaAVencer } from "@/emails/vigencia-a-vencer";
+import { renderizarEmailDocumentoAVencer } from "@/emails/documento-a-vencer";
 import { renderizarEmailLembreteAssinatura } from "@/emails/lembrete-assinatura";
 import { renderizarEmailResumoDiario } from "@/emails/resumo-diario";
 
@@ -373,4 +380,93 @@ export async function jobResumoDiario(deps: DepsBase & { agora: Date }): Promise
   }
 
   return { referencia: hoje, enviados, duplicados };
+}
+
+
+export interface ResultadoDocumentoAVencer {
+  enviados: number;
+  duplicados: number;
+  semDestinatario: number;
+}
+
+/**
+ * Documento aprovado chegando ao vencimento (migration 0040).
+ *
+ * Roda pendurado na mesma rota do job de vigência, de propósito: é o mesmo
+ * ritmo diário e a mesma pergunta ("o que vence em breve?"), e assim não é
+ * preciso registrar uma segunda entrada no pg_cron nem manter dois agendamentos
+ * que podem divergir.
+ */
+export async function jobDocumentoAVencer(
+  deps: DepsBase & { hoje: string },
+): Promise<ResultadoDocumentoAVencer> {
+  const { supabase, transport, hoje } = deps;
+
+  // Janela estreita pelo maior prazo, como no job de contratos: sem isso a
+  // consulta traria todo documento aprovado com validade da base.
+  const janelaFim = somarDias(hoje, Math.max(...PRAZOS_DOCUMENTO_DIAS));
+  const { data: documentos, error } = await supabase
+    .from("documentos")
+    .select("id, organizacao_id, tipo, status, valido_ate, pessoas ( nome_completo )")
+    .eq("status", "aprovado")
+    .not("valido_ate", "is", null)
+    .gte("valido_ate", hoje)
+    .lte("valido_ate", janelaFim);
+  if (error) throw new Error("falha ao ler documentos");
+
+  const aVencer = documentosAVencer(
+    (documentos ?? []).map((d) => ({ id: d.id, status: d.status, validoAte: d.valido_ate })),
+    hoje,
+    PRAZOS_DOCUMENTO_DIAS,
+  );
+
+  const { data: destinatarios } = await supabase
+    .from("usuarios")
+    .select("email, organizacao_id, papel")
+    .in("papel", ["gestor", "coord_comite"]);
+
+  const urlDocumentos = `${baseUrlApp()}/documentos`;
+  let enviados = 0;
+  let duplicados = 0;
+  let semDestinatario = 0;
+
+  for (const { documentoId, prazo } of aVencer) {
+    const documento = (documentos ?? []).find((d) => d.id === documentoId)!;
+    const alvos = (destinatarios ?? []).filter(
+      (u) => u.organizacao_id === documento.organizacao_id && u.email,
+    );
+    if (alvos.length === 0) {
+      semDestinatario += 1;
+      continue;
+    }
+
+    const pessoa = Array.isArray(documento.pessoas) ? documento.pessoas[0] : documento.pessoas;
+    const email = await renderizarEmailDocumentoAVencer({
+      nomePessoa: pessoa?.nome_completo ?? "—",
+      tipoDocumento: documento.tipo,
+      validoAte: documento.valido_ate.split("-").reverse().join("/"),
+      diasRestantes: prazo,
+      urlDocumentos,
+    });
+
+    for (const alvo of alvos) {
+      const r = await sendNotification({
+        supabase,
+        transport,
+        organizationId: documento.organizacao_id,
+        type: "documento_a_vencer",
+        recipientEmail: alvo.email,
+        entity: "documentos",
+        entityId: documentoId,
+        idempotencyKey: idempotencyKey("documento_a_vencer", documentoId, `${prazo}d`, alvo.email),
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+      if (r.sent) enviados += 1;
+      else if (r.reason === "duplicate") duplicados += 1;
+    }
+  }
+
+  return { enviados, duplicados, semDestinatario };
 }

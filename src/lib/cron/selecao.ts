@@ -75,3 +75,50 @@ export function deveReprocessarNotificacao(
 ): boolean {
   return notificacao.status === "falhou" && notificacao.tentativas < maxTentativas;
 }
+
+/**
+ * Prazos de aviso de vencimento de documento. Mais folgado que o de contrato
+ * (7 e 3): renovar um ASO ou uma NR depende de agendar exame ou curso, o que
+ * não se resolve em três dias.
+ */
+export const PRAZOS_DOCUMENTO_DIAS = [30, 7];
+
+export interface DocumentoValidade {
+  id: string;
+  status: string;
+  validoAte: string | null;
+}
+
+/**
+ * Documentos a exatamente N dias do vencimento, para cada N em `prazos`.
+ *
+ * Espelha `contratosAVencer` de propósito: mesmo formato de retorno e mesma
+ * regra de "exatamente N dias", para que o aviso saia uma vez por prazo em vez
+ * de todo dia da janela — e para que a chave de idempotência funcione igual
+ * (`documento_a_vencer:{id}:30d`).
+ *
+ * Só documento aprovado entra: pendente ainda vai ser conferido e rejeitado já
+ * não vale. Documento já vencido também fica de fora — o aviso é preventivo, e
+ * cobrar depois do prazo é ruído para quem não pode mais agir a tempo.
+ */
+export function documentosAVencer(
+  documentos: DocumentoValidade[],
+  hojeIso: string,
+  prazos: number[],
+): { documentoId: string; prazo: number }[] {
+  const resultado: { documentoId: string; prazo: number }[] = [];
+
+  for (const documento of documentos) {
+    if (documento.status !== "aprovado") continue;
+    if (!documento.validoAte) continue;
+
+    const restam = diasEntre(hojeIso, documento.validoAte);
+    if (restam < 0) continue;
+
+    for (const prazo of prazos) {
+      if (restam === prazo) resultado.push({ documentoId: documento.id, prazo });
+    }
+  }
+
+  return resultado;
+}
